@@ -23,13 +23,14 @@ SCHEMA_VERSION = 1
 
 # kind -> endpoint paths. `enumerate` lists code entries; `code` reads source+version;
 # `create` makes a new entry; `update` saves an existing one (needs current version).
+# Only app and driver are exposed: their code endpoints were verified live (see
+# reference/endpoints.md). Library create/update endpoints are not grounded on real
+# hardware, so `library` deploy/pull is deliberately out of the contract until it is.
 _PATHS = {
     "app": {"enumerate": "/hub2/userAppTypes", "code": "/app/ajax/code",
             "create": "/app/save", "update": "/app/ajax/update", "editor": "/app/editor/"},
     "driver": {"enumerate": "/hub2/userDeviceTypes", "code": "/driver/ajax/code",
                "create": "/driver/save", "update": "/driver/ajax/update", "editor": "/driver/editor/"},
-    "library": {"enumerate": "/hub2/userLibraries", "code": "/library/ajax/code",
-                "create": "/library/save", "update": "/library/ajax/update", "editor": "/library/editor/"},
 }
 
 KINDS = tuple(_PATHS)

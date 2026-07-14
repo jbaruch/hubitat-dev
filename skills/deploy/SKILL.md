@@ -11,7 +11,7 @@ This replaces the copy-paste-into-the-browser loop. Code operations are per-hub 
 
 ## Step 1 — Identify the target
 
-Confirm: the source file, the `kind` (`app`, `driver`, or `library`), the target hub (a `hubs.json` name via `--hub`, or an `--ip`), and whether this is a new entry or an update to an existing one. If updating an existing entry whose id is unknown, it is matched by the `name` in the source's `definition`.
+Confirm: the source file, the `kind` (`app` or `driver`), the target hub (a `hubs.json` name via `--hub`, or an `--ip`), and whether this is a new entry or an update to an existing one. If updating an existing entry whose id is unknown, it is matched by the `name` in the source's `definition`.
 
 Proceed to Step 2.
 

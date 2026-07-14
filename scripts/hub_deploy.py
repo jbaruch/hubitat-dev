@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Deploy an app/driver/library's Groovy source to a Hubitat hub (create or update).
+"""Deploy an app or driver's Groovy source to a Hubitat hub (create or update).
 
 Thin CLI over hubclient.HubClient. If --id is given (or --name matches an existing entry),
 it updates that entry with optimistic concurrency — the hub's current version is fetched

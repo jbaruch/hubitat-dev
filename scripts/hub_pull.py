@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Pull an app/driver/library's source and version from a Hubitat hub.
+"""Pull an app or driver's source and version from a Hubitat hub.
 
 Thin CLI over hubclient.HubClient (which carries the tested logic). Resolves the target
 by --id or by --name (enumerated match). With --out, writes the Groovy there and prints
