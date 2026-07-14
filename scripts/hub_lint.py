@@ -260,7 +260,7 @@ def main(argv=None) -> int:
     try:
         allowed = _load_allowed_imports(Path(args.allowed_imports))
         required = _load_required_commands(Path(args.capabilities))
-    except OSError as e:
+    except (OSError, json.JSONDecodeError) as e:
         print(f"cannot read reference data: {e}", file=sys.stderr)
         return 2
 

@@ -166,5 +166,25 @@ class TestStripping(unittest.TestCase):
         self.assertEqual(f[0]["line"], 3)
 
 
+class TestMainErrorPaths(unittest.TestCase):
+    def test_malformed_capabilities_returns_nonzero(self):
+        import io
+        import tempfile
+        from contextlib import redirect_stderr
+        with tempfile.TemporaryDirectory() as d:
+            from pathlib import Path as _P
+            src = _P(d) / "d.groovy"
+            src.write_text("def on() {}")
+            bad = _P(d) / "caps.json"
+            bad.write_text("{ not json")
+            allow = _P(d) / "allow.txt"
+            allow.write_text("java.util.ArrayList\n")
+            err = io.StringIO()
+            with redirect_stderr(err):
+                rc = hub_lint.main([str(src), "--capabilities", str(bad), "--allowed-imports", str(allow)])
+            self.assertEqual(rc, 2)
+            self.assertIn("reference data", err.getvalue())
+
+
 if __name__ == "__main__":
     unittest.main()

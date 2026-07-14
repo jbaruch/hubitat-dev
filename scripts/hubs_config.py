@@ -114,7 +114,7 @@ def main(argv=None) -> int:
             cfg = remove_hub(load(path), args.name)
         else:  # list / validate
             cfg = load(path)
-    except (ValueError, FileNotFoundError, json.JSONDecodeError) as e:
+    except (ValueError, OSError, json.JSONDecodeError) as e:
         print(str(e), file=sys.stderr)
         return 1
 
