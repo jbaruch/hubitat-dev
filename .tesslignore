@@ -1,19 +1,10 @@
 # Files excluded from the published plugin (present in the repo, not shipped).
 .git/
-.github/
 .gitignore
 .tesslignore
 .tessl/
-tessl.json
-.claude/
-.codex/
-.gemini/
-.vscode/
-.mcp.json
-CHANGELOG.md
-evals/
-scripts/**/tests/
 scratch/
+scripts/**/tests/
 __pycache__/
 *.pyc
 .DS_Store
