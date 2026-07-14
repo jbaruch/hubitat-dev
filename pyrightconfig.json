@@ -1,0 +1,11 @@
+{
+  "include": ["scripts"],
+  "exclude": ["**/__pycache__", "scratch"],
+  "typeCheckingMode": "standard",
+  "executionEnvironments": [
+    {
+      "root": "scripts",
+      "extraPaths": ["scripts"]
+    }
+  ]
+}

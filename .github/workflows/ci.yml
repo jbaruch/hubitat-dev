@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+        with:
+          python-version: "3.11"
+      - name: Install dev tooling
+        run: pip install -r requirements-dev.txt
+      - name: Pyright (zero-findings gate)
+        run: pyright scripts/
+      - name: Unit tests
+        run: python -m unittest discover -s scripts/tests -p 'test_*.py'
+
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+      - name: Install Tessl CLI
+        uses: tesslio/setup-tessl@25ec223fc0da33b41b8044ff5ab2b85235f4f91e # v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+      - name: Plugin lint
+        run: tessl plugin lint
+      - name: Skill review (changed only, threshold 85)
+        uses: jbaruch/coding-policy/.github/actions/skill-review@2d30094f068c6793b572e8fd802c598cc442a4c0 # main @ 2026-07-14
+        with:
+          threshold: "85"

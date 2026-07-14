@@ -1,19 +1,15 @@
 # Files excluded from the published plugin (present in the repo, not shipped).
 .git/
-.github/
 .gitignore
 .tesslignore
 .tessl/
-tessl.json
-.claude/
-.codex/
-.gemini/
-.vscode/
-.mcp.json
-CHANGELOG.md
-evals/
-scripts/**/tests/
 scratch/
+scripts/**/tests/
 __pycache__/
 *.pyc
 .DS_Store
+# CI / dev-only artifacts — not part of the plugin surface (MCP config files stay packageable)
+.github/workflows/
+.github/dependabot.yml
+requirements-dev.txt
+pyrightconfig.json

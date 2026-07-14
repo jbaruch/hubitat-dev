@@ -1,5 +1,5 @@
 {
-  "name": "hubitat-dev",
+  "name": "jbaruch/hubitat-dev",
   "mode": "vendored",
   "dependencies": {
     "jbaruch/coding-policy": {

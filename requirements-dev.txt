@@ -1,0 +1,3 @@
+# Dev/CI tooling. Runtime scripts are stdlib-only; this is only for the CI gates.
+# Renewed via .github/dependabot.yml (pip ecosystem).
+pyright==1.1.408
