@@ -1,0 +1,2702 @@
+{
+  "_meta": {
+    "source": "https://docs2.hubitat.com/en/developer/driver/capability-list",
+    "verified_platform": "2.5.1.125",
+    "verified_date": "2026-07-14",
+    "count": 102,
+    "note": "Parsed from the authoritative capability list. Marker capabilities (Actuator, Sensor) carry no attributes/commands. A driver declaring a capability must implement a Groovy method for each required command."
+  },
+  "capabilities": {
+    "AccelerationSensor": {
+      "capability": "AccelerationSensor",
+      "selector": "capability.accelerationSensor",
+      "attributes": [
+        {
+          "name": "acceleration",
+          "type": "ENUM [\"inactive\", \"active\"]"
+        }
+      ],
+      "commands": []
+    },
+    "Actuator": {
+      "capability": "Actuator",
+      "selector": "capability.actuator",
+      "attributes": [],
+      "commands": []
+    },
+    "AirQuality": {
+      "capability": "AirQuality",
+      "selector": "capability.airQuality",
+      "attributes": [],
+      "commands": []
+    },
+    "Alarm": {
+      "capability": "Alarm",
+      "selector": "capability.alarm",
+      "attributes": [
+        {
+          "name": "alarm",
+          "type": "ENUM [\"strobe\", \"off\", \"both\", \"siren\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "both()",
+          "name": "both",
+          "params": []
+        },
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "siren()",
+          "name": "siren",
+          "params": []
+        },
+        {
+          "signature": "strobe()",
+          "name": "strobe",
+          "params": []
+        }
+      ]
+    },
+    "AudioNotification": {
+      "capability": "AudioNotification",
+      "selector": "capability.audioNotification",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "playText(text, volumelevel)",
+          "name": "playText",
+          "params": [
+            {
+              "name": "text",
+              "required": true,
+              "type": "STRING",
+              "desc": "Text to play"
+            },
+            {
+              "name": "volumelevel",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "Volume level (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "playTextAndRestore(text, volumelevel)",
+          "name": "playTextAndRestore",
+          "params": [
+            {
+              "name": "text",
+              "required": true,
+              "type": "STRING",
+              "desc": "Text to play"
+            },
+            {
+              "name": "volumelevel",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "Volume level (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "playTextAndResume(text, volumelevel)",
+          "name": "playTextAndResume",
+          "params": [
+            {
+              "name": "text",
+              "required": true,
+              "type": "STRING",
+              "desc": "Text to play"
+            }
+          ]
+        },
+        {
+          "signature": "playTrack(trackuri, volumelevel)",
+          "name": "playTrack",
+          "params": [
+            {
+              "name": "trackuri",
+              "required": true,
+              "type": "STRING",
+              "desc": "URI/URL of track to play"
+            },
+            {
+              "name": "volumelevel",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "Volume level (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "playTrackAndRestore(trackuri, volumelevel)",
+          "name": "playTrackAndRestore",
+          "params": [
+            {
+              "name": "trackuri",
+              "required": true,
+              "type": "STRING",
+              "desc": "URI/URL of track to play"
+            },
+            {
+              "name": "volumelevel",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "Volume level (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "playTrackAndResume(trackuri, volumelevel)",
+          "name": "playTrackAndResume",
+          "params": [
+            {
+              "name": "trackuri",
+              "required": true,
+              "type": "STRING",
+              "desc": "URI/URL of track to play"
+            },
+            {
+              "name": "volumelevel",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "Volume level (0 to 100)"
+            }
+          ]
+        }
+      ]
+    },
+    "AudioVolume": {
+      "capability": "AudioVolume",
+      "selector": "capability.audioVolume",
+      "attributes": [
+        {
+          "name": "mute",
+          "type": "ENUM [\"unmuted\", \"muted\"]"
+        },
+        {
+          "name": "volume",
+          "type": "NUMBER, unit:%"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "mute()",
+          "name": "mute",
+          "params": []
+        },
+        {
+          "signature": "setVolume(volumelevel)",
+          "name": "setVolume",
+          "params": [
+            {
+              "name": "volumelevel",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Volume level (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "unmute()",
+          "name": "unmute",
+          "params": []
+        },
+        {
+          "signature": "volumeDown()",
+          "name": "volumeDown",
+          "params": []
+        },
+        {
+          "signature": "volumeUp()",
+          "name": "volumeUp",
+          "params": []
+        }
+      ]
+    },
+    "Battery": {
+      "capability": "Battery",
+      "selector": "capability.battery",
+      "attributes": [
+        {
+          "name": "battery",
+          "type": "NUMBER, unit:%"
+        }
+      ],
+      "commands": []
+    },
+    "Beacon": {
+      "capability": "Beacon",
+      "selector": "capability.beacon",
+      "attributes": [
+        {
+          "name": "presence",
+          "type": "ENUM [\"not present\", \"present\"]"
+        }
+      ],
+      "commands": []
+    },
+    "Bulb": {
+      "capability": "Bulb",
+      "selector": "capability.bulb",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "on()",
+          "name": "on",
+          "params": []
+        }
+      ]
+    },
+    "Button": {
+      "capability": "Button",
+      "selector": "capability.button",
+      "attributes": [
+        {
+          "name": "button",
+          "type": "NUMBER"
+        },
+        {
+          "name": "holdableButton",
+          "type": "ENUM [\"true\", \"false\"]"
+        },
+        {
+          "name": "numberOfButtons",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": []
+    },
+    "CarbonDioxideMeasurement": {
+      "capability": "CarbonDioxideMeasurement",
+      "selector": "capability.carbonDioxideMeasurement",
+      "attributes": [
+        {
+          "name": "carbonDioxide",
+          "type": "NUMBER, unit:ppm"
+        }
+      ],
+      "commands": []
+    },
+    "CarbonMonoxideDetector": {
+      "capability": "CarbonMonoxideDetector",
+      "selector": "capability.carbonMonoxideDetector",
+      "attributes": [
+        {
+          "name": "carbonMonoxide",
+          "type": "ENUM [\"clear\", \"tested\", \"detected\"]"
+        }
+      ],
+      "commands": []
+    },
+    "ChangeLevel": {
+      "capability": "ChangeLevel",
+      "selector": "capability.changeLevel",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "startLevelChange(direction)",
+          "name": "startLevelChange",
+          "params": [
+            {
+              "name": "direction",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Direction for level change request"
+            }
+          ]
+        },
+        {
+          "signature": "stopLevelChange()",
+          "name": "stopLevelChange",
+          "params": []
+        }
+      ]
+    },
+    "Chime": {
+      "capability": "Chime",
+      "selector": "capability.chime",
+      "attributes": [
+        {
+          "name": "soundEffects",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "soundName",
+          "type": "STRING"
+        },
+        {
+          "name": "status",
+          "type": "ENUM [\"playing\", \"stopped\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "playSound(soundnumber)",
+          "name": "playSound",
+          "params": [
+            {
+              "name": "soundnumber",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Sound number to play"
+            }
+          ]
+        },
+        {
+          "signature": "stop()",
+          "name": "stop",
+          "params": []
+        }
+      ]
+    },
+    "ColorControl": {
+      "capability": "ColorControl",
+      "selector": "capability.colorControl",
+      "attributes": [
+        {
+          "name": "RGB",
+          "type": "STRING"
+        },
+        {
+          "name": "color",
+          "type": "STRING"
+        },
+        {
+          "name": "colorName",
+          "type": "STRING"
+        },
+        {
+          "name": "hue",
+          "type": "NUMBER"
+        },
+        {
+          "name": "saturation",
+          "type": "NUMBER, unit:%"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setColor(colormap)",
+          "name": "setColor",
+          "params": [
+            {
+              "name": "colormap",
+              "required": true,
+              "type": "COLOR_MAP",
+              "desc": "Map of color settings in HSV/HSB format using keys hue, saturation, and (optionally) level:"
+            }
+          ]
+        },
+        {
+          "signature": "setHue(hue)",
+          "name": "setHue",
+          "params": [
+            {
+              "name": "hue",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Color hue (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "setSaturation(saturation)",
+          "name": "setSaturation",
+          "params": [
+            {
+              "name": "saturation",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Color saturation (0 to 100)"
+            }
+          ]
+        }
+      ]
+    },
+    "ColorMode": {
+      "capability": "ColorMode",
+      "selector": "capability.colorMode",
+      "attributes": [
+        {
+          "name": "colorMode",
+          "type": "ENUM [\"CT\", \"RGB\", \"EFFECTS\"]"
+        }
+      ],
+      "commands": []
+    },
+    "ColorTemperature": {
+      "capability": "ColorTemperature",
+      "selector": "capability.colorTemperature",
+      "attributes": [
+        {
+          "name": "colorName",
+          "type": "STRING"
+        },
+        {
+          "name": "colorTemperature",
+          "type": "NUMBER, unit:\u00b0K"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setColorTemperature(colortemperature, level, transitionTime)",
+          "name": "setColorTemperature",
+          "params": [
+            {
+              "name": "colortemperature",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Color temperature in degrees Kelvin"
+            },
+            {
+              "name": "level",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "level to set"
+            },
+            {
+              "name": "transitionTime",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "transition time to use in seconds"
+            }
+          ]
+        }
+      ]
+    },
+    "Configuration": {
+      "capability": "Configuration",
+      "selector": "capability.configuration",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "configure()",
+          "name": "configure",
+          "params": []
+        }
+      ]
+    },
+    "Consumable": {
+      "capability": "Consumable",
+      "selector": "capability.consumable",
+      "attributes": [
+        {
+          "name": "consumableStatus",
+          "type": "ENUM [\"missing\", \"order\", \"maintenance_required\", \"good\", \"replace\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setConsumableStatus(STRING)",
+          "name": "setConsumableStatus",
+          "params": [
+            {
+              "name": "STRING",
+              "required": false,
+              "type": "STRING",
+              "desc": "STRING"
+            }
+          ]
+        }
+      ]
+    },
+    "ContactSensor": {
+      "capability": "ContactSensor",
+      "selector": "capability.contactSensor",
+      "attributes": [
+        {
+          "name": "contact",
+          "type": "ENUM [\"closed\", \"open\"]"
+        }
+      ],
+      "commands": []
+    },
+    "CurrentMeter": {
+      "capability": "CurrentMeter",
+      "selector": "capability.currentMeter",
+      "attributes": [
+        {
+          "name": "amperage",
+          "type": "NUMBER, unit:A"
+        }
+      ],
+      "commands": []
+    },
+    "DoorControl": {
+      "capability": "DoorControl",
+      "selector": "capability.doorControl",
+      "attributes": [
+        {
+          "name": "door",
+          "type": "ENUM [\"unknown\", \"closed\", \"open\", \"closing\", \"opening\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "close()",
+          "name": "close",
+          "params": []
+        },
+        {
+          "signature": "open()",
+          "name": "open",
+          "params": []
+        }
+      ]
+    },
+    "DoubleTapableButton": {
+      "capability": "DoubleTapableButton",
+      "selector": "capability.doubleTapableButton",
+      "attributes": [
+        {
+          "name": "doubleTapped",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "doubleTap(buttonNumber)",
+          "name": "doubleTap",
+          "params": [
+            {
+              "name": "buttonNumber",
+              "required": true,
+              "type": "NUMBER",
+              "desc": ""
+            }
+          ]
+        }
+      ]
+    },
+    "EnergyMeter": {
+      "capability": "EnergyMeter",
+      "selector": "capability.energyMeter",
+      "attributes": [
+        {
+          "name": "energy",
+          "type": "NUMBER, unit:kWh"
+        }
+      ],
+      "commands": []
+    },
+    "EstimatedTimeOfArrival": {
+      "capability": "EstimatedTimeOfArrival",
+      "selector": "capability.estimatedTimeOfArrival",
+      "attributes": [
+        {
+          "name": "eta",
+          "type": "DATE"
+        }
+      ],
+      "commands": []
+    },
+    "FanControl": {
+      "capability": "FanControl",
+      "selector": "capability.fanControl",
+      "attributes": [
+        {
+          "name": "speed",
+          "type": "ENUM [\"low\",\"medium-low\",\"medium\",\"medium-high\",\"high\",\"on\",\"off\",\"auto\"]"
+        },
+        {
+          "name": "supportedFanSpeeds",
+          "type": "JSON_OBJECT"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setSpeed(fanspeed)",
+          "name": "setSpeed",
+          "params": [
+            {
+              "name": "fanspeed",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Fan speed to set"
+            }
+          ]
+        },
+        {
+          "signature": "cycleSpeed()",
+          "name": "cycleSpeed",
+          "params": []
+        }
+      ]
+    },
+    "FilterStatus": {
+      "capability": "FilterStatus",
+      "selector": "capability.filterStatus",
+      "attributes": [
+        {
+          "name": "filterStatus",
+          "type": "ENUM [\"normal\", \"replace\"]"
+        }
+      ],
+      "commands": []
+    },
+    "Flash": {
+      "capability": "Flash",
+      "selector": "capability.flash",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "flash(rateToFlash)",
+          "name": "flash",
+          "params": [
+            {
+              "name": "rateToFlash",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "Rate to flash in ms"
+            }
+          ]
+        }
+      ]
+    },
+    "GarageDoorControl": {
+      "capability": "GarageDoorControl",
+      "selector": "capability.garageDoorControl",
+      "attributes": [
+        {
+          "name": "door",
+          "type": "ENUM [\"unknown\", \"open\", \"closing\", \"closed\", \"opening\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "close()",
+          "name": "close",
+          "params": []
+        },
+        {
+          "signature": "open()",
+          "name": "open",
+          "params": []
+        }
+      ]
+    },
+    "GasDetector": {
+      "capability": "GasDetector",
+      "selector": "capability.gasDetector",
+      "attributes": [
+        {
+          "name": "naturalGas",
+          "type": "ENUM [\"clear\", \"tested\", \"detected\"]"
+        }
+      ],
+      "commands": []
+    },
+    "HealthCheck": {
+      "capability": "HealthCheck",
+      "selector": "capability.healthCheck",
+      "attributes": [
+        {
+          "name": "checkInterval",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "ping()",
+          "name": "ping",
+          "params": []
+        }
+      ]
+    },
+    "HoldableButton": {
+      "capability": "HoldableButton",
+      "selector": "capability.holdableButton",
+      "attributes": [
+        {
+          "name": "held",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "hold(buttonNumber)",
+          "name": "hold",
+          "params": [
+            {
+              "name": "buttonNumber",
+              "required": true,
+              "type": "NUMBER",
+              "desc": ""
+            }
+          ]
+        }
+      ]
+    },
+    "IlluminanceMeasurement": {
+      "capability": "IlluminanceMeasurement",
+      "selector": "capability.illuminanceMeasurement",
+      "attributes": [
+        {
+          "name": "illuminance",
+          "type": "NUMBER, unit:lx"
+        }
+      ],
+      "commands": []
+    },
+    "ImageCapture": {
+      "capability": "ImageCapture",
+      "selector": "capability.imageCapture",
+      "attributes": [
+        {
+          "name": "image",
+          "type": "STRING"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "take()",
+          "name": "take",
+          "params": []
+        }
+      ]
+    },
+    "Indicator": {
+      "capability": "Indicator",
+      "selector": "capability.indicator",
+      "attributes": [
+        {
+          "name": "indicatorStatus",
+          "type": "ENUM [\"never\", \"when on\", \"when off\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "indicatorNever()",
+          "name": "indicatorNever",
+          "params": []
+        },
+        {
+          "signature": "indicatorWhenOff()",
+          "name": "indicatorWhenOff",
+          "params": []
+        },
+        {
+          "signature": "indicatorWhenOn()",
+          "name": "indicatorWhenOn",
+          "params": []
+        }
+      ]
+    },
+    "Initialize": {
+      "capability": "Initialize",
+      "selector": "capability.initialize",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "initialize() - this method will run on system start on devices using capability \"Initialize\" (one common use is re-establishing telnet, websocket, or similar LAN connections for such devices)",
+          "name": "initialize",
+          "params": []
+        }
+      ]
+    },
+    "Light": {
+      "capability": "Light",
+      "selector": "capability.light",
+      "attributes": [
+        {
+          "name": "switch",
+          "type": "ENUM [\"on\", \"off\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "on()",
+          "name": "on",
+          "params": []
+        }
+      ]
+    },
+    "LightEffects": {
+      "capability": "LightEffects",
+      "selector": "capability.lightEffects",
+      "attributes": [
+        {
+          "name": "effectName",
+          "type": "STRING"
+        },
+        {
+          "name": "lightEffects",
+          "type": "JSON_OBJECT"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setEffect(effectnumber)",
+          "name": "setEffect",
+          "params": [
+            {
+              "name": "effectnumber",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Effect number to enable"
+            }
+          ]
+        },
+        {
+          "signature": "setNextEffect()",
+          "name": "setNextEffect",
+          "params": []
+        },
+        {
+          "signature": "setPreviousEffect()",
+          "name": "setPreviousEffect",
+          "params": []
+        }
+      ]
+    },
+    "LiquidFlowRate": {
+      "capability": "LiquidFlowRate",
+      "selector": "capability.liquidFlowRate",
+      "attributes": [
+        {
+          "name": "rate",
+          "type": "NUMBER, unit:LPM || GPM"
+        }
+      ],
+      "commands": []
+    },
+    "LocationMode": {
+      "capability": "LocationMode",
+      "selector": "capability.locationMode",
+      "attributes": [
+        {
+          "name": "mode",
+          "type": "DYNAMIC_ENUM"
+        }
+      ],
+      "commands": []
+    },
+    "Lock": {
+      "capability": "Lock",
+      "selector": "capability.lock",
+      "attributes": [
+        {
+          "name": "lock",
+          "type": "ENUM [\"locked\", \"unlocked with timeout\", \"unlocked\", \"unknown\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "lock()",
+          "name": "lock",
+          "params": []
+        },
+        {
+          "signature": "unlock()",
+          "name": "unlock",
+          "params": []
+        }
+      ]
+    },
+    "LockCodes": {
+      "capability": "LockCodes",
+      "selector": "capability.lockCodes",
+      "attributes": [
+        {
+          "name": "codeChanged",
+          "type": "ENUM [\"added\", \"changed\", \"deleted\", \"failed\"]"
+        },
+        {
+          "name": "codeLength",
+          "type": "NUMBER"
+        },
+        {
+          "name": "lockCodes",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "maxCodes",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "deleteCode(codeposition)",
+          "name": "deleteCode",
+          "params": [
+            {
+              "name": "codeposition",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Code position number to delete"
+            }
+          ]
+        },
+        {
+          "signature": "getCodes()",
+          "name": "getCodes",
+          "params": []
+        },
+        {
+          "signature": "setCode(codeposition, pincode, name)",
+          "name": "setCode",
+          "params": [
+            {
+              "name": "codeposition",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Code position number"
+            },
+            {
+              "name": "pincode",
+              "required": true,
+              "type": "STRING",
+              "desc": "Numeric PIN code"
+            },
+            {
+              "name": "name",
+              "required": false,
+              "type": "STRING",
+              "desc": "Name for this lock code"
+            }
+          ]
+        },
+        {
+          "signature": "setCodeLength(pincodelength)",
+          "name": "setCodeLength",
+          "params": [
+            {
+              "name": "pincodelength",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Maximum pin code lentgh for this lock"
+            }
+          ]
+        }
+      ]
+    },
+    "MediaController": {
+      "capability": "MediaController",
+      "selector": "capability.mediaController",
+      "attributes": [
+        {
+          "name": "activities",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "currentActivity",
+          "type": "STRING"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "getAllActivities()",
+          "name": "getAllActivities",
+          "params": []
+        },
+        {
+          "signature": "getCurrentActivity()",
+          "name": "getCurrentActivity",
+          "params": []
+        },
+        {
+          "signature": "startActivity(activityname)",
+          "name": "startActivity",
+          "params": [
+            {
+              "name": "activityname",
+              "required": true,
+              "type": "STRING",
+              "desc": "Name of media activity to start"
+            }
+          ]
+        }
+      ]
+    },
+    "MediaInputSource": {
+      "capability": "MediaInputSource",
+      "selector": "capability.mediaInputSource",
+      "attributes": [
+        {
+          "name": "supportedInputs",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "mediaInputSource",
+          "type": "STRING"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setInputSource(inputName)",
+          "name": "setInputSource",
+          "params": [
+            {
+              "name": "inputName",
+              "required": true,
+              "type": "STRING",
+              "desc": "Input to select"
+            }
+          ]
+        }
+      ]
+    },
+    "MediaTransport": {
+      "capability": "MediaTransport",
+      "selector": "capability.mediaTransport",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "play()",
+          "name": "play",
+          "params": []
+        },
+        {
+          "signature": "pause()",
+          "name": "pause",
+          "params": []
+        },
+        {
+          "signature": "stop()",
+          "name": "stop",
+          "params": []
+        }
+      ]
+    },
+    "Momentary": {
+      "capability": "Momentary",
+      "selector": "capability.momentary",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "push()",
+          "name": "push",
+          "params": []
+        }
+      ]
+    },
+    "MotionSensor": {
+      "capability": "MotionSensor",
+      "selector": "capability.motionSensor",
+      "attributes": [],
+      "commands": []
+    },
+    "MusicPlayer": {
+      "capability": "MusicPlayer",
+      "selector": "capability.musicPlayer",
+      "attributes": [
+        {
+          "name": "level",
+          "type": "NUMBER"
+        },
+        {
+          "name": "mute",
+          "type": "ENUM [\"unmuted\", \"muted\"]"
+        },
+        {
+          "name": "status",
+          "type": "STRING"
+        },
+        {
+          "name": "trackData",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "trackDescription",
+          "type": "STRING"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "mute()",
+          "name": "mute",
+          "params": []
+        },
+        {
+          "signature": "nextTrack()",
+          "name": "nextTrack",
+          "params": []
+        },
+        {
+          "signature": "pause()",
+          "name": "pause",
+          "params": []
+        },
+        {
+          "signature": "play()",
+          "name": "play",
+          "params": []
+        },
+        {
+          "signature": "playText(text)",
+          "name": "playText",
+          "params": [
+            {
+              "name": "text",
+              "required": true,
+              "type": "STRING",
+              "desc": "Text to play"
+            }
+          ]
+        },
+        {
+          "signature": "playTrack(trackuri)",
+          "name": "playTrack",
+          "params": [
+            {
+              "name": "trackuri",
+              "required": true,
+              "type": "STRING",
+              "desc": "URI/URL of track to play"
+            }
+          ]
+        },
+        {
+          "signature": "previousTrack()",
+          "name": "previousTrack",
+          "params": []
+        },
+        {
+          "signature": "restoreTrack(trackuri)",
+          "name": "restoreTrack",
+          "params": [
+            {
+              "name": "trackuri",
+              "required": true,
+              "type": "STRING",
+              "desc": "URI/URL of track to restore"
+            }
+          ]
+        },
+        {
+          "signature": "resumeTrack(trackuri)",
+          "name": "resumeTrack",
+          "params": [
+            {
+              "name": "trackuri",
+              "required": true,
+              "type": "STRING",
+              "desc": "URI/URL of track to play"
+            }
+          ]
+        },
+        {
+          "signature": "setLevel(volumelevel)",
+          "name": "setLevel",
+          "params": [
+            {
+              "name": "volumelevel",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Volume level (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "setTrack(trackuri)",
+          "name": "setTrack",
+          "params": [
+            {
+              "name": "trackuri",
+              "required": true,
+              "type": "STRING",
+              "desc": "URI/URL of track to set"
+            }
+          ]
+        },
+        {
+          "signature": "stop()",
+          "name": "stop",
+          "params": []
+        },
+        {
+          "signature": "unmute()",
+          "name": "unmute",
+          "params": []
+        }
+      ]
+    },
+    "Notification": {
+      "capability": "Notification",
+      "selector": "capability.notification",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "deviceNotification(text)",
+          "name": "deviceNotification",
+          "params": []
+        }
+      ]
+    },
+    "Outlet": {
+      "capability": "Outlet",
+      "selector": "capability.outlet",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "on()",
+          "name": "on",
+          "params": []
+        }
+      ]
+    },
+    "Polling": {
+      "capability": "Polling",
+      "selector": "capability.polling",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "poll()",
+          "name": "poll",
+          "params": []
+        }
+      ]
+    },
+    "PowerMeter": {
+      "capability": "PowerMeter",
+      "selector": "capability.powerMeter",
+      "attributes": [
+        {
+          "name": "power",
+          "type": "NUMBER, unit:W"
+        }
+      ],
+      "commands": []
+    },
+    "PowerSource": {
+      "capability": "PowerSource",
+      "selector": "capability.powerSource",
+      "attributes": [
+        {
+          "name": "powerSource",
+          "type": "ENUM [\"battery\", \"dc\", \"mains\", \"unknown\"]"
+        }
+      ],
+      "commands": []
+    },
+    "PresenceSensor": {
+      "capability": "PresenceSensor",
+      "selector": "capability.presenceSensor",
+      "attributes": [
+        {
+          "name": "presence",
+          "type": "ENUM [\"present\", \"not present\"]"
+        }
+      ],
+      "commands": []
+    },
+    "PressureMeasurement": {
+      "capability": "PressureMeasurement",
+      "selector": "capability.pressureMeasurement",
+      "attributes": [
+        {
+          "name": "pressure",
+          "type": "NUMBER, unit: Pa || psi"
+        }
+      ],
+      "commands": []
+    },
+    "PushableButton": {
+      "capability": "PushableButton",
+      "selector": "capability.pushableButton",
+      "attributes": [
+        {
+          "name": "numberOfButtons",
+          "type": "NUMBER"
+        },
+        {
+          "name": "pushed",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "push(buttonNumber)",
+          "name": "push",
+          "params": [
+            {
+              "name": "buttonNumber",
+              "required": true,
+              "type": "NUMBER",
+              "desc": ""
+            }
+          ]
+        }
+      ]
+    },
+    "Refresh": {
+      "capability": "Refresh",
+      "selector": "capability.refresh",
+      "attributes": [],
+      "commands": []
+    },
+    "RelativeHumidityMeasurement": {
+      "capability": "RelativeHumidityMeasurement",
+      "selector": "capability.relativeHumidityMeasurement",
+      "attributes": [
+        {
+          "name": "humidity",
+          "type": "NUMBER, unit:%rh"
+        }
+      ],
+      "commands": []
+    },
+    "RelaySwitch": {
+      "capability": "RelaySwitch",
+      "selector": "capability.relaySwitch",
+      "attributes": [
+        {
+          "name": "switch",
+          "type": "ENUM [\"on\", \"off\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "on()",
+          "name": "on",
+          "params": []
+        }
+      ]
+    },
+    "ReleasableButton": {
+      "capability": "ReleasableButton",
+      "selector": "capability.releasableButton",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "release(buttonNumber)",
+          "name": "release",
+          "params": [
+            {
+              "name": "buttonNumber",
+              "required": true,
+              "type": "NUMBER",
+              "desc": ""
+            }
+          ]
+        }
+      ]
+    },
+    "SamsungTV": {
+      "capability": "SamsungTV",
+      "selector": "capability.samsungTV",
+      "attributes": [
+        {
+          "name": "messageButton",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "mute",
+          "type": "ENUM [\"muted\", \"unknown\", \"unmuted\"]"
+        },
+        {
+          "name": "pictureMode",
+          "type": "ENUM [\"unknown\", \"standard\", \"movie\", \"dynamic\"]"
+        },
+        {
+          "name": "soundMode",
+          "type": "ENUM [\"speech\", \"movie\", \"unknown\", \"standard\", \"music\"]"
+        },
+        {
+          "name": "switch",
+          "type": "ENUM [\"on\", \"off\"]"
+        },
+        {
+          "name": "volume",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "mute()",
+          "name": "mute",
+          "params": []
+        },
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "on()",
+          "name": "on",
+          "params": []
+        },
+        {
+          "signature": "setPictureMode(ENUM)",
+          "name": "setPictureMode",
+          "params": [
+            {
+              "name": "ENUM",
+              "required": false,
+              "type": "ENUM",
+              "desc": "ENUM"
+            }
+          ]
+        },
+        {
+          "signature": "setSoundMode(ENUM)",
+          "name": "setSoundMode",
+          "params": [
+            {
+              "name": "ENUM",
+              "required": false,
+              "type": "ENUM",
+              "desc": "ENUM"
+            }
+          ]
+        },
+        {
+          "signature": "setVolume(NUMBER)",
+          "name": "setVolume",
+          "params": [
+            {
+              "name": "NUMBER",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "NUMBER"
+            }
+          ]
+        },
+        {
+          "signature": "showMessage(STRING, STRING, STRING, STRING)",
+          "name": "showMessage",
+          "params": [
+            {
+              "name": "STRING",
+              "required": false,
+              "type": "STRING",
+              "desc": "STRING"
+            },
+            {
+              "name": "STRING",
+              "required": false,
+              "type": "STRING",
+              "desc": "STRING"
+            },
+            {
+              "name": "STRING",
+              "required": false,
+              "type": "STRING",
+              "desc": "STRING"
+            },
+            {
+              "name": "STRING",
+              "required": false,
+              "type": "STRING",
+              "desc": "STRING"
+            }
+          ]
+        },
+        {
+          "signature": "unmute()",
+          "name": "unmute",
+          "params": []
+        },
+        {
+          "signature": "volumeDown()",
+          "name": "volumeDown",
+          "params": []
+        },
+        {
+          "signature": "volumeUp()",
+          "name": "volumeUp",
+          "params": []
+        }
+      ]
+    },
+    "SecurityKeypad": {
+      "capability": "SecurityKeypad",
+      "selector": "capability.securityKeypad",
+      "attributes": [
+        {
+          "name": "codeChanged",
+          "type": "ENUM [\"added\", \"changed\", \"deleted\", \"failed\"]"
+        },
+        {
+          "name": "codeLength",
+          "type": "NUMBER"
+        },
+        {
+          "name": "lockCodes",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "maxCodes",
+          "type": "NUMBER"
+        },
+        {
+          "name": "securityKeypad",
+          "type": "ENUM [\"disarmed\", \"armed home\", \"armed away\", \"unknown\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "armAway()",
+          "name": "armAway",
+          "params": []
+        },
+        {
+          "signature": "armHome()",
+          "name": "armHome",
+          "params": []
+        },
+        {
+          "signature": "deleteCode(codeposition)",
+          "name": "deleteCode",
+          "params": [
+            {
+              "name": "codeposition",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Code position number to delete"
+            }
+          ]
+        },
+        {
+          "signature": "disarm()",
+          "name": "disarm",
+          "params": []
+        },
+        {
+          "signature": "getCodes()",
+          "name": "getCodes",
+          "params": []
+        },
+        {
+          "signature": "setCode(codeposition, pincode, name)",
+          "name": "setCode",
+          "params": [
+            {
+              "name": "codeposition",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Code position number"
+            },
+            {
+              "name": "pincode",
+              "required": true,
+              "type": "STRING",
+              "desc": "Numeric PIN code"
+            },
+            {
+              "name": "name",
+              "required": false,
+              "type": "STRING",
+              "desc": "Name for this lock code"
+            }
+          ]
+        },
+        {
+          "signature": "setCodeLength(pincodelength)",
+          "name": "setCodeLength",
+          "params": [
+            {
+              "name": "pincodelength",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Maximum pin code lentgh for this keypad"
+            }
+          ]
+        },
+        {
+          "signature": "setEntryDelay(entrancedelay)",
+          "name": "setEntryDelay",
+          "params": [
+            {
+              "name": "entrancedelay",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Entrance delay in seconds"
+            }
+          ]
+        },
+        {
+          "signature": "setExitDelay(exitdelay)",
+          "name": "setExitDelay",
+          "params": [
+            {
+              "name": "exitdelay",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Exit delay in seconds"
+            }
+          ]
+        }
+      ]
+    },
+    "Sensor": {
+      "capability": "Sensor",
+      "selector": "capability.sensor",
+      "attributes": [],
+      "commands": []
+    },
+    "ShockSensor": {
+      "capability": "ShockSensor",
+      "selector": "capability.shockSensor",
+      "attributes": [
+        {
+          "name": "shock",
+          "type": "ENUM [\"clear\", \"detected\"]"
+        }
+      ],
+      "commands": []
+    },
+    "SignalStrength": {
+      "capability": "SignalStrength",
+      "selector": "capability.signalStrength",
+      "attributes": [
+        {
+          "name": "lqi",
+          "type": "NUMBER"
+        },
+        {
+          "name": "rssi",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": []
+    },
+    "SleepSensor": {
+      "capability": "SleepSensor",
+      "selector": "capability.sleepSensor",
+      "attributes": [
+        {
+          "name": "sleeping",
+          "type": "ENUM [\"not sleeping\", \"sleeping\"]"
+        }
+      ],
+      "commands": []
+    },
+    "SmokeDetector": {
+      "capability": "SmokeDetector",
+      "selector": "capability.smokeDetector",
+      "attributes": [
+        {
+          "name": "smoke",
+          "type": "ENUM [\"clear\", \"tested\", \"detected\"]"
+        }
+      ],
+      "commands": []
+    },
+    "SoundPressureLevel": {
+      "capability": "SoundPressureLevel",
+      "selector": "capability.soundPressureLevel",
+      "attributes": [
+        {
+          "name": "soundPressureLevel",
+          "type": "NUMBER, unit:dB"
+        }
+      ],
+      "commands": []
+    },
+    "SoundSensor": {
+      "capability": "SoundSensor",
+      "selector": "capability.soundSensor",
+      "attributes": [
+        {
+          "name": "sound",
+          "type": "ENUM [\"detected\", \"not detected\"]"
+        }
+      ],
+      "commands": []
+    },
+    "SpeechRecognition": {
+      "capability": "SpeechRecognition",
+      "selector": "capability.speechRecognition",
+      "attributes": [
+        {
+          "name": "phraseSpoken",
+          "type": "STRING"
+        }
+      ],
+      "commands": []
+    },
+    "SpeechSynthesis": {
+      "capability": "SpeechSynthesis",
+      "selector": "capability.speechSynthesis",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "speak(text, volume, voice)",
+          "name": "speak",
+          "params": [
+            {
+              "name": "text",
+              "required": true,
+              "type": "STRING",
+              "desc": "Text to speak"
+            },
+            {
+              "name": "volume",
+              "required": false,
+              "type": "NUMBER",
+              "desc": ""
+            },
+            {
+              "name": "voice",
+              "required": false,
+              "type": "STRING",
+              "desc": "AWS Polly voice name"
+            }
+          ]
+        }
+      ]
+    },
+    "StepSensor": {
+      "capability": "StepSensor",
+      "selector": "capability.stepSensor",
+      "attributes": [
+        {
+          "name": "goal",
+          "type": "NUMBER"
+        },
+        {
+          "name": "steps",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": []
+    },
+    "Switch": {
+      "capability": "Switch",
+      "selector": "capability.switch",
+      "attributes": [
+        {
+          "name": "switch",
+          "type": "ENUM [\"on\", \"off\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "on()",
+          "name": "on",
+          "params": []
+        }
+      ]
+    },
+    "SwitchLevel": {
+      "capability": "SwitchLevel",
+      "selector": "capability.switchLevel",
+      "attributes": [
+        {
+          "name": "level",
+          "type": "NUMBER, unit:%"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setLevel(level, duration)",
+          "name": "setLevel",
+          "params": [
+            {
+              "name": "level",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Level to set (0 to 100)"
+            },
+            {
+              "name": "duration",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "Transition duration in seconds"
+            }
+          ]
+        }
+      ]
+    },
+    "TV": {
+      "capability": "TV",
+      "selector": "capability.tv",
+      "attributes": [
+        {
+          "name": "channel",
+          "type": "NUMBER"
+        },
+        {
+          "name": "movieMode",
+          "type": "STRING"
+        },
+        {
+          "name": "picture",
+          "type": "STRING"
+        },
+        {
+          "name": "power",
+          "type": "STRING"
+        },
+        {
+          "name": "sound",
+          "type": "STRING"
+        },
+        {
+          "name": "volume",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "channelDown()",
+          "name": "channelDown",
+          "params": []
+        },
+        {
+          "signature": "channelUp()",
+          "name": "channelUp",
+          "params": []
+        },
+        {
+          "signature": "volumeDown()",
+          "name": "volumeDown",
+          "params": []
+        },
+        {
+          "signature": "volumeUp()",
+          "name": "volumeUp",
+          "params": []
+        }
+      ]
+    },
+    "TamperAlert": {
+      "capability": "TamperAlert",
+      "selector": "capability.tamperAlert",
+      "attributes": [
+        {
+          "name": "tamper",
+          "type": "ENUM [\"clear\", \"detected\"]"
+        }
+      ],
+      "commands": []
+    },
+    "Telnet": {
+      "capability": "Telnet",
+      "selector": "capability.telnet",
+      "attributes": [
+        {
+          "name": "networkStatus",
+          "type": "ENUM [\"online\", \"offline\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "sendMsg(message)",
+          "name": "sendMsg",
+          "params": [
+            {
+              "name": "message",
+              "required": true,
+              "type": "STRING",
+              "desc": "Text message to send"
+            }
+          ]
+        }
+      ]
+    },
+    "TemperatureMeasurement": {
+      "capability": "TemperatureMeasurement",
+      "selector": "capability.temperatureMeasurement",
+      "attributes": [
+        {
+          "name": "temperature",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        }
+      ],
+      "commands": []
+    },
+    "TestCapability": {
+      "capability": "TestCapability",
+      "selector": "capability.testCapability",
+      "attributes": [],
+      "commands": []
+    },
+    "Thermostat": {
+      "capability": "Thermostat",
+      "selector": "capability.thermostat",
+      "attributes": [
+        {
+          "name": "coolingSetpoint",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        },
+        {
+          "name": "heatingSetpoint",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        },
+        {
+          "name": "schedule",
+          "type": "JSON_OBJECT (Deprecated)"
+        },
+        {
+          "name": "supportedThermostatFanModes",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "supportedThermostatModes",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "temperature",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        },
+        {
+          "name": "thermostatFanMode",
+          "type": "ENUM [\"on\", \"circulate\", \"auto\"]"
+        },
+        {
+          "name": "thermostatMode",
+          "type": "ENUM [\"auto\", \"off\", \"heat\", \"emergency heat\", \"cool\"]"
+        },
+        {
+          "name": "thermostatOperatingState",
+          "type": "ENUM [\"heating\", \"pending cool\", \"pending heat\", \"vent economizer\", \"idle\", \"cooling\", \"fan only\"]"
+        },
+        {
+          "name": "thermostatSetpoint",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "auto()",
+          "name": "auto",
+          "params": []
+        },
+        {
+          "signature": "cool()",
+          "name": "cool",
+          "params": []
+        },
+        {
+          "signature": "emergencyHeat()",
+          "name": "emergencyHeat",
+          "params": []
+        },
+        {
+          "signature": "fanAuto()",
+          "name": "fanAuto",
+          "params": []
+        },
+        {
+          "signature": "fanCirculate()",
+          "name": "fanCirculate",
+          "params": []
+        },
+        {
+          "signature": "fanOn()",
+          "name": "fanOn",
+          "params": []
+        },
+        {
+          "signature": "heat()",
+          "name": "heat",
+          "params": []
+        },
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "setCoolingSetpoint(temperature)",
+          "name": "setCoolingSetpoint",
+          "params": [
+            {
+              "name": "temperature",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Cooling setpoint in degrees"
+            }
+          ]
+        },
+        {
+          "signature": "setHeatingSetpoint(temperature)",
+          "name": "setHeatingSetpoint",
+          "params": [
+            {
+              "name": "temperature",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Heating setpoint in degrees"
+            }
+          ]
+        },
+        {
+          "signature": "setSchedule(JSON_OBJECT) (Deprecated)",
+          "name": "setSchedule",
+          "params": [
+            {
+              "name": "JSON_OBJECT",
+              "required": false,
+              "type": "JSON_OBJECT",
+              "desc": "JSON_OBJECT (Deprecated)"
+            }
+          ]
+        },
+        {
+          "signature": "setThermostatFanMode(fanmode)",
+          "name": "setThermostatFanMode",
+          "params": [
+            {
+              "name": "fanmode",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Fan mode to set"
+            }
+          ]
+        },
+        {
+          "signature": "setThermostatMode(thermostatmode)",
+          "name": "setThermostatMode",
+          "params": [
+            {
+              "name": "thermostatmode",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Thermostat mode to set"
+            }
+          ]
+        }
+      ]
+    },
+    "ThermostatCoolingSetpoint": {
+      "capability": "ThermostatCoolingSetpoint",
+      "selector": "capability.thermostatCoolingSetpoint",
+      "attributes": [
+        {
+          "name": "coolingSetpoint",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setCoolingSetpoint(temperature)",
+          "name": "setCoolingSetpoint",
+          "params": [
+            {
+              "name": "temperature",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Cooling setpoint in degrees"
+            }
+          ]
+        }
+      ]
+    },
+    "ThermostatFanMode": {
+      "capability": "ThermostatFanMode",
+      "selector": "capability.thermostatFanMode",
+      "attributes": [
+        {
+          "name": "thermostatFanMode",
+          "type": "ENUM [\"auto\", \"circulate\", \"on\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "fanAuto()",
+          "name": "fanAuto",
+          "params": []
+        },
+        {
+          "signature": "fanCirculate()",
+          "name": "fanCirculate",
+          "params": []
+        },
+        {
+          "signature": "fanOn()",
+          "name": "fanOn",
+          "params": []
+        },
+        {
+          "signature": "setThermostatFanMode(fanmode)",
+          "name": "setThermostatFanMode",
+          "params": [
+            {
+              "name": "fanmode",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Fan mode to set"
+            }
+          ]
+        }
+      ]
+    },
+    "ThermostatHeatingSetpoint": {
+      "capability": "ThermostatHeatingSetpoint",
+      "selector": "capability.thermostatHeatingSetpoint",
+      "attributes": [
+        {
+          "name": "heatingSetpoint",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setHeatingSetpoint(temperature)",
+          "name": "setHeatingSetpoint",
+          "params": [
+            {
+              "name": "temperature",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Heating setpoint in degrees"
+            }
+          ]
+        }
+      ]
+    },
+    "ThermostatMode": {
+      "capability": "ThermostatMode",
+      "selector": "capability.thermostatMode",
+      "attributes": [
+        {
+          "name": "thermostatMode",
+          "type": "ENUM [\"heat\", \"cool\", \"emergency heat\", \"auto\", \"off\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "auto()",
+          "name": "auto",
+          "params": []
+        },
+        {
+          "signature": "cool()",
+          "name": "cool",
+          "params": []
+        },
+        {
+          "signature": "emergencyHeat()",
+          "name": "emergencyHeat",
+          "params": []
+        },
+        {
+          "signature": "heat()",
+          "name": "heat",
+          "params": []
+        },
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "setThermostatMode(thermostatmode)",
+          "name": "setThermostatMode",
+          "params": [
+            {
+              "name": "thermostatmode",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Thermostat mode to set"
+            }
+          ]
+        }
+      ]
+    },
+    "ThermostatOperatingState": {
+      "capability": "ThermostatOperatingState",
+      "selector": "capability.thermostatOperatingState",
+      "attributes": [
+        {
+          "name": "thermostatOperatingState",
+          "type": "ENUM [\"vent economizer\", \"pending cool\", \"cooling\", \"heating\", \"pending heat\", \"fan only\", \"idle\"]"
+        }
+      ],
+      "commands": []
+    },
+    "ThermostatSchedule": {
+      "capability": "ThermostatSchedule",
+      "selector": "capability.thermostatSchedule",
+      "attributes": [
+        {
+          "name": "schedule",
+          "type": "JSON_OBJECT"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setSchedule(JSON_OBJECT)",
+          "name": "setSchedule",
+          "params": [
+            {
+              "name": "JSON_OBJECT",
+              "required": false,
+              "type": "JSON_OBJECT",
+              "desc": "JSON_OBJECT"
+            }
+          ]
+        }
+      ]
+    },
+    "ThermostatSetpoint": {
+      "capability": "ThermostatSetpoint",
+      "selector": "capability.thermostatSetpoint",
+      "attributes": [
+        {
+          "name": "thermostatSetpoint",
+          "type": "NUMBER, unit:\u00b0F || \u00b0C"
+        }
+      ],
+      "commands": []
+    },
+    "ThreeAxis": {
+      "capability": "ThreeAxis",
+      "selector": "capability.threeAxis",
+      "attributes": [
+        {
+          "name": "threeAxis",
+          "type": "VECTOR3"
+        }
+      ],
+      "commands": []
+    },
+    "TimedSession": {
+      "capability": "TimedSession",
+      "selector": "capability.timedSession",
+      "attributes": [
+        {
+          "name": "sessionStatus",
+          "type": "ENUM [\"stopped\", \"canceled\", \"running\", \"paused\"]"
+        },
+        {
+          "name": "timeRemaining",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "cancel()",
+          "name": "cancel",
+          "params": []
+        },
+        {
+          "signature": "pause()",
+          "name": "pause",
+          "params": []
+        },
+        {
+          "signature": "setTimeRemaining(NUMBER)",
+          "name": "setTimeRemaining",
+          "params": [
+            {
+              "name": "NUMBER",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "NUMBER"
+            }
+          ]
+        },
+        {
+          "signature": "start()",
+          "name": "start",
+          "params": []
+        },
+        {
+          "signature": "stop()",
+          "name": "stop",
+          "params": []
+        }
+      ]
+    },
+    "Tone": {
+      "capability": "Tone",
+      "selector": "capability.tone",
+      "attributes": [],
+      "commands": [
+        {
+          "signature": "beep()",
+          "name": "beep",
+          "params": []
+        }
+      ]
+    },
+    "TouchSensor": {
+      "capability": "TouchSensor",
+      "selector": "capability.touchSensor",
+      "attributes": [
+        {
+          "name": "touch",
+          "type": "ENUM [\"touched\"]"
+        }
+      ],
+      "commands": []
+    },
+    "UltravioletIndex": {
+      "capability": "UltravioletIndex",
+      "selector": "capability.ultravioletIndex",
+      "attributes": [
+        {
+          "name": "ultravioletIndex",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": []
+    },
+    "Valve": {
+      "capability": "Valve",
+      "selector": "capability.valve",
+      "attributes": [
+        {
+          "name": "valve",
+          "type": "ENUM [\"open\", \"closed\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "close()",
+          "name": "close",
+          "params": []
+        },
+        {
+          "signature": "open()",
+          "name": "open",
+          "params": []
+        }
+      ]
+    },
+    "Variable": {
+      "capability": "Variable",
+      "selector": "capability.variable",
+      "attributes": [
+        {
+          "name": "variable",
+          "type": "STRING"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "setVariable(valueToSet)",
+          "name": "setVariable",
+          "params": [
+            {
+              "name": "valueToSet",
+              "required": true,
+              "type": "STRING",
+              "desc": ""
+            }
+          ]
+        }
+      ]
+    },
+    "VideoCamera": {
+      "capability": "VideoCamera",
+      "selector": "capability.videoCapture",
+      "attributes": [
+        {
+          "name": "camera",
+          "type": "ENUM [\"on\", \"off\", \"restarting\", \"unavailable\"]"
+        },
+        {
+          "name": "mute",
+          "type": "ENUM [\"unmuted\", \"muted\"]"
+        },
+        {
+          "name": "settings",
+          "type": "JSON_OBJECT"
+        },
+        {
+          "name": "statusMessage",
+          "type": "STRING"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "flip()",
+          "name": "flip",
+          "params": []
+        },
+        {
+          "signature": "mute()",
+          "name": "mute",
+          "params": []
+        },
+        {
+          "signature": "off()",
+          "name": "off",
+          "params": []
+        },
+        {
+          "signature": "on()",
+          "name": "on",
+          "params": []
+        },
+        {
+          "signature": "unmute()",
+          "name": "unmute",
+          "params": []
+        }
+      ]
+    },
+    "VideoCapture": {
+      "capability": "VideoCapture",
+      "selector": "capability.videoCapture",
+      "attributes": [
+        {
+          "name": "clip",
+          "type": "JSON_OBJECT"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "capture(DATE, DATE, DATE)",
+          "name": "capture",
+          "params": [
+            {
+              "name": "DATE",
+              "required": false,
+              "type": "DATE",
+              "desc": "DATE"
+            },
+            {
+              "name": "DATE",
+              "required": false,
+              "type": "DATE",
+              "desc": "DATE"
+            },
+            {
+              "name": "DATE",
+              "required": false,
+              "type": "DATE",
+              "desc": "DATE"
+            }
+          ]
+        }
+      ]
+    },
+    "VoltageMeasurement": {
+      "capability": "VoltageMeasurement",
+      "selector": "capability.voltageMeasurement",
+      "attributes": [
+        {
+          "name": "voltage",
+          "type": "NUMBER, unit:V"
+        },
+        {
+          "name": "frequency",
+          "type": "NUMBER, unit:Hz"
+        }
+      ],
+      "commands": []
+    },
+    "WaterSensor": {
+      "capability": "WaterSensor",
+      "selector": "capability.waterSensor",
+      "attributes": [
+        {
+          "name": "water",
+          "type": "ENUM [\"wet\", \"dry\"]"
+        }
+      ],
+      "commands": []
+    },
+    "WindowBlind": {
+      "capability": "WindowBlind",
+      "selector": "capability.windowBlind",
+      "attributes": [
+        {
+          "name": "position",
+          "type": "NUMBER, unit:%"
+        },
+        {
+          "name": "windowBlind",
+          "type": "ENUM [\"opening\", \"partially open\", \"closed\", \"open\", \"closing\", \"unknown\"]"
+        },
+        {
+          "name": "tilt",
+          "type": "NUMBER, unit:%"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "close()",
+          "name": "close",
+          "params": []
+        },
+        {
+          "signature": "open()",
+          "name": "open",
+          "params": []
+        },
+        {
+          "signature": "setPosition(position)",
+          "name": "setPosition",
+          "params": [
+            {
+              "name": "position",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Shade position (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "startPositionChange(direction)",
+          "name": "startPositionChange",
+          "params": [
+            {
+              "name": "direction",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Direction for position change request [\"open\", \"close\"]"
+            }
+          ]
+        },
+        {
+          "signature": "stopPositionChange()",
+          "name": "stopPositionChange",
+          "params": []
+        },
+        {
+          "signature": "setTiltLevel(tilt)",
+          "name": "setTiltLevel",
+          "params": [
+            {
+              "name": "tilt",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Tilt percent (0 to 100)"
+            }
+          ]
+        }
+      ]
+    },
+    "WindowShade": {
+      "capability": "WindowShade",
+      "selector": "capability.windowShade",
+      "attributes": [
+        {
+          "name": "position",
+          "type": "NUMBER, unit:%"
+        },
+        {
+          "name": "windowShade",
+          "type": "ENUM [\"opening\", \"partially open\", \"closed\", \"open\", \"closing\", \"unknown\"]"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "close()",
+          "name": "close",
+          "params": []
+        },
+        {
+          "signature": "open()",
+          "name": "open",
+          "params": []
+        },
+        {
+          "signature": "setPosition(position)",
+          "name": "setPosition",
+          "params": [
+            {
+              "name": "position",
+              "required": true,
+              "type": "NUMBER",
+              "desc": "Shade position (0 to 100)"
+            }
+          ]
+        },
+        {
+          "signature": "startPositionChange(direction)",
+          "name": "startPositionChange",
+          "params": [
+            {
+              "name": "direction",
+              "required": true,
+              "type": "ENUM",
+              "desc": "Direction for position change request [\"open\", \"close\"]"
+            }
+          ]
+        },
+        {
+          "signature": "stopPositionChange()",
+          "name": "stopPositionChange",
+          "params": []
+        }
+      ]
+    },
+    "ZwMultichannel": {
+      "capability": "ZwMultichannel",
+      "selector": "capability.zwMultichannel",
+      "attributes": [
+        {
+          "name": "epEvent",
+          "type": "STRING"
+        },
+        {
+          "name": "epInfo",
+          "type": "STRING"
+        }
+      ],
+      "commands": [
+        {
+          "signature": "enableEpEvents(STRING)",
+          "name": "enableEpEvents",
+          "params": [
+            {
+              "name": "STRING",
+              "required": false,
+              "type": "STRING",
+              "desc": "STRING"
+            }
+          ]
+        },
+        {
+          "signature": "epCmd(NUMBER, STRING)",
+          "name": "epCmd",
+          "params": [
+            {
+              "name": "NUMBER",
+              "required": false,
+              "type": "NUMBER",
+              "desc": "NUMBER"
+            },
+            {
+              "name": "STRING",
+              "required": false,
+              "type": "STRING",
+              "desc": "STRING"
+            }
+          ]
+        }
+      ]
+    },
+    "pHMeasurement": {
+      "capability": "pHMeasurement",
+      "selector": "capability.pHMeasurement",
+      "attributes": [
+        {
+          "name": "pH",
+          "type": "NUMBER"
+        }
+      ],
+      "commands": []
+    }
+  }
+}
