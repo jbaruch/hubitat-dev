@@ -3,6 +3,8 @@
 
 import importlib.util
 import json
+import os
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -136,6 +138,35 @@ class TestDeploy(unittest.TestCase):
         c = hubclient.HubClient("http://h:8080", t)
         with self.assertRaises(hubclient.HubError):
             c.deploy("driver", "source")
+
+    def test_update_unsuccessful_status_is_not_accepted(self):
+        # "unsuccessful" contains the substring "success" — must NOT be read as a success.
+        t = make_transport({
+            ("GET", "/driver/ajax/code"): (200, {}, json.dumps({"id": 5, "version": 3, "source": "old"})),
+            ("POST", "/driver/ajax/update"): (200, {}, json.dumps({"status": "unsuccessful"})),
+        })
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError):
+            c.deploy("driver", "x", code_id=5)
+
+
+class TestResolveBaseFromArgs(unittest.TestCase):
+    def test_ip_wins(self):
+        self.assertEqual(hubclient.resolve_base_from_args(ip="1.2.3.4", port=8080), "http://1.2.3.4:8080")
+
+    def test_hub_flag_defaults_to_hubs_json_in_cwd(self):
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "hubs.json").write_text(json.dumps(CFG))
+            old = os.getcwd()
+            os.chdir(d)
+            try:
+                self.assertEqual(hubclient.resolve_base_from_args(hub="main"), "http://192.168.30.2:8080")
+            finally:
+                os.chdir(old)
+
+    def test_no_ip_no_hub_raises(self):
+        with self.assertRaises(hubclient.HubError):
+            hubclient.resolve_base_from_args()
 
 
 class TestNonJsonResponses(unittest.TestCase):

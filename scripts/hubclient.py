@@ -73,9 +73,12 @@ def resolve_base_from_args(ip: Optional[str] = None, port: int = 8080,
     hubs.json and pick the named hub (or its default)."""
     if ip:
         return base_url(ip, port)
+    if hubs_path is None and hub:
+        hubs_path = "hubs.json"  # a named hub with no explicit path resolves against ./hubs.json
     if hubs_path:
         return resolve_hub(load_hubs(hubs_path), hub)["base"]
-    raise HubError("provide --ip <addr> or --hubs <hubs.json>")
+    raise HubError("provide --ip <addr>, --hub <name> with a hubs.json in the working directory, "
+                   "or --hubs <path>")
 
 
 def load_hubs(path) -> dict:
@@ -189,12 +192,16 @@ class HubClient:
 
         status, _, text = self._post_form(
             _PATHS[kind]["update"], {"id": plan["id"], "version": plan["version"], "source": source})
-        low = text.lower()
-        # Only an explicit success signal confirms the save. An unexpected 200 (e.g. an HTML
-        # page) must not be reported as success — the hub's /ajax/update returns {status:"success"}.
-        if "success" in low:
+        # Confirm via the parsed JSON status field, exactly "success" — a substring match
+        # would wrongly accept {"status":"unsuccessful"} or an HTML page mentioning "success".
+        # The hub's /ajax/update returns {"status":"success"}.
+        try:
+            confirmed = json.loads(text).get("status") == "success"
+        except (json.JSONDecodeError, AttributeError):
+            confirmed = False
+        if confirmed:
             return {"action": "update", "id": plan["id"], "version": plan["version"]}
-        if "version" in low:
+        if "version" in text.lower():
             raise DeployConflict(
                 f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "
                 f"version than {plan['version']}. Re-pull and reconcile before deploying.")
