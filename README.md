@@ -32,9 +32,14 @@ All rules are always-on — installing the plugin means you want this context.
 
 | Skill | Use when |
 |-------|----------|
-| [scaffold](skills/scaffold/SKILL.md) | Generating a correct app or driver skeleton from declared capabilities. |
+| [scaffold](skills/scaffold/SKILL.md) | Generating a correct app or driver skeleton from declared capabilities, self-checked with the linter. |
+| [deploy](skills/deploy/SKILL.md) | Pushing app/driver source to a hub and confirming it via the log stream — no browser copy-paste. |
+| [debug](skills/debug/SKILL.md) | Tailing the log/event websocket, filtered, and reading it against the code to diagnose. |
+| [lint-review](skills/lint-review/SKILL.md) | Linting Groovy for sandbox violations and silent-failure traps, then judging each finding. |
+| [test](skills/test/SKILL.md) | Setting up offline unit tests (biocomp/hubitat_ci) so logic is exercised off-hub. |
+| [hub-config](skills/hub-config/SKILL.md) | Managing `hubs.json` — register, list, and set the default hub (action router). |
 
-_More skills land as the plugin fills out (deploy, pull, debug, lint-review, test, hub-config)._
+Typical loop: `scaffold` → `lint-review` → `deploy` → `debug`, with `hub-config` set up once and `test` for anything with real logic.
 
 ## Installation
 
