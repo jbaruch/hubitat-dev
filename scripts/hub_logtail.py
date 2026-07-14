@@ -187,6 +187,9 @@ def main(argv=None) -> int:
         _stream(sock, buf, filters, args.json, deadline, args.max_frames, args.follow, sys.stdout)
     except KeyboardInterrupt:
         return 0
+    except OSError as e:
+        print(f"log-tail connection to {args.ip} failed: {e}", file=sys.stderr)
+        return 1
     finally:
         sock.close()
     return 0

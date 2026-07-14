@@ -149,6 +149,16 @@ class TestStream(unittest.TestCase):
                            False, None, 0, False, out)
         self.assertEqual(count, 1)
 
+    def test_non_timeout_socket_error_propagates(self):
+        # A hard socket error (not a timeout) must propagate out of _stream so the CLI
+        # layer reports it as a clean error rather than continuing the loop.
+        class Broken:
+            def recv(self, _n):
+                raise OSError("connection reset")
+        with self.assertRaises(OSError):
+            lt._stream(Broken(), bytearray(), {"levels": None, "type_": None,
+                       "name_substr": None, "dev_id": None}, False, None, 0, False, io.StringIO())
+
 
 if __name__ == "__main__":
     unittest.main()

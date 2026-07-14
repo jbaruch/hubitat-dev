@@ -169,6 +169,28 @@ class TestResolveBaseFromArgs(unittest.TestCase):
             hubclient.resolve_base_from_args()
 
 
+class TestLoadHubs(unittest.TestCase):
+    def test_missing_file_raises_huberror(self):
+        with tempfile.TemporaryDirectory() as d:
+            with self.assertRaises(hubclient.HubError) as ctx:
+                hubclient.load_hubs(str(Path(d) / "absent.json"))
+            self.assertIn("not found", str(ctx.exception))
+
+    def test_malformed_json_raises_huberror(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "hubs.json"
+            p.write_text("{ not json")
+            with self.assertRaises(hubclient.HubError):
+                hubclient.load_hubs(str(p))
+
+    def test_wrong_schema_version_raises_huberror(self):
+        with tempfile.TemporaryDirectory() as d:
+            p = Path(d) / "hubs.json"
+            p.write_text(json.dumps({"schema_version": 999, "hubs": {}}))
+            with self.assertRaises(hubclient.HubError):
+                hubclient.load_hubs(str(p))
+
+
 class TestNonJsonResponses(unittest.TestCase):
     def test_enumerate_on_html_raises_actionable_error(self):
         # Hub Security on returns an HTML login page, not JSON.

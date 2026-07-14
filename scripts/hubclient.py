@@ -82,11 +82,18 @@ def resolve_base_from_args(ip: Optional[str] = None, port: int = 8080,
 
 
 def load_hubs(path) -> dict:
-    with open(path) as f:
-        cfg = json.load(f)
+    try:
+        with open(path) as f:
+            cfg = json.load(f)
+    except FileNotFoundError as e:
+        raise HubError(
+            f"hub config {path} not found — create it with hubs_config.py "
+            f"(init/add), or pass --ip <addr> instead of --hub.") from e
+    except (OSError, json.JSONDecodeError) as e:
+        raise HubError(f"hub config {path} could not be read as JSON: {e}") from e
     ver = cfg.get("schema_version")
     if ver != SCHEMA_VERSION:
-        raise HubError(f"hubs.json schema_version {ver} != {SCHEMA_VERSION} (this client's version)")
+        raise HubError(f"hub config {path} schema_version {ver} != {SCHEMA_VERSION} (this client's version)")
     return cfg
 
 
