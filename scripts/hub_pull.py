@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+# E402: this import must follow the sys.path insert above so hubclient resolves when run as a script.
 from hubclient import HubClient, HubError, KINDS, resolve_base_from_args  # noqa: E402
 
 

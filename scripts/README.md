@@ -8,7 +8,7 @@ self-error-handling (non-zero exit + stderr diagnostic on failure), and has an e
 |--------|------|---------|
 | `hub_lint.py` | Flag sandbox violations and silent-failure traps in Groovy source | none (offline) |
 | `hubclient.py` | Shared: hub config resolution + code enumerate/pull/deploy (imported, not a CLI) | — |
-| `hub_pull.py` | Pull an app/driver/library's source + version from a hub | HTTP |
+| `hub_pull.py` | Pull an app or driver's source + version from a hub | HTTP |
 | `hub_deploy.py` | Deploy source to a hub (create/update, version optimistic-concurrency) | HTTP |
 | `hub_logtail.py` | Tail the `/logsocket` or `/eventsocket` websocket, filtered | WebSocket |
 
