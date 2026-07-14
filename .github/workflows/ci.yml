@@ -36,6 +36,6 @@ jobs:
       - name: Plugin lint
         run: tessl plugin lint
       - name: Skill review (changed only, threshold 85)
-        uses: jbaruch/coding-policy/.github/actions/skill-review@main
+        uses: jbaruch/coding-policy/.github/actions/skill-review@2d30094f068c6793b572e8fd802c598cc442a4c0 # main @ 2026-07-14
         with:
           threshold: "85"
