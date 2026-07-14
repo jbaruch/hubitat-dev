@@ -1,7 +1,5 @@
 # Changelog
 
-## 0.1.0 — 2026-07-14
-
 ### Added
 
 - Initial plugin skeleton for `jbaruch/hubitat-dev`: manifest, README with registry badge, and the `sandbox-constraints` rule and `scaffold` skill seeds.
@@ -11,4 +9,6 @@
 - Deterministic scripts (Python, stdlib-only, unit-tested): `hub_lint.py` (sandbox + silent-failure linter, validated against real community drivers with zero false positives), `hubclient.py` (shared config + code enumerate/pull/deploy with version optimistic-concurrency), `hub_pull.py`, `hub_deploy.py`, and `hub_logtail.py` (stdlib websocket tail of `/logsocket` and `/eventsocket`, smoke-tested live). Pyright gate config (`pyrightconfig.json`) at zero findings.
 - Six skills: `scaffold`, `deploy`, `debug`, `lint-review`, `test`, and the `hub-config` action router. The `hubs.json` stateful artifact with its owner script `hubs_config.py`, schema doc, and committed `hubs.example.json` (IPs only, no secrets — Maker API credentials stay in the environment).
 - Two lift-scoped eval scenarios (`driver-fancontrol-speeds`, `sandbox-import-allowlist`) grading only counterintuitive plugin-specific facts. A measurement pass retired the zero-lift scenarios (the floor model already knows the common idioms) and reshaped criteria to drop universal-competence checks that inflated the baseline; `evals/README.md` documents the honest scope — the plugin's core value is the deterministic layer, which `plugin-evals` says not to eval.
-- CI workflow (`.github/workflows/ci.yml`) gating unit tests and the pyright zero-findings check, with `requirements-dev.txt` pinning pyright and a Dependabot config renewing the pip and github-actions pins.
+- CI workflow (`.github/workflows/ci.yml`) gating the pyright zero-findings check, unit tests, `tessl plugin lint`, and the changed-skills `tessl skill review` loop; SHA-pinned actions with a Dependabot config renewing the pip and github-actions pins.
+- Publish-on-merge (`.github/workflows/publish.yml`): every merge to `main` stamps the CHANGELOG version and publishes to the Tessl registry via `tesslio/patch-version-publish` (which runs the eval suite). Manifest set public (`private: false`).
+- Hardened every script failure path to the exit-non-zero + stderr contract (non-JSON hub responses, unwritable output, missing/malformed `hubs.json`, socket resets); shaped through a 12-round cross-family policy review.
