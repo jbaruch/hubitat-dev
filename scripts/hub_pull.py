@@ -46,7 +46,11 @@ def main(argv=None, client_factory=None) -> int:
     meta = {"kind": args.kind, "id": result["id"], "name": result["name"],
             "version": result["version"]}
     if args.out:
-        Path(args.out).write_text(result["source"])
+        try:
+            Path(args.out).write_text(result["source"])
+        except OSError as e:
+            print(f"cannot write {args.out}: {e}", file=sys.stderr)
+            return 1
         meta["out"] = args.out
     else:
         meta["source"] = result["source"]

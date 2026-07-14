@@ -133,17 +133,29 @@ class HubClient:
     def _post_form(self, path: str, fields: dict):
         return self._t("POST", self.base + path, urlencode(fields))
 
+    def _json(self, text: str, path: str):
+        """Parse a hub response as JSON, or raise an actionable HubError. A hub with Hub
+        Security on (or a changed endpoint) returns an HTML login/error page, not JSON."""
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            raise HubError(
+                f"{self.base}{path} did not return JSON (got {text[:80]!r}). Check that Hub "
+                f"Security is off on this hub and that the endpoint is valid on its firmware.") from e
+
     def enumerate(self, kind: str) -> list:
-        status, _, text = self._get(_PATHS[kind]["enumerate"])
+        path = _PATHS[kind]["enumerate"]
+        status, _, text = self._get(path)
         if status != 200:
-            raise HubError(f"enumerate {kind} returned HTTP {status}")
-        return json.loads(text)
+            raise HubError(f"enumerate {kind} returned HTTP {status} from {self.base}{path}")
+        return self._json(text, path)
 
     def pull(self, kind: str, code_id: int) -> dict:
-        status, _, text = self._get(f"{_PATHS[kind]['code']}?id={code_id}")
+        path = f"{_PATHS[kind]['code']}?id={code_id}"
+        status, _, text = self._get(path)
         if status != 200:
-            raise HubError(f"pull {kind} id={code_id} returned HTTP {status}")
-        data = json.loads(text)
+            raise HubError(f"pull {kind} id={code_id} returned HTTP {status} from {self.base}{path}")
+        data = self._json(text, path)
         return {"id": data.get("id", code_id), "name": data.get("name"),
                 "version": data.get("version"), "source": data.get("source", "")}
 
@@ -168,6 +180,11 @@ class HubClient:
             if status not in (200, 302):
                 raise HubError(f"create {kind} returned HTTP {status}")
             new_id = _id_from_location(headers, kind)
+            if new_id is None:
+                raise HubError(
+                    f"create {kind} returned HTTP {status} but no new id was found in the "
+                    f"redirect (Location: {headers.get('Location')!r}). The create may have "
+                    f"failed — re-enumerate the hub before deploying again.")
             return {"action": "create", "id": new_id}
 
         status, _, text = self._post_form(

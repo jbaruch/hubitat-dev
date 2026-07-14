@@ -130,6 +130,31 @@ class TestDeploy(unittest.TestCase):
         with self.assertRaises(hubclient.DeployConflict):
             c.deploy("driver", "x", code_id=5)
 
+    def test_create_without_new_id_raises(self):
+        # A create that redirects somewhere without an editor id must not return {id: None}.
+        t = make_transport({("POST", "/driver/save"): (302, {"Location": "/error"}, "")})
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError):
+            c.deploy("driver", "source")
+
+
+class TestNonJsonResponses(unittest.TestCase):
+    def test_enumerate_on_html_raises_actionable_error(self):
+        # Hub Security on returns an HTML login page, not JSON.
+        t = make_transport({("GET", "/hub2/userDeviceTypes"):
+                            (200, {}, "<html><body>The login information...</body></html>")})
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError) as ctx:
+            c.enumerate("driver")
+        self.assertIn("did not return JSON", str(ctx.exception))
+        self.assertIn("Hub Security", str(ctx.exception))
+
+    def test_pull_on_html_raises_actionable_error(self):
+        t = make_transport({("GET", "/driver/ajax/code"): (200, {}, "<html>login</html>")})
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError):
+            c.pull("driver", 5)
+
 
 if __name__ == "__main__":
     unittest.main()

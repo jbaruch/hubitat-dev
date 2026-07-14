@@ -165,8 +165,16 @@ def main(argv=None) -> int:
         return 1
     try:
         sock.sendall(request)
+        sock.settimeout(5.0)
+        # Read until the header terminator — a TCP read can return the handshake
+        # response in several packets, so a single recv() may hold only part of it.
+        raw = b""
+        while b"\r\n\r\n" not in raw and len(raw) < 8192:
+            chunk = sock.recv(4096)
+            if not chunk:
+                break
+            raw += chunk
         sock.settimeout(1.0)
-        raw = sock.recv(4096)
         sep = raw.find(b"\r\n\r\n")
         header = (raw[:sep] if sep >= 0 else raw).decode("latin1", "replace")
         if "101" not in header.split("\r\n", 1)[0]:

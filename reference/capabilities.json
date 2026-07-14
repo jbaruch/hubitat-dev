@@ -980,7 +980,7 @@
               "name": "pincodelength",
               "required": true,
               "type": "NUMBER",
-              "desc": "Maximum pin code lentgh for this lock"
+              "desc": "Maximum pin code length for this lock"
             }
           ]
         }
@@ -1616,7 +1616,7 @@
               "name": "pincodelength",
               "required": true,
               "type": "NUMBER",
-              "desc": "Maximum pin code lentgh for this keypad"
+              "desc": "Maximum pin code length for this keypad"
             }
           ]
         },

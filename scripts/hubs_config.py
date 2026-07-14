@@ -119,7 +119,11 @@ def main(argv=None) -> int:
         return 1
 
     if args.action not in ("list", "validate"):
-        save(path, cfg)
+        try:
+            save(path, cfg)
+        except OSError as e:
+            print(f"cannot write {path}: {e}", file=sys.stderr)
+            return 1
     json.dump(cfg, sys.stdout, indent=2)
     sys.stdout.write("\n")
     return 0
