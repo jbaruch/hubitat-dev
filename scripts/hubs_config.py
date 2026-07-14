@@ -48,7 +48,14 @@ def migrate(cfg: dict) -> dict:
 def load(path: Path) -> dict:
     if not path.exists():
         raise FileNotFoundError(f"{path} does not exist — run `hubs_config.py init` first")
-    return migrate(json.loads(path.read_text()))
+    raw = json.loads(path.read_text())
+    original_version = raw.get("schema_version")  # capture before migrate() mutates raw in place
+    cfg = migrate(raw)
+    # Owner-migrates-on-read (stateful-artifacts): if the on-disk version was old, persist the
+    # upgrade so the migration is durable — even for read actions (list/validate), not just writes.
+    if original_version != SCHEMA_VERSION:
+        save(path, cfg)
+    return cfg
 
 
 def save(path: Path, cfg: dict) -> None:

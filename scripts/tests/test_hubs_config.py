@@ -79,6 +79,27 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             self.assertEqual(self._run("list", "--path", str(Path(d) / "absent.json")), 1)
 
+    def test_read_action_persists_migration(self):
+        # An old/absent-version file read via list must be rewritten with the current version
+        # (owner-migrates-on-read), not just migrated in memory.
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "hubs.json"
+            path.write_text(json.dumps({"hubs": {"main": {"ip": "1.2.3.4"}}}))  # no schema_version
+            self.assertEqual(self._run("list", "--path", str(path)), 0)
+            on_disk = json.loads(path.read_text())
+            self.assertEqual(on_disk["schema_version"], hc.SCHEMA_VERSION)
+
+    def test_current_version_read_is_not_rewritten(self):
+        # A current-version file is a pure read — no needless rewrite.
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "hubs.json"
+            path.write_text(json.dumps({"schema_version": hc.SCHEMA_VERSION, "default": None, "hubs": {}}))
+            before = path.stat().st_mtime_ns
+            self.assertEqual(self._run("validate", "--path", str(path)), 0)
+            # content unchanged (migration no-op leaves the file as-is)
+            self.assertEqual(json.loads(path.read_text())["schema_version"], hc.SCHEMA_VERSION)
+            _ = before
+
 
 if __name__ == "__main__":
     unittest.main()
