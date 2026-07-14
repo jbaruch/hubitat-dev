@@ -1,0 +1,13 @@
+{
+  "name": "jbaruch/hubitat-dev",
+  "version": "0.1.0",
+  "description": "Context for developing and debugging Hubitat Elevation apps, drivers, and hub environment — sandbox constraints, lifecycle idioms, capability contracts, plus grounded deploy/log-tail/lint mechanisms.",
+  "private": true,
+  "rules": "rules/",
+  "skills": "skills/",
+  "repository": "https://github.com/jbaruch/hubitat-dev",
+  "author": {
+    "name": "Baruch Sadogursky",
+    "email": "jbaruch@sadogursky.com"
+  }
+}

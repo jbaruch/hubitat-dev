@@ -1,0 +1,16 @@
+{
+  "name": "hubitat-dev",
+  "mode": "vendored",
+  "dependencies": {
+    "jbaruch/coding-policy": {
+      "version": "0.3.91"
+    }
+  },
+  "agents": [
+    "claude-code",
+    "gemini",
+    "codex",
+    "copilot",
+    "copilot-vscode"
+  ]
+}
