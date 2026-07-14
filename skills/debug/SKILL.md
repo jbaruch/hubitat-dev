@@ -28,12 +28,14 @@ Argument and output contract, filter semantics, and frame shape: `scripts/hub_lo
 
 Proceed to Step 3.
 
-## Step 3 — Trigger and read
+## Step 3 — Trigger the behavior
 
-While tailing, have the behavior exercised (press the device command, fire the app trigger, wait for the schedule). If the code lacks a log line at the point of doubt, add a guarded `log.debug` there (`if (logEnable) log.debug "..."`), redeploy with `Skill(skill: "deploy")`, and tail again.
+While tailing, have the behavior exercised (press the device command, fire the app trigger, wait for the schedule). If the code lacks a log line at the point of doubt, add a guarded `log.debug` there (`if (logEnable) log.debug "..."`), redeploy with `Skill(skill: "deploy")`, and tail again. Proceed to Step 4.
 
-Read the frames against the source: a missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name or first-run-`installed()` trap.
+## Step 4 — Read the frames against the source
 
-## Step 4 — Report
+A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name or first-run-`installed()` trap. Proceed to Step 5.
+
+## Step 5 — Report
 
 State the diagnosis with the evidence (the frame that showed it) and the fix. If the fix is a code change, offer to apply it and redeploy. Finish here.

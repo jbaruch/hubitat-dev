@@ -29,11 +29,15 @@ Add hubitat_ci and Spock per the `example.md` build.gradle (hubitat_ci ships on 
 
 Per `testing-standards`: fixed inputs (a captured Zigbee/Z-Wave description string is a fine fixture), assert outcomes (`1 * api.sendEvent([name: "switch", value: "on"])`), no wall-clock or random data, each test independent. Cover the capability commands and the `parse()` dispatch against known frames. Proceed to Step 4.
 
-## Step 4 — Run, diagnose, wire CI
+## Step 4 — Run the suite
 
 Run the suite with Gradle. On failure, read the mode:
 - a validation error from `sandbox.run()` (bad input type, unsupported API, bad command signature) is a **script** bug — fix the driver, it would fail on the hub too.
 - an unmet interaction (`0 * ... sendEvent`) means the code path wasn't reached — check the branch and inputs.
 - an `hubitat_ci` stub gap on a newer API — fall back to extracting the logic and testing it with Spock + `groovy.mock.interceptor`.
 
-Once green, wire the suite into the repo's CI so it runs on every change, and document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe). Finish here.
+Iterate until green, then proceed to Step 5.
+
+## Step 5 — Wire into CI
+
+Wire the green suite into the repo's CI so it runs on every change, and document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe). Finish here.

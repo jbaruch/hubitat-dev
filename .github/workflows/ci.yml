@@ -22,3 +22,20 @@ jobs:
         run: python -m unittest discover -s scripts/tests -p 'test_*.py'
       - name: Pyright (zero-findings gate)
         run: pyright scripts/
+
+  plugin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Install Tessl CLI
+        uses: tesslio/setup-tessl@v2
+        with:
+          token: ${{ secrets.TESSL_TOKEN }}
+      - name: Plugin lint
+        run: tessl plugin lint
+      - name: Skill review (changed only, threshold 85)
+        uses: jbaruch/coding-policy/.github/actions/skill-review@main
+        with:
+          threshold: "85"

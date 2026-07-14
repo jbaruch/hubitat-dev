@@ -8,3 +8,8 @@ scripts/**/tests/
 __pycache__/
 *.pyc
 .DS_Store
+# CI / dev-only artifacts — not part of the plugin surface (MCP config files stay packageable)
+.github/workflows/
+.github/dependabot.yml
+requirements-dev.txt
+pyrightconfig.json
