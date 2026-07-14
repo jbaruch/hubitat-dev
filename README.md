@@ -16,11 +16,17 @@ Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local netwo
 
 ## Rules
 
+All rules are always-on — installing the plugin means you want this context.
+
 | Rule | Purpose |
 |------|---------|
-| [sandbox-constraints](rules/sandbox-constraints.md) | What the Groovy 2.4 sandbox forbids — no user classes, threads, `sleep`/`println`; allowed-imports allow-list only. |
-
-_More rules land as the plugin fills out (app/driver lifecycle, logging conventions, state-vs-attributes, Groovy gotchas, multi-hub topology)._
+| [sandbox-constraints](rules/sandbox-constraints.md) | What the Groovy 2.4 sandbox forbids — no user classes, threads, `sleep`/`println`; the 197-class import allow-list. |
+| [app-lifecycle](rules/app-lifecycle.md) | App callbacks and the `installed()`→`updated()`→`unsubscribe()` idiom that keeps an app from silently doing nothing. |
+| [driver-lifecycle](rules/driver-lifecycle.md) | Driver callbacks, the capability contract (declare = must implement), and the `parse()` dispatch pattern. |
+| [logging-conventions](rules/logging-conventions.md) | The `logEnable`/`txtEnable` toggles and the `runIn(1800, logsOff)` auto-disable idiom. |
+| [state-vs-attributes](rules/state-vs-attributes.md) | Attributes via `sendEvent` (subscribable) vs. `state`/`atomicState` (private, JSON-serializable). |
+| [groovy-gotchas](rules/groovy-gotchas.md) | Silent-failure traps the compiler misses: string handler names, `0`-is-falsy, null device inputs, reserved names. |
+| [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
 
 ## Skills
 
