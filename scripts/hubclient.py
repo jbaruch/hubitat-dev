@@ -190,10 +190,13 @@ class HubClient:
         status, _, text = self._post_form(
             _PATHS[kind]["update"], {"id": plan["id"], "version": plan["version"], "source": source})
         low = text.lower()
-        if "success" in low or status == 200 and "error" not in low:
+        # Only an explicit success signal confirms the save. An unexpected 200 (e.g. an HTML
+        # page) must not be reported as success — the hub's /ajax/update returns {status:"success"}.
+        if "success" in low:
             return {"action": "update", "id": plan["id"], "version": plan["version"]}
         if "version" in low:
             raise DeployConflict(
                 f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "
                 f"version than {plan['version']}. Re-pull and reconcile before deploying.")
-        raise HubError(f"update {kind} id={plan['id']} failed: HTTP {status} {text[:200]}")
+        raise HubError(
+            f"update {kind} id={plan['id']} did not confirm success (HTTP {status}): {text[:200]}")

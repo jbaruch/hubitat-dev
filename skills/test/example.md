@@ -25,6 +25,8 @@ dependencies {
 }
 ```
 
+**Renewal:** these three pins move together (Groovy 2.5 ↔ Spock 1.2 ↔ hubitat_ci 0.17). The biocomp Azure feed has no dependency scanner, so re-check the [hubitat_ci releases](https://github.com/biocomp/hubitat_ci/releases) when adopting and on each dependency-review pass, and bump all three as one focused change if a newer hubitat_ci ships.
+
 ## App test — validation + a mocked callback
 
 ```groovy

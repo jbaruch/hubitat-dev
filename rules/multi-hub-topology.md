@@ -11,7 +11,7 @@ Hubitat's two planes behave differently across a multi-hub setup. Conflating the
 
 - **Code** (apps, drivers, libraries) lives in each hub's own editor. There is no mesh for code — deploy, pull, and log-tail target one hub **by IP**. A driver installed on hub A does not exist on hub B until deployed there too.
 - **Devices** can mesh: with hub meshing, one Maker API instance can expose devices from secondary hubs. Device *control* can be centralized; code *deployment* cannot.
-- Hub connection details are therefore keyed by hub, one IP each. The `hub-config` skill owns that config.
+- Hub connection details are keyed by hub, one IP each; the `hub-config` skill owns that config.
 
 ## Local network, no Hub Security (assumed default)
 

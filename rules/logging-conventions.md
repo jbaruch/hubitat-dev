@@ -5,7 +5,7 @@ description: The logEnable/txtEnable logging convention and auto-disable idiom e
 
 # Logging Conventions
 
-The only debugger Hubitat gives you is `log` + the live log stream (`ws://<hub>/logsocket`, see `reference/endpoints.md`). Logging discipline is therefore load-bearing, not cosmetic.
+The only debugger Hubitat gives you is `log` + the live log stream (`ws://<hub>/logsocket`, see `reference/endpoints.md`). Logging discipline is load-bearing, not cosmetic.
 
 ## Levels
 
