@@ -222,6 +222,16 @@ class TestSummarize(unittest.TestCase):
         s = m.summarize([m.parse_zwave_frame(ZW_RAW)])
         self.assertNotIn("transmit_report", s)
 
+    def test_transmit_report_even_count_median_is_averaged(self):
+        # two reports: hub noise floor -92 and -96 → true median -94.0 (not the upper-middle -92)
+        a = TXREPORT
+        b = TXREPORT.replace("measured noise floor: -92 dBm", "measured noise floor: -96 dBm")
+        frames = [m.parse_zwave_frame({"sourceLabel": "DRIVER", "plainTextMessage": t, "time": "t"})
+                  for t in (a, b)]
+        s = m.summarize(frames)
+        self.assertEqual(s["transmit_report"]["reports"], 2)
+        self.assertEqual(s["transmit_report"]["hub_noise_floor_med"], -94.0)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -272,7 +272,11 @@ def summarize(frames: list) -> dict:
     if tx:
         def med(vals):
             vals = sorted(v for v in vals if v is not None)
-            return None if not vals else vals[len(vals) // 2]
+            if not vals:
+                return None
+            n = len(vals)
+            mid = n // 2
+            return vals[mid] if n % 2 else (vals[mid - 1] + vals[mid]) / 2  # true median
         result["transmit_report"] = {
             "reports": len(tx),
             "noack": sum(1 for t in tx if t["status"] and t["status"] != "OK"),
