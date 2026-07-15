@@ -54,6 +54,30 @@ class TestParseZigbee(unittest.TestCase):
         self.assertEqual(f["name"], "Stairs Top Motion Sensor")
 
 
+class TestDecodeFrame(unittest.TestCase):
+    def test_valid_object_frame_decodes(self):
+        import json
+        f = m.decode_frame(json.dumps(ZB_RAW), "zigbee")
+        self.assertEqual(f["cluster"], "IAS Zone")
+
+    def test_malformed_json_is_none(self):
+        self.assertIsNone(m.decode_frame("{not json", "zigbee"))
+
+    def test_json_valid_but_not_an_object_is_none(self):
+        # the version-sensitive socket could emit a bare number/list/string — must skip, not crash
+        for text in ("123", "[1, 2, 3]", '"a string"', "null"):
+            self.assertIsNone(m.decode_frame(text, "zigbee"))
+            self.assertIsNone(m.decode_frame(text, "zwave"))
+
+    def test_wrong_typed_numeric_field_does_not_crash_aggregation(self):
+        import json
+        bad = {**ZB_RAW, "lastHopLqi": "oops", "lastHopRssi": None, "sequence": "x"}
+        f = m.decode_frame(json.dumps(bad), "zigbee")
+        self.assertIsNone(f["lqi"])
+        self.assertIsNone(f["rssi"])
+        m.summarize([f])  # must not raise on the wrong-typed frame
+
+
 class TestParseZwave(unittest.TestCase):
     def test_node_and_rssi_extracted_from_text(self):
         f = m.parse_zwave_frame(ZW_RAW)

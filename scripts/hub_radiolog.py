@@ -83,6 +83,12 @@ def cluster_name(cluster_id) -> str:
     return "unknown"
 
 
+def _num(v):
+    """Coerce a value to a real int/float, else None — defends the ranking/aggregation against a
+    version-changed socket sending a wrong-typed numeric field (a string LQI would crash min())."""
+    return v if isinstance(v, (int, float)) and not isinstance(v, bool) else None
+
+
 def parse_zigbee_frame(f: dict) -> dict:
     """Normalize a raw Zigbee log frame to the fields worth reading/aggregating."""
     return {
@@ -94,9 +100,9 @@ def parse_zigbee_frame(f: dict) -> dict:
         "cluster": cluster_name(f.get("clusterId")),
         "srcEp": f.get("sourceEndpoint"),
         "dstEp": f.get("destinationEndpoint"),
-        "seq": f.get("sequence"),
-        "lqi": f.get("lastHopLqi"),
-        "rssi": f.get("lastHopRssi"),
+        "seq": _num(f.get("sequence")),
+        "lqi": _num(f.get("lastHopLqi")),
+        "rssi": _num(f.get("lastHopRssi")),
         "type": f.get("type"),
         "time": f.get("time"),
     }
@@ -209,6 +215,20 @@ def parse_frame(raw: dict, radio: str) -> dict:
     return parse_zigbee_frame(raw) if radio == "zigbee" else parse_zwave_frame(raw)
 
 
+def decode_frame(text: str, radio: str):
+    """Decode one raw socket text frame to a normalized dict, or None when it is not a well-formed
+    JSON object. The radio sockets are undocumented and version-sensitive, so a malformed frame OR
+    a JSON value that is not an object (a bare number, list, or string from a shape change) must
+    skip the frame, never crash the tail."""
+    try:
+        raw = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    if not isinstance(raw, dict):
+        return None
+    return parse_frame(raw, radio)
+
+
 def _run(ip: str, radio: str, filters: dict, seconds, follow, summary, as_json, out) -> int:
     request, _ = build_handshake(ip, RADIO_SOCKETS[radio])
     try:
@@ -248,11 +268,8 @@ def _run(ip: str, radio: str, filters: dict, seconds, follow, summary, as_json, 
                     break
                 if opcode not in (0x1, 0x2):
                     continue
-                try:
-                    frame = parse_frame(json.loads(payload.decode("utf-8", "replace")), radio)
-                except (json.JSONDecodeError, KeyError):
-                    continue
-                if not matches(frame, **filters):
+                frame = decode_frame(payload.decode("utf-8", "replace"), radio)
+                if frame is None or not matches(frame, **filters):
                     continue
                 if summary:
                     collected.append(frame)
