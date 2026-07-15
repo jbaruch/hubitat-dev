@@ -55,8 +55,8 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_radiolog.py --ip <addr> -
     [--name "<device>" | --node <n>] --summary [--seconds N]
 ```
 
-Invoke with `--summary` (or `--json` for raw per-frame JSON) so the output is structured JSON for you to
-read, not human-formatted lines. Argument and frame contract: `scripts/hub_radiolog.py` module docstring.
+The script emits structured JSON by default; `--summary` gives the per-device rollup you want for
+diagnosis (raw per-frame JSON otherwise). Argument and frame contract: `scripts/hub_radiolog.py` module docstring.
 `--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
 worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
 `lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read

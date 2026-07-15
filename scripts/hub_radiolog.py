@@ -30,7 +30,8 @@ Usage:
     hub_radiolog.py --ip <addr> --radio zigbee [--name SUBSTR] [--seconds 20]
     hub_radiolog.py --ip <addr> --radio zwave  [--node 359] [--follow]
     hub_radiolog.py --ip <addr> --radio zigbee --summary [--seconds 30]   # per-device rollup
-Default: tail formatted frames for a bounded window. --summary aggregates the window instead.
+Output is structured JSON by default (per-frame JSON objects); --text switches to human-formatted
+lines for watching live by eye; --summary aggregates the window into a JSON per-device rollup.
 """
 import argparse
 import json
@@ -304,13 +305,16 @@ def main(argv=None) -> int:
     p.add_argument("--seconds", type=int, default=20)
     p.add_argument("--follow", action="store_true", help="run until interrupted")
     p.add_argument("--summary", action="store_true", help="aggregate the window into a per-device rollup")
-    p.add_argument("--json", action="store_true")
+    p.add_argument("--text", action="store_true",
+                   help="human-formatted lines instead of the default JSON (for watching live by eye)")
     args = p.parse_args(argv)
 
     filters = {"name_substr": args.name, "node": args.node,
                "device_id": args.device_id, "cluster": args.cluster}
+    # Structured JSON is the default (this is a skill-invoked deterministic script); --text opts
+    # into human-formatted lines. --summary emits a JSON rollup regardless.
     return _run(args.ip, args.radio, filters, args.seconds, args.follow,
-                args.summary, args.json, sys.stdout)
+                args.summary, not args.text, sys.stdout)
 
 
 if __name__ == "__main__":
