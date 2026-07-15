@@ -52,15 +52,16 @@ signal, retransmits, and dropped frames. When a suspect device needs confirming,
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_radiolog.py --ip <addr> --radio zigbee|zwave \
-    [--name "<device>" | --node <n>] [--summary] [--seconds N | --follow]
+    [--name "<device>" | --node <n>] --summary [--seconds N]
 ```
 
-Argument and frame contract: `scripts/hub_radiolog.py` module docstring. `--summary` aggregates a window
-into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`), worst-signal first — the live
-counterpart to the snapshot. **Zigbee frames carry per-device `lastHopLqi`/`lastHopRssi`** (the last hop
-into the hub — a repeater's link for a routed device). Read values against `rules/zwave-zigbee-mesh.md`
-(higher LQI/RSSI better; no absolute cutoff). Skip this step for a whole-network health check that needs
-no per-device confirmation. Proceed to Step 6.
+Invoke with `--summary` (or `--json` for raw per-frame JSON) so the output is structured JSON for you to
+read, not human-formatted lines. Argument and frame contract: `scripts/hub_radiolog.py` module docstring.
+`--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
+worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
+`lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read
+values against `rules/zwave-zigbee-mesh.md` (higher LQI/RSSI better; no absolute cutoff). Skip this step
+for a whole-network health check that needs no per-device confirmation. Proceed to Step 6.
 
 ## Step 6 — Report the Diagnosis
 
