@@ -2,6 +2,12 @@
 
 ### Added
 
+- Z-Wave and Zigbee **mesh-health** diagnostics: the `mesh-health` skill and `scripts/hub_mesh.py` fetch `/hub/zwaveDetails/json` and `/hub/zigbeeDetails/json` and flag failed/ghost nodes, nonzero PER, dead/incomplete Zigbee joins, and an unhealthy network, ranking nodes worst-first by PER/RTT/RSSI rather than against absolute cutoffs Hubitat does not publish. The new always-on `zwave-zigbee-mesh` rule carries the grounded field meanings and two load-bearing distinctions: `lwrRssi` is reported on two scales by the Z-Wave *backend* (zwaveJS absolute dBm vs legacy dB-above-noise), while `neighbors`/routing are set by *topology* — the tool tags each node `lr` (id ≥ 256, a star: no neighbors, no routes, no repeaters) vs `mesh` (id ≤ 232), so a weak Long Range node is never mis-advised toward a repeater or Z-Wave repair. Endpoints and field shapes verified live on 2.5.1.128 across a zwaveJS ("Apps") and a legacy ("Devices") hub; metric meanings and protocol constants grounded in Hubitat docs, Z-Wave Alliance / Silicon Labs (LR star topology, 700/800 sensitivity per modulation), and IEEE 802.15.4.
+
+## 0.1.0 — 2026-07-14
+
+### Added
+
 - Initial plugin skeleton for `jbaruch/hubitat-dev`: manifest, README with registry badge, and the `sandbox-constraints` rule and `scaffold` skill seeds.
 - Grounded the Hubitat code-editor and logging endpoints against live C-8 Pro hubs on platform 2.5.1.125 (Hub Security off): `/hub2/userAppTypes`, `/hub2/userDeviceTypes`, `/hub2/userLibraries` for code enumeration; `/app/ajax/code` and `/driver/ajax/code` for source+version round-trip; `ws://<hub>/logsocket` confirmed streaming structured JSON frames. These shapes seed `reference/endpoints.md`.
 - Bundled `reference/` data: `capabilities.json` (all 102 capabilities → attributes/commands/params, parsed from the authoritative capability list), `allowed-imports.txt` (the 197-class sandbox allow-list), `endpoints.md` (the grounded hub endpoint catalog), and `input-types.md` (app + driver preference input types).

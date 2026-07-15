@@ -66,6 +66,36 @@ REST log pulls also exist: `GET /logs/json`, `/logs/eventsJson`, `/logs/past/jso
 
 Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/apps/api/<makerAppId>/<path>?access_token=<token>`. Key paths: `/devices` (list), `/devices/all` (full JSON: capabilities, attributes, commands), `/devices/<id>`, `/devices/<id>/<command>/<secondaryValue>` (send command), `/devices/<id>/events`. Multi-hub note: with hubs meshed, one Maker API instance can expose devices from secondary hubs too — but **code** endpoints are per-hub and have no mesh.
 
+## Z-Wave & Zigbee mesh detail (undocumented — grounded 2026-07-15)
+
+Both return clean JSON on 2.5.1.128, no auth with Hub Security off. Drive them for mesh
+diagnostics; the `mesh-health` skill reads them via `scripts/hub_mesh.py`.
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /hub/zwaveDetails/json` | `{enabled, healthy, zwaveJS, firmwareVersion, region, longRangeChannel, nodes:[...]}` |
+| `GET /hub/zigbeeDetails/json` | `{enabled, networkState, healthy, inJoinMode, channel, weakChannel, panId, extendedPanId, powerLevel, devices:[...]}` |
+| `GET /hub/zigbee/getChildAndRouteInfo` | **text/plain** — Child Data + Neighbor Table (`[name, shortId], LQI:<n>, age:...`) + Route Table. The per-device (router) **LQI** the JSON snapshot lacks |
+| `GET /hub/zwaveTopology` | Routing matrix as an **HTML** `<table>` (not JSON) |
+
+**Z-Wave `nodes[]` per-node fields:** `nodeId`, `deviceId` (Hubitat device id), `deviceName`,
+`nodeState` (`OK` | `FAILED` — `FAILED` is a failed/ghost node), `msgCount` (int — traffic volume;
+weigh `per` against it), `per` (cumulative packet-error **count**, not a %), `averageRtt` (ms, string),
+`lwrRssi` (string — see scale note), `neighbors` (int), `routeChanges` (int or `N/A`), `route`,
+`security`, `listening`, `beaming`, `batteryPercent`.
+
+**Zigbee `devices[]` per-device fields:** `id`, `name`, `type`, `active` (bool), `ping`,
+`messageCount`, `lastActivity`, `lastMessage`, `shortZigbeeId` (16-bit), `zigbeeId` (64-bit IEEE).
+**No per-device LQI or RSSI is exposed here** — per-device (router) LQI is in `getChildAndRouteInfo`
+above; this snapshot is liveness + network-level only.
+
+**Backend vs topology — two independent axes, both verified live (the load-bearing gotcha):**
+
+- **Backend** (`zwaveJS` true/false) sets the `lwrRssi` scale — absolute dBm (negative, e.g. `-78db`) on zwaveJS vs dB *above the noise floor* (positive, e.g. `27dB`) on legacy — and whether `routeChanges` is reported (`N/A` on zwaveJS, an int on legacy). Higher RSSI is better on both; a fixed numeric cutoff does not transfer.
+- **Topology** sets `neighbors` and routing: **node id ≥ 256 = Z-Wave Long Range** (a star — `neighbors:0`, a direct `01 -> <node>` route, no repeaters, dynamic power); **id ≤ 232 = classic mesh** (neighbors + multi-hop routes). Verified: a classic node and LR nodes on the *same* zwaveJS hub show `neighbors:5` vs `0`, so `neighbors:0` is LR topology, not the backend.
+
+Field meanings and the LR-vs-mesh remediation split: `rules/zwave-zigbee-mesh.md`.
+
 ## Hub management (official — token API)
 
 `GET /hub/advanced/getManagementToken` → token, then `/management/reboot?token=`, `/management/firmwareUpdate?token=`. The Hub Information Driver (HPM) wraps reboot/update as device commands over Maker API.
