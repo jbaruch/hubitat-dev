@@ -29,10 +29,10 @@ and `summary.warnings` are both 0, report the mesh looks healthy and finish. Pro
 
 ## Step 3 — Triage the critical signals
 
-- Z-Wave `zwave.failed[]` — failed/ghost nodes. The unambiguous problem. Name the node and device.
+- Z-Wave FAILED nodes — split by `failure_kind`: `zwave.orphan_ghosts[]` (no `deviceId`, safe to remove) vs `zwave.unreachable_devices[]` (a real device currently unreachable — **may be transient; recover it, do not advise deleting it**). Name the node and device; never tell the user to remove an unreachable real device as if it were a ghost.
 - Zigbee `zigbee.network_problems[]` — `weakChannel`, offline, or unhealthy network. A whole-radio issue, not one device.
 
-These are grounded and definite. Proceed to Step 4.
+These are grounded and definite. Removal itself is a hub-UI + physical action the skill guides but does not perform (`rules/zwave-zigbee-mesh.md` Device lifecycle). Proceed to Step 4.
 
 ## Step 4 — Read the warnings and rankings against the rule
 

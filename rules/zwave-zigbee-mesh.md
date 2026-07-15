@@ -12,7 +12,7 @@ unambiguous signals and rank the rest; never assert an invented cutoff.
 
 ## Z-Wave node metrics (grounded meanings)
 
-- `nodeState` `FAILED` — a failed/ghost node (a dead device, or a pairing that never completed). The one unambiguous critical signal. Refresh, then Remove from the Z-Wave Details page.
+- `nodeState` `FAILED` — the node is unreachable. **Split it by `deviceId`** (`hub_mesh.py` tags `failure_kind`): FAILED **with** a bound `deviceId` is a *real device currently unreachable* — may be transient (recover it, do NOT delete); FAILED with **no** `deviceId` is an *orphan ghost* (a pairing that never bound a device) — safe to remove. Never force-remove a real device thinking it is a ghost.
 - `per` — cumulative packet-**error count** ("accumulation of packet errors for a node"), not a percentage. Lower is better; `0` is ideal. Nonzero means errors are occurring; judge severity relative to the node's `msgCount` and to peers.
 - `averageRtt` — round-trip time in ms; lower is better. No spec cutoff — rank, don't threshold.
 - `routeChanges` — classic-mesh stability indicator; frequent changes mean the Last Working Route keeps failing. Reported by the **legacy** backend; `N/A` on the zwaveJS backend.
@@ -44,6 +44,13 @@ unambiguous signals and rank the rest; never assert an invented cutoff.
 - `ws://<ip>/zwaveLogsocket` and `ws://<ip>/zigbeeLogsocket` stream per-frame decoded traffic — distinct from the driver `/logsocket`. Tail via `scripts/hub_radiolog.py`; the snapshot says who is weak, the log shows it happening.
 - Read them for live signal (Zigbee `lastHopLqi`/`lastHopRssi`, Z-Wave per-frame `RSSI: -NN dBm`), `sequence` gaps (a soft missed-frame hint, not a hard drop count — the counter is shared across the device's traffic), and which cluster/command a device uses.
 - `lastHopLqi`/`lastHopRssi` are the **last hop into the hub** — for a routed device that is the repeater→hub link, not the end device's own radio. ZCL cluster names for the common clusters; `0xFC00–0xFFFE` is manufacturer-specific, `0xE000–0xEFFF` is reserved space vendors (Tuya) use off-spec.
+
+## Device lifecycle & removal
+
+- **LR devices join via SmartStart, not classic inclusion** — the DSK/QR is added to the hub's provisioning list and the device auto-includes on power-up (no add-mode, no button). LR inclusion is S2-mandatory; the new node gets an id ≥ 256.
+- **Graceful removal is two steps and one is physical**: remove the device from the SmartStart provisioning list (else it re-includes), *and* exclude/factory-reset the physical device. An agent cannot do the physical step — so removal is guide-the-user, not automate.
+- **The tooling confirms a removal, it does not trigger one.** No groundable zwaveJS action endpoint exists (only `/hub/dismissWeakZigbee`); inclusion/exclusion/remove are hub-UI + physical. Confirm a removal two ways: the snapshot node-count/id diff, and the radio-log signature (`reference/zwave-lifecycle.md`).
+- Force-remove (`RemoveFailedNode`) applies only to a FAILED **orphan ghost**, never a recoverable real device.
 
 ## Grounding sources
 

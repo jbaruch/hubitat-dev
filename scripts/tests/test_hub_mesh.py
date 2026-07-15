@@ -109,6 +109,16 @@ class TestAnalyzeZwave(unittest.TestCase):
         self.assertEqual([n["nodeId"] for n in r["failed"]], [2])
         self.assertEqual(r["failed"][0]["deviceName"], "Ghost")
 
+    def test_failed_splits_orphan_ghost_vs_unreachable_device(self):
+        # FAILED + deviceId = real device (unreachable, don't delete); FAILED + no deviceId = ghost
+        d = zwave_details([zw_node(nodeId=1, nodeState="FAILED", deviceId=300, deviceName="Real Light"),
+                           zw_node(nodeId=2, nodeState="FAILED", deviceId=None, deviceName="Device")])
+        r = m.analyze_zwave(d)
+        self.assertEqual([n["nodeId"] for n in r["unreachable_devices"]], [1])
+        self.assertEqual([n["nodeId"] for n in r["orphan_ghosts"]], [2])
+        kinds = {n["nodeId"]: n["failure_kind"] for n in r["failed"]}
+        self.assertEqual(kinds, {1: "unreachable_device", 2: "orphan_ghost"})
+
     def test_packet_errors_ranked_worst_first(self):
         d = zwave_details([zw_node(nodeId=1, per=5), zw_node(nodeId=2, per=0),
                            zw_node(nodeId=3, per=300)])
