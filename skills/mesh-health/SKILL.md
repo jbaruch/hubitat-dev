@@ -58,6 +58,10 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_radiolog.py --ip <addr> -
 
 The script emits structured JSON by default; `--summary` gives the per-device rollup you want for
 diagnosis (raw per-frame JSON otherwise). Argument and frame contract: `scripts/hub_radiolog.py` module docstring.
+For a Z-Wave device that is slow or **flapping** (OK↔FAILED), operate it while capturing and read the
+`--summary` `transmit_report` rollup: if `hub_snr_med` is well below `dest_snr_med` and the hub noise
+floor is worse than the device's, the **hub's receiver** is the bottleneck (its RF environment), not
+the device or distance — see `reference/zwave-lifecycle.md` (TransmitReport).
 `--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
 worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
 `lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read

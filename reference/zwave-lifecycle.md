@@ -50,6 +50,24 @@ to an **orphan ghost** (FAILED with no bound `deviceId`), never a recoverable re
 wire signature was **not captured** this session (we declined to remove real devices), so it is not
 asserted here — capture it before documenting the frames.
 
+## TransmitReport — the richest RF diagnostic
+
+Every hub→device Z-Wave command emits a `[DRIVER] hub:` TransmitReport line the JSON snapshot never
+shows. `hub_radiolog.py` parses it into a `transmit` sub-dict (and `--summary` medians it). Real
+line and fields:
+
+```
+callback id: 244 transmit status: OK, took 40 ms routing attempts: 2 ... TX power: 14 dBm
+  ACK RSSI: -91 dBm            measured noise floor: -92 dBm            ← at the HUB
+  measured RSSI of ACK from destination: -85 dBm   measured noise floor by destination: -96 dBm  ← at the DEVICE
+```
+
+- `status` (OK / NoAck — the definitive send result), `took_ms` (real latency), `routing_attempts` (retransmits), `tx_power` (max US LR is 14 dBm).
+- `hub_noise_floor` + `hub_ack_rssi` → `hub_snr` (device→hub headroom, measured at the controller).
+- `dest_noise_floor` + `dest_rssi` → `dest_snr` (hub→device headroom, measured at the device).
+- **Read the asymmetry.** A hub noise floor worse than the devices' and a `hub_snr` well below `dest_snr` means the **hub's own receiver** is the bottleneck (its RF environment — co-located radios, USB3, a gear cluster), not the device and not distance. The opposite asymmetry points at the device end. This is the one measurement that localizes a flapping/high-latency link; the snapshot's single `lwrRssi` cannot.
+- Invalid RSSI sentinels (a positive dBm such as `+78`) are dropped — a received RSSI on these logs is always negative dBm.
+
 ## FAILED ≠ ghost
 
 A `nodeState: FAILED` node with a bound `deviceId` is a **real device currently unreachable** (may

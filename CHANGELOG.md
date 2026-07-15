@@ -3,6 +3,7 @@
 ### Added
 
 - Grounded the Z-Wave **device lifecycle** from live experiments (a real SmartStart LR inclusion and a real graceful exclusion, captured on `zwaveLogsocket`): new `reference/zwave-lifecycle.md` documents the inclusion interview signature (S2-mandatory, id ≥ 256, the CC interview + SPAN nonce resync) and the graceful-exclusion signature (`RemoveNodeFromNetwork` → status `0x06` on the node id → `Node N was removed`, then DB teardown). Force-remove (`RemoveFailedNode`) is noted as not-yet-captured rather than asserted.
+- `hub_radiolog.py` now parses the Z-Wave **TransmitReport** frame — the richest RF diagnostic, absent from the snapshot: per-direction noise floor + signal (`hub_snr`/`dest_snr`), real latency (`took_ms`), retransmits, TX power. `--summary` adds a `transmit_report` rollup. The hub-vs-device SNR asymmetry localizes a flapping/high-latency link to the hub's receiver vs the device (`reference/zwave-lifecycle.md`). Also drops invalid RSSI sentinels (a positive dBm such as `+78`) instead of reporting them as real readings.
 
 ### Changed
 
