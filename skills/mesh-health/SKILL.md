@@ -48,7 +48,8 @@ Correlate a flagged node against the reported symptom. Proceed to Step 5.
 ## Step 5 — Watch the live radio traffic
 
 The snapshot says *who* is weak; the radio log streams say *what is happening on the air* — per-frame
-signal, retransmits, and dropped frames. When a suspect device needs confirming, tail its live traffic:
+signal (LQI/RSSI) and sequence continuity (soft missed-frame hints). When a suspect device needs
+confirming, tail its live traffic:
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_radiolog.py --ip <addr> --radio zigbee|zwave \
