@@ -234,7 +234,9 @@ def _run(ip: str, radio: str, filters: dict, seconds, follow, summary, as_json, 
     try:
         sock = socket.create_connection((ip, 80), timeout=10)
     except OSError as e:
-        print(f"cannot connect to {ip}:80 — {e}", file=sys.stderr)
+        print(f"cannot connect to {ip}:80 — {e}. Confirm the hub IP is correct and reachable "
+              f"(ping it, or check hubs.json), and that Hub Security is off — the radio log "
+              f"sockets are unauthenticated local sockets on port 80.", file=sys.stderr)
         return 1
     collected = []
     try:
@@ -249,8 +251,10 @@ def _run(ip: str, radio: str, filters: dict, seconds, follow, summary, as_json, 
         sep = raw.find(b"\r\n\r\n")
         header = (raw[:sep] if sep >= 0 else raw).decode("latin1", "replace")
         if "101" not in header.split("\r\n", 1)[0]:
-            print(f"radio-log handshake failed: {header.splitlines()[0] if header else '(no response)'}",
-                  file=sys.stderr)
+            print(f"radio-log handshake failed: {header.splitlines()[0] if header else '(no response)'}. "
+                  f"The {RADIO_SOCKETS[radio]} endpoint may not exist on this firmware or Hub Security "
+                  f"may be on — verify the path against reference/endpoints.md and that the hub is on a "
+                  f"supported platform.", file=sys.stderr)
             return 1
         buf = bytearray(raw[sep + 4:]) if sep >= 0 else bytearray()
         sock.settimeout(1.0)
@@ -279,7 +283,8 @@ def _run(ip: str, radio: str, filters: dict, seconds, follow, summary, as_json, 
     except KeyboardInterrupt:
         pass
     except OSError as e:
-        print(f"radio-log connection to {ip} failed: {e}", file=sys.stderr)
+        print(f"radio-log connection to {ip} failed: {e}. The hub may have restarted or dropped "
+              f"the socket — re-run to reconnect.", file=sys.stderr)
         return 1
     finally:
         sock.close()
