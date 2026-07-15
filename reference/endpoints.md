@@ -87,7 +87,15 @@ weigh `per` against it), `per` (cumulative packet-error **count**, not a %), `av
 **Zigbee `devices[]` per-device fields:** `id`, `name`, `type`, `active` (bool), `ping`,
 `messageCount`, `lastActivity`, `lastMessage`, `shortZigbeeId` (16-bit), `zigbeeId` (64-bit IEEE).
 **No per-device LQI or RSSI is exposed here** — per-device (router) LQI is in `getChildAndRouteInfo`
-above; this snapshot is liveness + network-level only.
+above; per-frame LQI+RSSI in the radio log sockets below; this snapshot is liveness + network-level only.
+
+**Live radio log websockets** (verified 2026-07-15 on 2.5.1.128, `HTTP 101`, unmasked text frames,
+case-sensitive paths) — the per-frame decoded traffic, distinct from the driver `/logsocket`. Tail via `scripts/hub_radiolog.py`:
+
+| Socket | Frame shape (JSON per message) |
+|--------|-------------------------------|
+| `ws://<hub-ip>/zwaveLogsocket` | `{sourceLabel, plainTextMessage, deviceId, time}` — `sourceLabel` ∈ `SERIAL\|CNTRLR\|DRIVER`; node id and per-frame `RSSI: -NN dBm` live inside the decoded `plainTextMessage` text (`deviceId` is `-999` for hub-level lines) |
+| `ws://<hub-ip>/zigbeeLogsocket` | `{name, id, deviceId, profileId, clusterId, sourceEndpoint, destinationEndpoint, groupId, sequence, lastHopLqi, lastHopRssi, type, payload, time}` — **`lastHopLqi` (0–255) and `lastHopRssi` (dBm) of the last hop into the hub** (the repeater→hub link for a routed device) |
 
 **Backend vs topology — two independent axes, both verified live (the load-bearing gotcha):**
 

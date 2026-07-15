@@ -11,7 +11,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local netwo
 - **Authoring** — apps and drivers are single Groovy 2.4 files run in a locked-down sandbox. The rules encode what that sandbox forbids and the idioms that keep an app from silently doing nothing.
 - **Deploy / pull** — push source to a hub and pull it back over the same undocumented HTTP endpoints HPM and the VS Code extension use, with the `version` optimistic-concurrency token handled for you.
 - **Debug** — tail the hub's `/logsocket` and `/eventsocket` websockets (structured JSON, no library needed) and read them against the code.
-- **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and dead devices, grounded in Hubitat's metrics and the Silabs/IEEE 802.15.4 protocol specs.
+- **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and dead devices, then tail the live radio log sockets (`zwaveLogsocket`/`zigbeeLogsocket`) for per-frame signal (Zigbee LQI/RSSI, Z-Wave per-frame RSSI) — grounded in Hubitat's metrics and the Z-Wave Alliance/Silabs/IEEE 802.15.4 protocol specs.
 - **Lint** — catch the sandbox violations and silent-failure traps (bad imports, handler-name typos, capability→command gaps, the `installed()`/`updated()` first-run trap) before you paste.
 - **Test** — take apps and drivers off-hub for real unit tests.
 

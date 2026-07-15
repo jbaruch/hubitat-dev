@@ -45,7 +45,26 @@ Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 
 Correlate a flagged node against the reported symptom. Proceed to Step 5.
 
-## Step 5 — Report the Diagnosis
+## Step 5 — Watch the live radio traffic
+
+The snapshot says *who* is weak; the radio log streams say *what is happening on the air* — per-frame
+signal (LQI/RSSI) and sequence continuity (soft missed-frame hints). When a suspect device needs
+confirming, tail its live traffic:
+
+```
+python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_radiolog.py --ip <addr> --radio zigbee|zwave \
+    [--name "<device>" | --node <n>] --summary [--seconds N]
+```
+
+The script emits structured JSON by default; `--summary` gives the per-device rollup you want for
+diagnosis (raw per-frame JSON otherwise). Argument and frame contract: `scripts/hub_radiolog.py` module docstring.
+`--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
+worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
+`lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read
+values against `rules/zwave-zigbee-mesh.md` (higher LQI/RSSI better; no absolute cutoff). Skip this step
+for a whole-network health check that needs no per-device confirmation. Proceed to Step 6.
+
+## Step 6 — Report the Diagnosis
 
 State the diagnosis with the evidence (the flag or ranking that showed it) and the grounded fix.
 Ghost/failed-node removal and channel changes are **hub-UI actions** (Z-Wave Details → Refresh then
