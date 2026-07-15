@@ -66,6 +66,33 @@ REST log pulls also exist: `GET /logs/json`, `/logs/eventsJson`, `/logs/past/jso
 
 Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/apps/api/<makerAppId>/<path>?access_token=<token>`. Key paths: `/devices` (list), `/devices/all` (full JSON: capabilities, attributes, commands), `/devices/<id>`, `/devices/<id>/<command>/<secondaryValue>` (send command), `/devices/<id>/events`. Multi-hub note: with hubs meshed, one Maker API instance can expose devices from secondary hubs too — but **code** endpoints are per-hub and have no mesh.
 
+## Z-Wave & Zigbee mesh detail (undocumented — grounded 2026-07-15)
+
+Both return clean JSON on 2.5.1.128, no auth with Hub Security off. Drive them for mesh
+diagnostics; the `mesh-health` skill reads them via `scripts/hub_mesh.py`.
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /hub/zwaveDetails/json` | `{enabled, healthy, zwaveJS, firmwareVersion, region, longRangeChannel, nodes:[...]}` |
+| `GET /hub/zigbeeDetails/json` | `{enabled, networkState, healthy, inJoinMode, channel, weakChannel, panId, extendedPanId, powerLevel, devices:[...]}` |
+| `GET /hub/zwaveTopology` | Routing matrix as an **HTML** `<table>` (not JSON) |
+
+**Z-Wave `nodes[]` per-node fields:** `nodeId`, `deviceId` (Hubitat device id), `deviceName`,
+`nodeState` (`OK` | `FAILED` — `FAILED` is a failed/ghost node), `per` (cumulative packet-error
+**count**, not a %), `averageRtt` (ms, string), `lwrRssi` (string — see scale note), `neighbors`
+(int), `routeChanges` (int or `N/A`), `route`, `security`, `listening`, `beaming`, `batteryPercent`.
+
+**Zigbee `devices[]` per-device fields:** `id`, `name`, `type`, `active` (bool), `ping`,
+`messageCount`, `lastActivity`, `lastMessage`, `shortZigbeeId` (16-bit), `zigbeeId` (64-bit IEEE).
+**No per-device LQI or RSSI is exposed** — Zigbee diagnostics here are liveness + network-level only.
+
+**Backend split (verified across two hubs) — the load-bearing gotcha:** the Z-Wave backend
+changes what the same fields mean. On the **zwaveJS** backend (`zwaveJS:true`) `neighbors` is `0`,
+`routeChanges` is `N/A`, and `lwrRssi` is absolute dBm (negative, e.g. `-78db`). On the **legacy**
+backend (`zwaveJS:false`) `neighbors` and `routeChanges` are populated and `lwrRssi` is dB *above
+the noise floor* (positive, e.g. `27dB`). Higher RSSI is better on both, but a fixed numeric cutoff
+does not transfer between them. Field meanings and thresholds: `rules/zwave-zigbee-mesh.md`.
+
 ## Hub management (official — token API)
 
 `GET /hub/advanced/getManagementToken` → token, then `/management/reboot?token=`, `/management/firmwareUpdate?token=`. The Hub Information Driver (HPM) wraps reboot/update as device commands over Maker API.

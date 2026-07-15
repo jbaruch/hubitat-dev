@@ -11,6 +11,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local netwo
 - **Authoring** — apps and drivers are single Groovy 2.4 files run in a locked-down sandbox. The rules encode what that sandbox forbids and the idioms that keep an app from silently doing nothing.
 - **Deploy / pull** — push source to a hub and pull it back over the same undocumented HTTP endpoints HPM and the VS Code extension use, with the `version` optimistic-concurrency token handled for you.
 - **Debug** — tail the hub's `/logsocket` and `/eventsocket` websockets (structured JSON, no library needed) and read them against the code.
+- **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and dead devices, grounded in Hubitat's metrics and the Silabs/IEEE 802.15.4 protocol specs.
 - **Lint** — catch the sandbox violations and silent-failure traps (bad imports, handler-name typos, capability→command gaps, the `installed()`/`updated()` first-run trap) before you paste.
 - **Test** — take apps and drivers off-hub for real unit tests.
 
@@ -27,6 +28,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [state-vs-attributes](rules/state-vs-attributes.md) | Attributes via `sendEvent` (subscribable) vs. `state`/`atomicState` (private, JSON-serializable). |
 | [groovy-gotchas](rules/groovy-gotchas.md) | Silent-failure traps the compiler misses: string handler names, `0`-is-falsy, null device inputs, reserved names. |
 | [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
+| [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, the two-scale `lwrRssi` backend trap, and what counts as a real problem. |
 
 ## Skills
 
@@ -35,11 +37,12 @@ All rules are always-on — installing the plugin means you want this context.
 | [scaffold](skills/scaffold/SKILL.md) | Generating a correct app or driver skeleton from declared capabilities, self-checked with the linter. |
 | [deploy](skills/deploy/SKILL.md) | Pushing app/driver source to a hub and confirming it via the log stream — no browser copy-paste. |
 | [debug](skills/debug/SKILL.md) | Tailing the log/event websocket, filtered, and reading it against the code to diagnose. |
+| [mesh-health](skills/mesh-health/SKILL.md) | Diagnosing Z-Wave/Zigbee network problems — ghost/failed nodes, packet errors, weak routes, dead devices — from live mesh detail. |
 | [lint-review](skills/lint-review/SKILL.md) | Linting Groovy for sandbox violations and silent-failure traps, then judging each finding. |
 | [test](skills/test/SKILL.md) | Setting up offline unit tests (biocomp/hubitat_ci) so logic is exercised off-hub. |
 | [hub-config](skills/hub-config/SKILL.md) | Managing `hubs.json` — register, list, and set the default hub (action router). |
 
-Typical loop: `scaffold` → `lint-review` → `deploy` → `debug`, with `hub-config` set up once and `test` for anything with real logic.
+Typical loop: `scaffold` → `lint-review` → `deploy` → `debug`, with `hub-config` set up once and `test` for anything with real logic. `mesh-health` is orthogonal — reach for it when the problem is the radio network (a flaky device, a ghost node) rather than the code.
 
 ## Installation
 
