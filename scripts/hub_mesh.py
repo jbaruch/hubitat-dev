@@ -67,9 +67,11 @@ def parse_rssi(raw) -> Optional[float]:
     caller's concern (backend-dependent); this only extracts the number."""
     if raw is None:
         return None
-    s = str(raw).strip().lower().removesuffix("db").strip()
+    s = str(raw).strip().lower()
+    if s.endswith("db"):  # 3.8-compatible suffix strip (no str.removesuffix)
+        s = s[:-2]
     try:
-        return float(s)
+        return float(s.strip())
     except ValueError:
         return None
 
@@ -151,6 +153,7 @@ def normalize_zwave_node(node: dict) -> dict:
         "deviceId": node.get("deviceId"),
         "deviceName": node.get("deviceName") or "",
         "nodeState": node.get("nodeState"),
+        "msgCount": node.get("msgCount"),  # traffic volume — weigh PER against it
         "per": int(node["per"]) if isinstance(node.get("per"), (int, float)) else parse_num(node.get("per")),
         "rtt_ms": parse_num(node.get("averageRtt")),
         "rssi": parse_rssi(node.get("lwrRssi")),

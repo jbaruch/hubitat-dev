@@ -79,9 +79,10 @@ diagnostics; the `mesh-health` skill reads them via `scripts/hub_mesh.py`.
 | `GET /hub/zwaveTopology` | Routing matrix as an **HTML** `<table>` (not JSON) |
 
 **Z-Wave `nodes[]` per-node fields:** `nodeId`, `deviceId` (Hubitat device id), `deviceName`,
-`nodeState` (`OK` | `FAILED` — `FAILED` is a failed/ghost node), `per` (cumulative packet-error
-**count**, not a %), `averageRtt` (ms, string), `lwrRssi` (string — see scale note), `neighbors`
-(int), `routeChanges` (int or `N/A`), `route`, `security`, `listening`, `beaming`, `batteryPercent`.
+`nodeState` (`OK` | `FAILED` — `FAILED` is a failed/ghost node), `msgCount` (int — traffic volume;
+weigh `per` against it), `per` (cumulative packet-error **count**, not a %), `averageRtt` (ms, string),
+`lwrRssi` (string — see scale note), `neighbors` (int), `routeChanges` (int or `N/A`), `route`,
+`security`, `listening`, `beaming`, `batteryPercent`.
 
 **Zigbee `devices[]` per-device fields:** `id`, `name`, `type`, `active` (bool), `ping`,
 `messageCount`, `lastActivity`, `lastMessage`, `shortZigbeeId` (16-bit), `zigbeeId` (64-bit IEEE).

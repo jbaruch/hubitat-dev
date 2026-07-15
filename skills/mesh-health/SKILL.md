@@ -45,7 +45,7 @@ Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 
 Correlate a flagged node against the reported symptom. Proceed to Step 5.
 
-## Step 5 — Report and hand off fixes
+## Step 5 — Report the Diagnosis
 
 State the diagnosis with the evidence (the flag or ranking that showed it) and the grounded fix.
 Ghost/failed-node removal and channel changes are **hub-UI actions** (Z-Wave Details → Refresh then
