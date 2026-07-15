@@ -29,7 +29,7 @@ unambiguous signals and rank the rest; never assert an invented cutoff.
 
 - A C-8 Pro runs both at once. **Node id ≥ 256 = a Z-Wave LR node; id ≤ 232 = classic mesh.** Classify by id before advising — `hub_mesh.py` tags each node's `topology`.
 - **LR is a star**: every LR node talks **directly** to the hub — no routing, no hops, **no repeaters** (Z-Wave Alliance / Silicon Labs). `neighbors:0` and a direct `route` (`01 -> <node>`) are inherent to LR, not faults. LR uses per-transmission dynamic power control over a long link budget, so a distant LR node sitting at −85…−93 dBm can be normal.
-- **Never suggest a repeater or a Z-Wave repair for an LR node** — neither exists in a star. A genuinely weak LR link is a hub-antenna / placement / distance question, or is simply accepted.
+- **Never suggest a repeater or a Z-Wave repair for an LR node** — neither exists in a star. The fix for an **unreliable LR device at distance** (weak signal and/or high RTT, intermittently FAILED) is to **re-include it as classic Z-Wave mesh** so it routes through nearby mains-powered devices acting as repeaters — LR and classic mesh coexist on one hub, and a device that strains a single long direct hop is usually solid on a short mesh hop. Manufacturer-confirmed for Zooz LR switches. Otherwise: hub antenna/placement, or accept it.
 - **Classic mesh** (id ≤ 232) is the only place `neighbors`, multi-hop `route`, `routeChanges`, repeaters, and Z-Wave repair apply.
 
 ## Zigbee: liveness, and where signal actually lives
