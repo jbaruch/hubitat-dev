@@ -40,7 +40,7 @@ Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 - `zwave.packet_errors[]` — nonzero PER (cumulative error count); weigh against the node's `msgCount` and its peers, not an absolute number.
 - `zwave.ranked.by_rtt_ms` / `by_rssi` — worst-first. **Check `zwave.backend` first**: `lwrRssi` is absolute dBm under `zwavejs` and dB-above-noise under `legacy` — the same number means different things.
 - `zwave.weak_signal_heuristic[]` — backend-aware RSSI-near-floor flags; each carries `heuristic:true` and a cited `basis`. Present as a hint, not a fact.
-- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance* (weak signal and/or high `rtt_ms`, intermittently FAILED), the grounded fix is **re-include it as classic mesh** so it routes through nearby mains-powered repeaters — not placement platitudes. Only `mesh` nodes take repeaters/repair (`rules/zwave-zigbee-mesh.md`).
+- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair.
 - `zigbee.dead_devices[]` — `active:false`; `likely_incomplete_join:true` marks the `"Device"`/`"Device"` ghost. `zigbee.stalest` ranks by activity age.
 
 Correlate a flagged node against the reported symptom. Proceed to Step 5.
