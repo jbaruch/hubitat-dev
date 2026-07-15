@@ -138,11 +138,17 @@ def rssi_heuristic(rssi: Optional[float], backend: str, series: str = "800"):
 def node_topology(node_id) -> str:
     """Z-Wave LR node ids are >= 256; classic mesh is 1..232 (Z-Wave Alliance / Silicon Labs).
     LR is a star (no neighbors, no routes, no repeaters); mesh is where routing applies. The two
-    coexist on one hub, so topology is per-node, not per-hub."""
+    coexist on one hub, so topology is per-node, not per-hub. 233..255 is a reserved gap the spec
+    does not assign — classify it 'unknown', never 'mesh', so it gets no mesh-only advice."""
     try:
-        return "lr" if int(node_id) >= 256 else "mesh"
+        n = int(node_id)
     except (TypeError, ValueError):
         return "unknown"
+    if n >= 256:
+        return "lr"
+    if 1 <= n <= 232:
+        return "mesh"
+    return "unknown"
 
 
 def normalize_zwave_node(node: dict) -> dict:

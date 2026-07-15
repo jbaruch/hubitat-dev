@@ -168,6 +168,12 @@ class TestTopology(unittest.TestCase):
         self.assertEqual(m.node_topology(232), "mesh")
         self.assertEqual(m.node_topology(1), "mesh")
 
+    def test_reserved_gap_is_unknown_not_mesh(self):
+        # 233..255 is a reserved gap the spec does not assign — must not fall through to "mesh"
+        self.assertEqual(m.node_topology(233), "unknown")
+        self.assertEqual(m.node_topology(255), "unknown")
+        self.assertEqual(m.node_topology(0), "unknown")
+
     def test_unknown_when_missing(self):
         self.assertEqual(m.node_topology(None), "unknown")
         self.assertEqual(m.node_topology("x"), "unknown")
