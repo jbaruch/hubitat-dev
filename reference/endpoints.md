@@ -75,6 +75,7 @@ diagnostics; the `mesh-health` skill reads them via `scripts/hub_mesh.py`.
 |----------|---------|
 | `GET /hub/zwaveDetails/json` | `{enabled, healthy, zwaveJS, firmwareVersion, region, longRangeChannel, nodes:[...]}` |
 | `GET /hub/zigbeeDetails/json` | `{enabled, networkState, healthy, inJoinMode, channel, weakChannel, panId, extendedPanId, powerLevel, devices:[...]}` |
+| `GET /hub/zigbee/getChildAndRouteInfo` | **text/plain** — Child Data + Neighbor Table (`[name, shortId], LQI:<n>, age:...`) + Route Table. The per-device (router) **LQI** the JSON snapshot lacks |
 | `GET /hub/zwaveTopology` | Routing matrix as an **HTML** `<table>` (not JSON) |
 
 **Z-Wave `nodes[]` per-node fields:** `nodeId`, `deviceId` (Hubitat device id), `deviceName`,
@@ -84,14 +85,15 @@ diagnostics; the `mesh-health` skill reads them via `scripts/hub_mesh.py`.
 
 **Zigbee `devices[]` per-device fields:** `id`, `name`, `type`, `active` (bool), `ping`,
 `messageCount`, `lastActivity`, `lastMessage`, `shortZigbeeId` (16-bit), `zigbeeId` (64-bit IEEE).
-**No per-device LQI or RSSI is exposed** — Zigbee diagnostics here are liveness + network-level only.
+**No per-device LQI or RSSI is exposed here** — per-device (router) LQI is in `getChildAndRouteInfo`
+above; this snapshot is liveness + network-level only.
 
-**Backend split (verified across two hubs) — the load-bearing gotcha:** the Z-Wave backend
-changes what the same fields mean. On the **zwaveJS** backend (`zwaveJS:true`) `neighbors` is `0`,
-`routeChanges` is `N/A`, and `lwrRssi` is absolute dBm (negative, e.g. `-78db`). On the **legacy**
-backend (`zwaveJS:false`) `neighbors` and `routeChanges` are populated and `lwrRssi` is dB *above
-the noise floor* (positive, e.g. `27dB`). Higher RSSI is better on both, but a fixed numeric cutoff
-does not transfer between them. Field meanings and thresholds: `rules/zwave-zigbee-mesh.md`.
+**Backend vs topology — two independent axes, both verified live (the load-bearing gotcha):**
+
+- **Backend** (`zwaveJS` true/false) sets the `lwrRssi` scale — absolute dBm (negative, e.g. `-78db`) on zwaveJS vs dB *above the noise floor* (positive, e.g. `27dB`) on legacy — and whether `routeChanges` is reported (`N/A` on zwaveJS, an int on legacy). Higher RSSI is better on both; a fixed numeric cutoff does not transfer.
+- **Topology** sets `neighbors` and routing: **node id ≥ 256 = Z-Wave Long Range** (a star — `neighbors:0`, a direct `01 -> <node>` route, no repeaters, dynamic power); **id ≤ 232 = classic mesh** (neighbors + multi-hop routes). Verified: a classic node and LR nodes on the *same* zwaveJS hub show `neighbors:5` vs `0`, so `neighbors:0` is LR topology, not the backend.
+
+Field meanings and the LR-vs-mesh remediation split: `rules/zwave-zigbee-mesh.md`.
 
 ## Hub management (official — token API)
 

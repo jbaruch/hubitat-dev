@@ -17,8 +17,10 @@ Grounding (rules/zwave-zigbee-mesh.md carries the citations):
     numeric cutoff does NOT transfer across backends. Silicon Labs RX sensitivity floor:
     -97 dBm (700-series), -110 dBm (800-series).
   - nodeState FAILED marks a failed/ghost node.
-  - Zigbee exposes no per-device LQI/RSSI — only liveness (active, lastActivity, messageCount)
-    and network-level state (channel, weakChannel, healthy, networkState, powerLevel).
+  - Zigbee's zigbeeDetails snapshot exposes no per-device LQI/RSSI — only liveness (active,
+    lastActivity, messageCount) and network-level state (channel, weakChannel, healthy,
+    networkState, powerLevel). Per-device LQI lives in /hub/zigbee/getChildAndRouteInfo
+    (neighbor table); per-frame LQI+RSSI in the live zigbeeLogsocket.
 
 Because Hubitat gives no numeric "bad" thresholds, this script HARD-flags only unambiguous,
 grounded signals (FAILED nodes, nonzero PER, dead/incomplete Zigbee joins, an unhealthy
@@ -51,6 +53,9 @@ ZIGBEE_PATH = "/hub/zigbeeDetails/json"
 
 # Silicon Labs published receiver sensitivity floor, by Z-Wave series (dBm). Used only for
 # the backend-aware RSSI heuristic on the zwaveJS (absolute-dBm) scale. Source: silabs.com.
+# Note the modulation: -97 is 700-series 100 kbps GFSK; -110 is the 800-series LR channel
+# (100 kbps O-QPSK). The classic GFSK floor on 800 is a few dB higher, so this is a
+# conservative floor for a labeled heuristic, not an exact per-node threshold.
 SILABS_SENSITIVITY_DBM = {"700": -97, "800": -110}
 # A zwaveJS RSSI within this margin of the floor is flagged "near sensitivity floor". Margin,
 # not an absolute cutoff — the floor itself is the grounded number; the margin is judgment.
@@ -128,10 +133,21 @@ def rssi_heuristic(rssi: Optional[float], backend: str, series: str = "800"):
     return None
 
 
+def node_topology(node_id) -> str:
+    """Z-Wave LR node ids are >= 256; classic mesh is 1..232 (Z-Wave Alliance / Silicon Labs).
+    LR is a star (no neighbors, no routes, no repeaters); mesh is where routing applies. The two
+    coexist on one hub, so topology is per-node, not per-hub."""
+    try:
+        return "lr" if int(node_id) >= 256 else "mesh"
+    except (TypeError, ValueError):
+        return "unknown"
+
+
 def normalize_zwave_node(node: dict) -> dict:
     """Project a raw hub node to the fields the analysis ranks/flags on."""
     return {
         "nodeId": node.get("nodeId"),
+        "topology": node_topology(node.get("nodeId")),  # 'lr' | 'mesh' — remediation differs
         "deviceId": node.get("deviceId"),
         "deviceName": node.get("deviceName") or "",
         "nodeState": node.get("nodeState"),

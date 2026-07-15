@@ -160,6 +160,25 @@ class TestAnalyzeZigbee(unittest.TestCase):
         self.assertEqual(r["stalest"][0]["age_seconds"], 7200)
 
 
+class TestTopology(unittest.TestCase):
+    def test_lr_vs_mesh_by_node_id(self):
+        # LR node ids are >= 256; classic mesh is 1..232 (Z-Wave Alliance / Silicon Labs)
+        self.assertEqual(m.node_topology(268), "lr")
+        self.assertEqual(m.node_topology(256), "lr")
+        self.assertEqual(m.node_topology(232), "mesh")
+        self.assertEqual(m.node_topology(1), "mesh")
+
+    def test_unknown_when_missing(self):
+        self.assertEqual(m.node_topology(None), "unknown")
+        self.assertEqual(m.node_topology("x"), "unknown")
+
+    def test_topology_surfaced_on_analyzed_nodes(self):
+        d = zwave_details([zw_node(nodeId=268), zw_node(nodeId=100)])
+        nodes = {n["nodeId"]: n["topology"] for n in m.analyze_zwave(d)["ranked"]["by_rssi"]}
+        self.assertEqual(nodes[268], "lr")
+        self.assertEqual(nodes[100], "mesh")
+
+
 class TestAnalyzeRollup(unittest.TestCase):
     def test_summary_counts_across_radios(self):
         zw = zwave_details([zw_node(nodeState="FAILED"), zw_node(per=10)])
