@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.3 — 2026-07-15
+
 ### Added
 
 - Grounded the Z-Wave **device lifecycle** from live experiments (a real SmartStart LR inclusion and a real graceful exclusion, captured on `zwaveLogsocket`): new `reference/zwave-lifecycle.md` documents the inclusion interview signature (S2-mandatory, id ≥ 256, the CC interview + SPAN nonce resync) and the graceful-exclusion signature (`RemoveNodeFromNetwork` → status `0x06` on the node id → `Node N was removed`, then DB teardown). Force-remove (`RemoveFailedNode`) is noted as not-yet-captured rather than asserted.
