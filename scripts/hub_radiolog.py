@@ -14,6 +14,11 @@ Frame shapes (grounded):
       "[Node 359] [REQ] [BridgeApplicationCommand] │ RSSI: -83 dBm └[Security2CC...]". The node
       id and per-frame RSSI live IN that text (deviceId is -999 for hub-level lines), so they are
       extracted with fixed-format regexes — everything else is passed through verbatim.
+      A frame carrying a TransmitReport ("transmit status: ...") also gets a structured `transmit`
+      sub-dict — the richest RF diagnostic: per-direction noise floor + signal (→ hub_snr/dest_snr),
+      real latency (took_ms), retransmits, TX power. hub_* is at the controller, dest_* at the
+      device; a hub SNR far below the device SNR points at the hub's RF environment, not the device.
+      Invalid RSSI sentinels (a positive dBm like +78) are dropped, not reported as real.
   Zigbee  {name, id, deviceId, profileId, clusterId, sourceEndpoint, destinationEndpoint,
            groupId, sequence, lastHopLqi, lastHopRssi, time, type, payload}
       Carries per-frame lastHopLqi (0–255) and lastHopRssi (dBm) — the per-device signal the
@@ -60,6 +65,51 @@ ZCL_CLUSTERS = {
 
 _ZW_NODE_RE = re.compile(r"\[Node (\d+)\]")
 _ZW_RSSI_RE = re.compile(r"RSSI:\s*(-?\d+)\s*dBm", re.IGNORECASE)
+# zwaveJS TransmitReport fields — the richest RF diagnostic (per-direction noise floor + signal
+# → SNR, real latency, retransmits). `measured noise floor:` is at the controller; the same words
+# `... by destination:` are at the device, so the hub regex intentionally requires the colon.
+_ZW_TXSTATUS_RE = re.compile(r"transmit status: (\w+)")
+_ZW_TOOK_RE = re.compile(r"took (\d+) ms")
+_ZW_ROUTES_RE = re.compile(r"routing attempts: (\d+)")
+_ZW_TXPOWER_RE = re.compile(r"\bTX power: (-?\d+) dBm")
+_ZW_HUBNF_RE = re.compile(r"measured noise floor: (-?\d+) dBm")
+_ZW_DESTNF_RE = re.compile(r"measured noise floor by destination: (-?\d+) dBm")
+_ZW_ACKRSSI_RE = re.compile(r"\bACK RSSI: (-?\d+) dBm")
+_ZW_DESTRSSI_RE = re.compile(r"measured RSSI of ACK from destination: (-?\d+) dBm")
+
+
+def _valid_dbm(v):
+    """A received-signal RSSI on the zwave/zigbee logs is negative dBm (~ -30..-110). Positive or
+    implausible values are zwaveJS invalid/sentinel readings (e.g. +78) — return None, not garbage."""
+    return v if isinstance(v, (int, float)) and -120 <= v <= 0 else None
+
+
+def _search_int(rx, text):
+    m = rx.search(text)
+    return int(m.group(1)) if m else None
+
+
+def parse_transmit_report(text: str) -> dict:
+    """Extract the TransmitReport fields from a decoded Z-Wave frame's text. hub_* is measured at
+    the controller, dest_* at the device — the asymmetry (which end has the worse SNR / higher
+    noise floor) points at whether a link problem is on the hub side or the device side."""
+    status = _ZW_TXSTATUS_RE.search(text)
+    hub_rssi = _valid_dbm(_search_int(_ZW_ACKRSSI_RE, text))
+    hub_nf = _valid_dbm(_search_int(_ZW_HUBNF_RE, text))
+    dest_rssi = _valid_dbm(_search_int(_ZW_DESTRSSI_RE, text))
+    dest_nf = _valid_dbm(_search_int(_ZW_DESTNF_RE, text))
+    return {
+        "status": status.group(1) if status else None,
+        "took_ms": _search_int(_ZW_TOOK_RE, text),
+        "routing_attempts": _search_int(_ZW_ROUTES_RE, text),
+        "tx_power": _search_int(_ZW_TXPOWER_RE, text),
+        "hub_noise_floor": hub_nf,          # controller's receive noise floor
+        "dest_noise_floor": dest_nf,        # device's receive noise floor
+        "hub_ack_rssi": hub_rssi,           # device->hub signal, as heard at the hub
+        "dest_rssi": dest_rssi,             # hub->device signal, as heard at the device
+        "hub_snr": hub_rssi - hub_nf if hub_rssi is not None and hub_nf is not None else None,
+        "dest_snr": dest_rssi - dest_nf if dest_rssi is not None and dest_nf is not None else None,
+    }
 
 
 def cluster_name(cluster_id) -> str:
@@ -103,25 +153,29 @@ def parse_zigbee_frame(f: dict) -> dict:
         "dstEp": f.get("destinationEndpoint"),
         "seq": _num(f.get("sequence")),
         "lqi": _num(f.get("lastHopLqi")),
-        "rssi": _num(f.get("lastHopRssi")),
+        "rssi": _valid_dbm(_num(f.get("lastHopRssi"))),  # negative dBm; drop invalid sentinels
         "type": f.get("type"),
         "time": f.get("time"),
     }
 
 
 def parse_zwave_frame(f: dict) -> dict:
-    """Normalize a raw Z-Wave log frame. Node id and RSSI are pulled from the decoded text."""
+    """Normalize a raw Z-Wave log frame. Node id and RSSI come from the decoded text; a frame that
+    carries a TransmitReport (`transmit status: ...`) gets a structured `transmit` sub-dict."""
     text = f.get("plainTextMessage") or ""
     node = _ZW_NODE_RE.search(text)
     rssi = _ZW_RSSI_RE.search(text)
-    return {
+    out = {
         "radio": "zwave",
         "sourceLabel": f.get("sourceLabel"),
         "node": int(node.group(1)) if node else None,
-        "rssi": int(rssi.group(1)) if rssi else None,
+        "rssi": _valid_dbm(int(rssi.group(1))) if rssi else None,  # drop +78-style invalid readings
         "text": " ".join(text.split()),  # collapse the multi-line decoded block to one line
         "time": f.get("time"),
     }
+    if _ZW_TXSTATUS_RE.search(text):
+        out["transmit"] = parse_transmit_report(text)
+    return out
 
 
 def matches(frame: dict, name_substr=None, node=None, device_id=None, cluster=None) -> bool:
@@ -207,9 +261,33 @@ def summarize(frames: list) -> dict:
             "clusters": sorted(d["clusters"]),
             "sequence_gaps": tracker.gaps.get(key, 0),
         }
-    # worst signal first: sort by average RSSI ascending (weakest at the top)
-    return {"device_count": len(out), "devices": dict(sorted(out.items(),
-            key=lambda kv: (kv[1]["rssi"]["avg"] if kv[1]["rssi"] else 0)))}
+    result = {"device_count": len(out), "devices": dict(sorted(out.items(),
+              # worst signal first: sort by average RSSI ascending (weakest at the top)
+              key=lambda kv: (kv[1]["rssi"]["avg"] if kv[1]["rssi"] else 0)))}
+
+    # Z-Wave TransmitReport rollup — the hub-vs-device asymmetry that localizes a link problem.
+    # A hub noise floor worse than the devices', with hub-side SNR below device-side, points at the
+    # hub's RF environment (not the device, not distance). Median over the window's reports.
+    tx = [fr["transmit"] for fr in frames if fr.get("transmit")]
+    if tx:
+        def med(vals):
+            vals = sorted(v for v in vals if v is not None)
+            if not vals:
+                return None
+            n = len(vals)
+            mid = n // 2
+            return vals[mid] if n % 2 else (vals[mid - 1] + vals[mid]) / 2  # true median
+        result["transmit_report"] = {
+            "reports": len(tx),
+            "noack": sum(1 for t in tx if t["status"] and t["status"] != "OK"),
+            "retransmits": sum(1 for t in tx if (t["routing_attempts"] or 0) > 1),
+            "took_ms_med": med(t["took_ms"] for t in tx),
+            "hub_noise_floor_med": med(t["hub_noise_floor"] for t in tx),
+            "dest_noise_floor_med": med(t["dest_noise_floor"] for t in tx),
+            "hub_snr_med": med(t["hub_snr"] for t in tx),      # device->hub headroom
+            "dest_snr_med": med(t["dest_snr"] for t in tx),    # hub->device headroom
+        }
+    return result
 
 
 def parse_frame(raw: dict, radio: str) -> dict:

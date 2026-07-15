@@ -29,10 +29,10 @@ and `summary.warnings` are both 0, report the mesh looks healthy and finish. Pro
 
 ## Step 3 — Triage the critical signals
 
-- Z-Wave `zwave.failed[]` — failed/ghost nodes. The unambiguous problem. Name the node and device.
+- Z-Wave FAILED nodes — split by `failure_kind`: `zwave.orphan_ghosts[]` (no `deviceId`, safe to remove) vs `zwave.unreachable_devices[]` (a real device currently unreachable — **may be transient; recover it, do not advise deleting it**). Name the node and device; never tell the user to remove an unreachable real device as if it were a ghost.
 - Zigbee `zigbee.network_problems[]` — `weakChannel`, offline, or unhealthy network. A whole-radio issue, not one device.
 
-These are grounded and definite. Proceed to Step 4.
+These are grounded and definite. Removal itself is a hub-UI + physical action the skill guides but does not perform (`rules/zwave-zigbee-mesh.md` Device lifecycle). Proceed to Step 4.
 
 ## Step 4 — Read the warnings and rankings against the rule
 
@@ -40,7 +40,7 @@ Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 - `zwave.packet_errors[]` — nonzero PER (cumulative error count); weigh against the node's `msgCount` and its peers, not an absolute number.
 - `zwave.ranked.by_rtt_ms` / `by_rssi` — worst-first. **Check `zwave.backend` first**: `lwrRssi` is absolute dBm under `zwavejs` and dB-above-noise under `legacy` — the same number means different things.
 - `zwave.weak_signal_heuristic[]` — backend-aware RSSI-near-floor flags; each carries `heuristic:true` and a cited `basis`. Present as a hint, not a fact.
-- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**; a weak LR link is placement/antenna/distance. Only `mesh` nodes take repeaters/repair (`rules/zwave-zigbee-mesh.md`).
+- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair.
 - `zigbee.dead_devices[]` — `active:false`; `likely_incomplete_join:true` marks the `"Device"`/`"Device"` ghost. `zigbee.stalest` ranks by activity age.
 
 Correlate a flagged node against the reported symptom. Proceed to Step 5.
@@ -58,6 +58,10 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_radiolog.py --ip <addr> -
 
 The script emits structured JSON by default; `--summary` gives the per-device rollup you want for
 diagnosis (raw per-frame JSON otherwise). Argument and frame contract: `scripts/hub_radiolog.py` module docstring.
+For a Z-Wave device that is slow or **flapping** (OK↔FAILED), operate it while capturing and read the
+`--summary` `transmit_report` rollup: if `hub_snr_med` is well below `dest_snr_med` and the hub noise
+floor is worse than the device's, the **hub's receiver** is the bottleneck (its RF environment), not
+the device or distance — see `reference/zwave-lifecycle.md` (TransmitReport).
 `--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
 worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
 `lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read

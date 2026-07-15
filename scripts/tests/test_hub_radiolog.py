@@ -94,6 +94,52 @@ class TestParseZwave(unittest.TestCase):
         self.assertIsNone(f["rssi"])
 
 
+TXREPORT = ("« [REQ] [SendDataBridge] callback id: 244 transmit status: OK, took 40 ms "
+            "routing attempts: 2 protocol & route speed: Z-Wave Long Range, 100 kbit/s "
+            "routing scheme: Resort to Direct ACK RSSI: -91 dBm ACK channel no.: 3 TX channel no.: 3 "
+            "TX power: 14 dBm measured noise floor: -92 dBm ACK TX power by destination: 14 dBm "
+            "measured RSSI of ACK from destination: -85 dBm measured noise floor by destination: -96 dBm")
+
+
+class TestTransmitReport(unittest.TestCase):
+    def test_fields_and_per_direction_snr(self):
+        t = m.parse_transmit_report(TXREPORT)
+        self.assertEqual((t["status"], t["took_ms"], t["routing_attempts"], t["tx_power"]), ("OK", 40, 2, 14))
+        # hub side hears the device at -91 vs a -92 floor => 1 dB; device hears hub at -85 vs -96 => 11 dB
+        self.assertEqual((t["hub_noise_floor"], t["dest_noise_floor"]), (-92, -96))
+        self.assertEqual((t["hub_ack_rssi"], t["dest_rssi"]), (-91, -85))
+        self.assertEqual((t["hub_snr"], t["dest_snr"]), (1, 11))
+
+    def test_hub_noise_floor_regex_not_confused_by_destination(self):
+        # "measured noise floor:" (hub) must not match "measured noise floor by destination:"
+        t = m.parse_transmit_report(TXREPORT)
+        self.assertNotEqual(t["hub_noise_floor"], t["dest_noise_floor"])
+
+    def test_frame_gets_transmit_subdict(self):
+        f = m.parse_zwave_frame({"sourceLabel": "DRIVER", "plainTextMessage": TXREPORT, "time": "t"})
+        self.assertEqual(f["transmit"]["hub_snr"], 1)
+
+    def test_non_report_frame_has_no_transmit(self):
+        f = m.parse_zwave_frame({"sourceLabel": "SERIAL", "plainTextMessage": "» [ACK] (0x06)", "time": "t"})
+        self.assertNotIn("transmit", f)
+
+
+class TestRssiSentinel(unittest.TestCase):
+    def test_positive_dbm_dropped_zwave(self):
+        f = m.parse_zwave_frame({"sourceLabel": "DRIVER",
+                                 "plainTextMessage": "« [Node 260] RSSI: 78 dBm", "time": "t"})
+        self.assertIsNone(f["rssi"])  # +78 dBm is an invalid sentinel, not a real reading
+
+    def test_real_negative_dbm_kept(self):
+        f = m.parse_zwave_frame({"sourceLabel": "DRIVER",
+                                 "plainTextMessage": "« [Node 260] RSSI: -85 dBm", "time": "t"})
+        self.assertEqual(f["rssi"], -85)
+
+    def test_zigbee_positive_rssi_dropped(self):
+        f = m.parse_zigbee_frame({**ZB_RAW, "lastHopRssi": 78})
+        self.assertIsNone(f["rssi"])
+
+
 class TestMatches(unittest.TestCase):
     def test_zigbee_name_filter(self):
         f = m.parse_zigbee_frame(ZB_RAW)
@@ -162,6 +208,29 @@ class TestSummarize(unittest.TestCase):
         s = m.summarize(frames)
         self.assertIn("Node 359", s["devices"])
         self.assertEqual(s["devices"]["Node 359"]["rssi"], {"min": -83, "avg": -83.0, "n": 2})
+
+    def test_transmit_report_rollup(self):
+        frames = [m.parse_zwave_frame({"sourceLabel": "DRIVER", "plainTextMessage": TXREPORT, "time": "t"})]
+        s = m.summarize(frames)
+        tr = s["transmit_report"]
+        self.assertEqual(tr["reports"], 1)
+        self.assertEqual((tr["hub_snr_med"], tr["dest_snr_med"]), (1, 11))  # the hub-side bottleneck
+        self.assertEqual(tr["hub_noise_floor_med"], -92)
+        self.assertEqual(tr["retransmits"], 1)
+
+    def test_no_transmit_report_key_when_absent(self):
+        s = m.summarize([m.parse_zwave_frame(ZW_RAW)])
+        self.assertNotIn("transmit_report", s)
+
+    def test_transmit_report_even_count_median_is_averaged(self):
+        # two reports: hub noise floor -92 and -96 → true median -94.0 (not the upper-middle -92)
+        a = TXREPORT
+        b = TXREPORT.replace("measured noise floor: -92 dBm", "measured noise floor: -96 dBm")
+        frames = [m.parse_zwave_frame({"sourceLabel": "DRIVER", "plainTextMessage": t, "time": "t"})
+                  for t in (a, b)]
+        s = m.summarize(frames)
+        self.assertEqual(s["transmit_report"]["reports"], 2)
+        self.assertEqual(s["transmit_report"]["hub_noise_floor_med"], -94.0)
 
 
 if __name__ == "__main__":

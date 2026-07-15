@@ -16,7 +16,9 @@ Grounding (rules/zwave-zigbee-mesh.md carries the citations):
     above the noise floor (positive = good). "Higher is better" holds on both; a fixed
     numeric cutoff does NOT transfer across backends. Silicon Labs RX sensitivity floor:
     -97 dBm (700-series), -110 dBm (800-series).
-  - nodeState FAILED marks a failed/ghost node.
+  - nodeState FAILED marks an unreachable node. It splits by deviceId: FAILED + a bound deviceId
+    is a REAL device currently unreachable (may be transient — recover, don't delete); FAILED with
+    NO deviceId is an orphan ghost (a pairing that never bound a device — safe to remove).
   - Zigbee's zigbeeDetails snapshot exposes no per-device LQI/RSSI — only liveness (active,
     lastActivity, messageCount) and network-level state (channel, weakChannel, healthy,
     networkState, powerLevel). Per-device LQI lives in /hub/zigbee/getChildAndRouteInfo
@@ -181,6 +183,11 @@ def analyze_zwave(details: dict) -> dict:
     failed, packet_errors, weak_signal = [], [], []
     for n in nodes:
         if str(n["nodeState"]).upper() == "FAILED":
+            # A FAILED node with a bound deviceId is a REAL device that is currently unreachable
+            # (may be transient — power-cycle/recover, do NOT delete). Only a FAILED node with no
+            # deviceId is an orphan ghost (a pairing that never bound a device) — safe to remove.
+            # Verified live: 8 FAILED nodes all had deviceIds, i.e. real dead/unreachable devices.
+            n["failure_kind"] = "unreachable_device" if n["deviceId"] else "orphan_ghost"
             failed.append(n)
         if n["per"] and n["per"] > 0:
             packet_errors.append(n)
@@ -196,7 +203,9 @@ def analyze_zwave(details: dict) -> dict:
         "backend": backend,
         "healthy": details.get("healthy"),
         "node_count": len(nodes),
-        "failed": failed,                               # CRITICAL: ghost/failed nodes
+        "failed": failed,                               # each tagged failure_kind (see below)
+        "orphan_ghosts": [n for n in failed if n["failure_kind"] == "orphan_ghost"],
+        "unreachable_devices": [n for n in failed if n["failure_kind"] == "unreachable_device"],
         "packet_errors": sorted(packet_errors, key=lambda n: n["per"], reverse=True),
         "weak_signal_heuristic": weak_signal,
         "ranked": {

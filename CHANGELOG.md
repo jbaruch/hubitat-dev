@@ -1,5 +1,15 @@
 # Changelog
 
+### Added
+
+- Grounded the Z-Wave **device lifecycle** from live experiments (a real SmartStart LR inclusion and a real graceful exclusion, captured on `zwaveLogsocket`): new `reference/zwave-lifecycle.md` documents the inclusion interview signature (S2-mandatory, id ≥ 256, the CC interview + SPAN nonce resync) and the graceful-exclusion signature (`RemoveNodeFromNetwork` → status `0x06` on the node id → `Node N was removed`, then DB teardown). Force-remove (`RemoveFailedNode`) is noted as not-yet-captured rather than asserted.
+- `hub_radiolog.py` now parses the Z-Wave **TransmitReport** frame — the richest RF diagnostic, absent from the snapshot: per-direction noise floor + signal (`hub_snr`/`dest_snr`), real latency (`took_ms`), retransmits, TX power. `--summary` adds a `transmit_report` rollup. The hub-vs-device SNR asymmetry localizes a flapping/high-latency link to the hub's receiver vs the device (`reference/zwave-lifecycle.md`). Also drops invalid RSSI sentinels (a positive dBm such as `+78`) instead of reporting them as real readings.
+
+### Changed
+
+- `hub_mesh.py` now splits FAILED nodes into `orphan_ghosts` (no `deviceId` — safe to remove) vs `unreachable_devices` (a bound `deviceId` — a real device currently unreachable, possibly transient; recover, don't delete), tagging each `failure_kind`. The `zwave-zigbee-mesh` rule and `mesh-health` skill stop calling every FAILED node a "ghost" and no longer advise removing a real unreachable device. Grounded when 8 real devices went FAILED (all with `deviceId`s) during heavy LR-channel activity — not ghosts. Removal is documented as a hub-UI + physical action the tooling confirms (snapshot diff + wire signature) but never triggers; no groundable zwaveJS action endpoint exists.
+- The rule and skill now frame the **unreliable Long Range device at distance** case as a tradeoff, not a prescription: improving the direct link (hub antenna/placement, LR channel) keeps LR's reliability-when-the-link-holds, while re-including as classic mesh gains repeater routing at the cost of mesh's routing flakiness. Explicitly does not default to mesh — many networks find LR more reliable. Grounded diagnosing a real fleet where 8 identical Zooz LR switches were unreliable with high latency while 65 identical siblings were fine.
+
 ## 0.1.2 — 2026-07-15
 
 ### Added
