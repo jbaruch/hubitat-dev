@@ -39,6 +39,12 @@ unambiguous signals and rank the rest; never assert an invented cutoff.
 - Per device (snapshot): `active:false` = not communicating (dead or an unfinished join). A generic `name:"Device"` of `type:"Device"` is a join that never initialized — the Zigbee ghost.
 - Network-level problems: `networkState` ≠ `ONLINE`, `healthy:false`, or `weakChannel:true` (interference on the current channel). Zigbee uses 2.4 GHz channels 11–26; `weakChannel` overlaps busy Wi-Fi.
 
+## Live radio traffic (the log sockets)
+
+- `ws://<ip>/zwaveLogsocket` and `ws://<ip>/zigbeeLogsocket` stream per-frame decoded traffic — distinct from the driver `/logsocket`. Tail via `scripts/hub_radiolog.py`; the snapshot says who is weak, the log shows it happening.
+- Read them for live signal (Zigbee `lastHopLqi`/`lastHopRssi`, Z-Wave per-frame `RSSI: -NN dBm`), `sequence` gaps (a soft missed-frame hint, not a hard drop count — the counter is shared across the device's traffic), and which cluster/command a device uses.
+- `lastHopLqi`/`lastHopRssi` are the **last hop into the hub** — for a routed device that is the repeater→hub link, not the end device's own radio. ZCL cluster names for the common clusters; `0xFC00–0xFFFE` is manufacturer-specific, `0xE000–0xEFFF` is reserved space vendors (Tuya) use off-spec.
+
 ## Grounding sources
 
 - Field meanings: Hubitat docs (Z-Wave Details, Zigbee Details, Troubleshoot Z-Wave/Zigbee) and staff mesh-details explanations.

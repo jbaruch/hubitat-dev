@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- Live **radio-traffic** debugging: `scripts/hub_radiolog.py` tails the dedicated Z-Wave and Zigbee log websockets (`ws://<ip>/zwaveLogsocket`, `ws://<ip>/zigbeeLogsocket` — distinct from the driver `/logsocket`) and reads the per-frame decoded traffic. A new `mesh-health` step ties it to the snapshot: triage says which device is weak, the radio log shows it happening. Zigbee frames carry per-device `lastHopLqi`/`lastHopRssi` (the last hop into the hub) and a `sequence` counter, so `--summary` produces a live per-device signal rollup (LQI/RSSI min+avg, soft dropped-frame gaps, decoded ZCL cluster) the snapshot cannot — worst signal first. Z-Wave frames surface the controller/driver decode with per-frame RSSI. Cluster classification follows the ZCL spec (manufacturer-specific `0xFC00–0xFFFE`; `0xE000–0xEFFF` is reserved space vendors use off-spec). Log sockets and frame shapes verified live on 2.5.1.128.
+
 ## 0.1.1 — 2026-07-15
 
 ### Added
