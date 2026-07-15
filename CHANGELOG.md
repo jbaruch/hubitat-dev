@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.1 — 2026-07-15
+
 ### Added
 
 - Z-Wave and Zigbee **mesh-health** diagnostics: the `mesh-health` skill and `scripts/hub_mesh.py` fetch `/hub/zwaveDetails/json` and `/hub/zigbeeDetails/json` and flag failed/ghost nodes, nonzero PER, dead/incomplete Zigbee joins, and an unhealthy network, ranking nodes worst-first by PER/RTT/RSSI rather than against absolute cutoffs Hubitat does not publish. The new always-on `zwave-zigbee-mesh` rule carries the grounded field meanings and two load-bearing distinctions: `lwrRssi` is reported on two scales by the Z-Wave *backend* (zwaveJS absolute dBm vs legacy dB-above-noise), while `neighbors`/routing are set by *topology* — the tool tags each node `lr` (id ≥ 256, a star: no neighbors, no routes, no repeaters) vs `mesh` (id ≤ 232), so a weak Long Range node is never mis-advised toward a repeater or Z-Wave repair. Endpoints and field shapes verified live on 2.5.1.128 across a zwaveJS ("Apps") and a legacy ("Devices") hub; metric meanings and protocol constants grounded in Hubitat docs, Z-Wave Alliance / Silicon Labs (LR star topology, 700/800 sensitivity per modulation), and IEEE 802.15.4.
