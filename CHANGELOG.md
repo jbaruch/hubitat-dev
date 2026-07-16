@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.15 — 2026-07-16
+
 ### Added
 
 - **`e.statusCode` throws NPE from inside its own getter on 2.5.1** (`rules/groovy-gotchas.md`, closes #25). From a real four-day outage of a large cloud-connected community app. A failed `httpGet`/`httpPost` can raise an `HttpResponseException` whose internal `response` is null; `getStatusCode()` dereferences it, so **reading the status throws**. Safe navigation does not help — `e` is not null, and `e?.statusCode` still enters the getter — so the NPE escapes the `catch` and every recovery below it is dead code, silently. The consequences are the reason this is the file's headline: an OAuth token expiring hourly, a refresh path that could never run, and a manual re-login that bought exactly one hour, every time. It gets worse than the crash: `e.response?.data` is null for the same reason, so the standard community `(500 && code==14)` test **cannot match on this platform even after the NPE is stopped** — fixing the crash alone leaves the bug. Version scope is stated as honestly as it was reported: seen on 2.5.1.125 and 2.5.1.128, not on 2.5.0.159, correlation across one hub rather than a bisect. `/hub/eventsJson` corroborates the timing independently — the measured hub's firmware timeline runs 2.5.0.159 → 2.5.1.121 on 2026-07-07, days before onset — which is the new endpoint doing the exact job it was added for.
