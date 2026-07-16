@@ -37,7 +37,7 @@ baseline reliably gets wrong.
   rather than a fact. The fixture is engineered so every axis is measured and every
   axis is green (`summary {critical:0, warnings:0}`, no FAILED nodes, no packet
   errors, hub-mesh peers probing clean) while every actuator sits frozen 13.7 h in a
-  53-second window and every reporter stays fresh — across *both* radios. Grades the
+  47-second window and every reporter stays fresh — across *both* radios. Grades the
   actuator-vs-reporter split (`rules/zwave-zigbee-mesh.md` The command path,
   `skills/mesh-health/SKILL.md` Step 4): name the command path, not a radio fault;
   use reporter freshness as proof the radio works; refuse the all-clear the zero
