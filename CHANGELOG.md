@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **Device-removal safety** — a device delete is effectively irreversible, and a replacement gets a new device id that strands every prior reference. New always-on `device-lifecycle` rule, `device-removal` skill, and `scripts/hub_device_usage.py` (stdlib, unit-tested) read the hub's own computed "in use by" list from `GET /device/fullJson/<id>` (grounded live on 2.5.1.128) and split it into load-bearing (enabled apps) vs inert (disabled apps, idle monitors), plus dashboards, `parentApp`, and child devices — the full blast radius. The workflow: enumerate → warn with the concrete list before deleting → the delete is a hub-UI + physical action the tooling confirms, never triggers → verify the references actually cleared (auto-pruning is not guaranteed for every reference type) → on a replacement, capture the old memberships first and re-wire them onto the new id, reporting what was restored vs left. Documents the `statusJson` blind spot (device inputs report as `None` — verify via `configure/json`) and that app-managed integrations (CoCoHue, HubiThings Replica) always mint new ids on replacement. `reference/endpoints.md` gains the `/device/fullJson` usage shape; `scripts/README.md` index updated (also filling in the previously-missing `hub_mesh`/`hub_radiolog`/`hubs_config` rows).
+
 ## 0.1.4 — 2026-07-16
 
 ### Added
