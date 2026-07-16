@@ -7,7 +7,7 @@ description: Driving the Hubitat web UI with Playwright for UI-only operations â
 
 The `hubitat-dev` toolset is HTTP/code only. A class of operations has no documented endpoint and
 is reachable only through the hub web UI at `http://<hub-ip>:8080`, driven with the Playwright MCP.
-Selectors, setup, the full workflow, and every gotcha's detail live in `reference/playwright-ui.md`.
+The setup, full workflow, selectors, and per-gotcha detail all live in `reference/playwright-ui.md`.
 
 ## Reach for HTTP first
 
