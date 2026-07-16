@@ -143,6 +143,48 @@ class TestResolveDeviceId(unittest.TestCase):
         with self.assertRaises(m.HubError):
             m.resolve_device_id({"devices": []}, "Anything")
 
+    def test_resolves_a_nested_child_device(self):
+        """A child appears ONLY under its parent's children[] — never at the top level. Resolving
+        by name has to walk the tree or a child is unreachable by --name (grounded 2.5.1.128)."""
+        dl = {"devices": [
+            {"data": {"id": 300, "name": "Console Power Strip"},
+             "parent": True, "child": False,
+             "children": [
+                 {"data": {"id": 301, "name": "Power Strip - CH1"}, "parent": False, "child": True},
+                 {"data": {"id": 302, "name": "Power Strip - CH2"}, "parent": False, "child": True},
+             ]},
+        ]}
+        self.assertEqual(m.resolve_device_id(dl, "Power Strip - CH2"), 302)
+        self.assertEqual(m.resolve_device_id(dl, "Console Power Strip"), 300)
+
+    def test_child_name_colliding_with_top_level_is_ambiguous(self):
+        """Walking the tree must not silently prefer the top-level hit."""
+        dl = {"devices": [
+            {"data": {"id": 10, "name": "Lamp"}},
+            {"data": {"id": 20, "name": "Strip"},
+             "children": [{"data": {"id": 21, "name": "Lamp"}}]},
+        ]}
+        with self.assertRaises(m.HubError) as ctx:
+            m.resolve_device_id(dl, "Lamp")
+        self.assertIn("10", str(ctx.exception))
+        self.assertIn("21", str(ctx.exception))
+
+    def test_grandchildren_are_reached(self):
+        dl = {"devices": [
+            {"data": {"id": 1, "name": "A"},
+             "children": [{"data": {"id": 2, "name": "B"},
+                           "children": [{"data": {"id": 3, "name": "C"}}]}]},
+        ]}
+        self.assertEqual(m.resolve_device_id(dl, "C"), 3)
+
+    def test_missing_or_malformed_children_do_not_break_the_walk(self):
+        dl = {"devices": [
+            {"data": {"id": 1, "name": "A"}, "children": None},
+            {"data": {"id": 2, "name": "B"}},
+            {"data": {"id": 3, "name": "C"}, "children": ["junk"]},
+        ]}
+        self.assertEqual(m.resolve_device_id(dl, "C"), 3)
+
 
 class FakeTransport:
     """Callable transport: returns a fixed (status, headers, text) for any call."""

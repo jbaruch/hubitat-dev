@@ -121,15 +121,35 @@ def analyze_usage(full: dict) -> dict:
     }
 
 
+def _walk_devices(entries) -> list:
+    """Pure. Flatten a /hub2/devicesList `devices` forest to every entry, at any depth.
+
+    The body is a TREE, not a flat list: a child device appears ONLY nested in its parent's
+    `children[]`, never at the top level (`reference/parent-child-devices.md`, verified on
+    2.5.1.128 — 151 top-level entries, 5 children reachable only by recursing). Iterating
+    `devices[]` alone silently misses every child device.
+    """
+    out = []
+    for entry in entries or []:
+        if not isinstance(entry, dict):
+            continue
+        out.append(entry)
+        out.extend(_walk_devices(entry.get("children")))
+    return out
+
+
 def resolve_device_id(devices_list: dict, name: str) -> int:
     """Pure. Match a device by display name against a /hub2/devicesList body (entries are
     `{data: {id, name, ...}}`; `data.name` is the friendly name). Case-insensitive exact match —
     raises HubError on zero matches, or on more than one (listing the colliding ids) so the caller
     never silently picks the wrong device. Name-to-id resolution is deterministic hub polling, so it
-    lives here, not in the skill (script-delegation)."""
+    lives here, not in the skill (script-delegation).
+
+    Searches the whole tree via _walk_devices, so a child device resolves by name like any other.
+    """
     target = name.strip().lower()
     matches = []
-    for entry in devices_list.get("devices") or []:
+    for entry in _walk_devices(devices_list.get("devices")):
         data = entry.get("data") or {}
         dev_name = data.get("name")
         if dev_name is not None and str(dev_name).strip().lower() == target and data.get("id") is not None:
