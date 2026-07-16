@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.12 — 2026-07-16
+
 ### Changed
 
 - **The `device-migration` swap-blocked scenario was measured and not shipped** (closes #23). `plugin-evals` makes lift an **admission gate, not a curation afterthought**, so the candidate was built and run before being committed: **baseline 100%, with-context 100% — zero lift** (`deepseek-v4-flash`, 3 runs each, against `hubitat-dev@0.1.11`). It does not land, and `evals/README.md` records the measurement so the same candidate is not re-proposed as an obvious gap. The suite stays at three scenarios.
