@@ -42,17 +42,11 @@ dependencies {
 | JDK 16 / 17 / 21 | `Could not initialize class org.codehaus.groovy.vmplugin.v7.Java7` |
 | JDK 25 | `Unsupported class file major version 69` |
 
-The chain: **hubitat_ci 0.17 is binary-locked to Groovy 2.5, and Groovy 2.5 does not run on JDK 16+.**
-hubitat_ci is not merely untested past Groovy 2.5 — it is incompatible, in two independent ways:
-
-- **Groovy 4** removed `groovy.util.slurpersupport.GPathResult`, which hubitat_ci loads →
-  `NoClassDefFoundError`. (Groovy 3 still ships the deprecated alias; Groovy 4 does not.)
-- **Groovy 3** clears that and then fails on `NoSuchMethodError: ...DefaultGroovyMethods...` — a
-  signature hubitat_ci was compiled against and Groovy 3 changed.
-
-On JDK 16+ hubitat_ci additionally reaches into JDK internals it can no longer see
-(`sun.util.calendar.ZoneInfo`, then `com.sun.org.apache.xerces.internal.dom.DocumentImpl`), each
-needing its own `--add-exports`. Not worth chasing: Groovy 2.5 cannot run there regardless.
+**hubitat_ci 0.17 is binary-locked to Groovy 2.5, and Groovy 2.5 does not run on JDK 16+.** Do not
+raise either pin to match a newer runtime — Groovy 4 fails on `NoClassDefFoundError:
+groovy/util/slurpersupport/GPathResult`, Groovy 3 on `NoSuchMethodError` in `DefaultGroovyMethods`,
+and neither is fixable downstream. `--add-exports` does not rescue JDK 16+ either; the CHANGELOG
+records the full investigation.
 
 The ceiling is hubitat_ci's, not Hubitat's. The hub runs Groovy 2.4; the harness stays newer than
 production.
@@ -132,11 +126,9 @@ class MyDriverTest extends Specification {
 
 - `sandbox.run()` validates by default; pass `validationFlags: [...]` to relax specific checks.
 - **The validator is stricter than the hub.** hubitat_ci 0.17 treats `description`, `iconUrl`,
-  `iconX2Url` and `iconX3Url` as *mandatory* in `definition()` and fails `sandbox.run()` with
-  `mandatory parameters '[iconX3Url]' not set`. The hub does not agree: **14 apps across two live
-  hubs run today with no `iconX3Url`** — HubiThings Replica, Life360+ and OwnTracks among them
-  (measured 2026-07-16 by reading `/app/ajax/code` for every app in `/hub2/userAppTypes`). Reach for
-  `validationFlags` before editing a working app to satisfy a 2019 harness.
+  `iconX2Url` and `iconX3Url` as *mandatory* in `definition()`, failing with
+  `mandatory parameters '[iconX3Url]' not set`. The hub accepts apps without them. Reach for
+  `validationFlags`; never edit a working app to satisfy the harness.
 - The executor mock (`AppExecutor` / `DeviceExecutor`) is where platform calls land — assert on
   `sendEvent`, `getLog()`, HTTP, scheduling as Spock interactions.
 - Where hubitat_ci can't stub a newer API, extract the logic into a plain method and test it with
