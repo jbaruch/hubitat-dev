@@ -42,12 +42,9 @@ While tailing, have the behavior exercised (press the device command, fire the a
 
 A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name, the first-run-`installed()`, or the 2.5.1 `e.statusCode` trap, where the NPE escapes the `catch` and kills the recovery below it.
 
-**A status is not a fact** — for radios, see `rules/zwave-zigbee-mesh.md`:
-- **Prefer timestamps to indicators.** Read `lastPollDate`, `authTokenExpires`, an event `date`. Treat an app's own status label as cached state, never as a probe — it can read a green "Online" through a multi-day outage.
-- **Verify an action by re-reading the thing it changed** (`/device/fullJson/<id>`, `/device/eventsJson/<id>`), never by the app's own "I did X" log line. That line fires when the command is **sent**, not when it lands.
-- **Compare a frozen attribute's event `date`, not its value.** Attributes hold their last good value rather than going null — a dashboard reads plausible while the integration is dead.
+**A status is not a fact.** Read `lastPollDate`, `authTokenExpires`, or an event `date`; treat a status label as cached state, never a probe. Verify an action by re-reading what it changed (`/device/fullJson/<id>`, `/device/eventsJson/<id>`), never by the app's own "I did X" line. Compare a frozen attribute's event `date`, not its value. Radios: `rules/zwave-zigbee-mesh.md`. Endpoint timezone and ordering splits: `reference/endpoints.md`.
 
-When two sources disagree, reconcile them before diagnosing — and mind that the log endpoints disagree about both timezone and ordering (`reference/endpoints.md`). Proceed to Step 5.
+Reconcile disagreeing sources before diagnosing. Proceed to Step 5.
 
 ## Step 5 — Report
 
