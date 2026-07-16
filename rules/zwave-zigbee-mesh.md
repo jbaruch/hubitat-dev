@@ -44,6 +44,7 @@ unambiguous signals and rank the rest; never assert an invented cutoff.
 - `ws://<ip>/zwaveLogsocket` and `ws://<ip>/zigbeeLogsocket` stream per-frame decoded traffic — distinct from the driver `/logsocket`. Tail via `scripts/hub_radiolog.py`; the snapshot says who is weak, the log shows it happening.
 - Read them for live signal (Zigbee `lastHopLqi`/`lastHopRssi`, Z-Wave per-frame `RSSI: -NN dBm`), `sequence` gaps (a soft missed-frame hint, not a hard drop count — the counter is shared across the device's traffic), and which cluster/command a device uses.
 - `lastHopLqi`/`lastHopRssi` are the **last hop into the hub** — for a routed device that is the repeater→hub link, not the end device's own radio. ZCL cluster names for the common clusters; `0xFC00–0xFFFE` is manufacturer-specific, `0xE000–0xEFFF` is reserved space vendors (Tuya) use off-spec.
+- The Z-Wave **TransmitReport** (`hub_radiolog --summary` → `transmit_report`) gives the noise floor and SNR at *both* ends. An elevated or spiky **hub** noise floor with `hub_snr` well below `dest_snr` means the hub's own receiver is the bottleneck, from its RF environment rather than the device or distance. Common culprits are co-located 900 MHz radios, USB3, and gear clusters. The fix gets the hub's receiver out of that noise by relocating the hub, fitting an external antenna, or separating co-located hubs. Never the device.
 
 ## Device lifecycle & removal
 

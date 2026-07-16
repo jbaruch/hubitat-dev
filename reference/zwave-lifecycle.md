@@ -67,6 +67,7 @@ callback id: 244 transmit status: OK, took 40 ms routing attempts: 2 ... TX powe
 - `dest_noise_floor` + `dest_rssi` → `dest_snr` (hub→device headroom, measured at the device).
 - **Read the asymmetry.** A hub noise floor worse than the devices' and a `hub_snr` well below `dest_snr` means the **hub's own receiver** is the bottleneck (its RF environment — co-located radios, USB3, a gear cluster), not the device and not distance. The opposite asymmetry points at the device end. This is the one measurement that localizes a flapping/high-latency link; the snapshot's single `lwrRssi` cannot.
 - Invalid RSSI sentinels (a positive dBm such as `+78`) are dropped — a received RSSI on these logs is always negative dBm.
+- **Validated live (before/after):** a hub in a server closet (3 hubs + network gear) showed a hub noise floor median −90 dBm with spikes to −85 and `hub_snr` ~1–8 dB while `dest_snr` ~11–15; 8 LR devices flapped OK↔FAILED with a 100 ms latency tail. Moving the hub to a quiet room dropped the noise floor to median −97 (spikes gone, worst −94), eliminated the retransmits and the latency tail (max `took_ms` 100 → 10 ms), and recovered all 8 — even though the devices' own signal got *weaker*. The noise floor, not the signal, was the fault.
 
 ## FAILED ≠ ghost
 
