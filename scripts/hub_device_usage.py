@@ -31,8 +31,11 @@ Grounding notes:
 
 Usage:
     hub_device_usage.py --ip 192.168.30.17 --device 252
+    hub_device_usage.py --ip 192.168.30.17 --name "Alice Office Closet Motion Sensor"
     hub_device_usage.py --hub devices --device 252   # resolve via ./hubs.json (hub-config skill)
-Output: a single JSON object on stdout (see analyze_usage()); non-zero exit on a fetch failure.
+Exactly one of --device / --name is required; --name resolves the id from /hub2/devicesList (exact
+name match, fails clearly on zero or multiple matches). Output: a single JSON object on stdout (see
+analyze_usage()); non-zero exit on a fetch failure.
 """
 import argparse
 import json
@@ -45,6 +48,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from hubclient import HubError, _urllib_transport, resolve_base_from_args  # noqa: E402
 
 DEVICE_PATH = "/device/fullJson/"
+DEVICES_LIST_PATH = "/hub2/devicesList"
 
 
 def parse_count(raw) -> Optional[int]:
@@ -117,14 +121,53 @@ def analyze_usage(full: dict) -> dict:
     }
 
 
+def resolve_device_id(devices_list: dict, name: str) -> int:
+    """Pure. Match a device by display name against a /hub2/devicesList body (entries are
+    `{data: {id, name, ...}}`; `data.name` is the friendly name). Case-insensitive exact match —
+    raises HubError on zero matches, or on more than one (listing the colliding ids) so the caller
+    never silently picks the wrong device. Name-to-id resolution is deterministic hub polling, so it
+    lives here, not in the skill (script-delegation)."""
+    target = name.strip().lower()
+    matches = []
+    for entry in devices_list.get("devices") or []:
+        data = entry.get("data") or {}
+        dev_name = data.get("name")
+        if dev_name is not None and str(dev_name).strip().lower() == target and data.get("id") is not None:
+            matches.append((int(data["id"]), str(dev_name)))
+    if not matches:
+        raise HubError(f"no device named {name!r} on this hub — check the exact display name "
+                       f"(the hub's Devices page), or pass --device <id>.")
+    if len(matches) > 1:
+        listed = ", ".join(f"{n!r} (id {i})" for i, n in matches)
+        raise HubError(f"{len(matches)} devices match name {name!r}: {listed}. Pass --device <id> "
+                       f"to disambiguate.")
+    return matches[0][0]
+
+
+def fetch_devices(base: str, transport=None) -> dict:
+    """GET /hub2/devicesList. Raises HubError on non-200 or non-JSON."""
+    transport = transport or _urllib_transport
+    url = base.rstrip("/") + DEVICES_LIST_PATH
+    status, _, text = transport("GET", url, None)
+    if status != 200:
+        raise HubError(f"{url} returned HTTP {status} — check that Hub Security is off on this hub "
+                       f"(an authed hub returns a redirect/401 to the login page).")
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        raise HubError(f"{url} did not return JSON (got {text[:80]!r}). Check that Hub Security is "
+                       f"off on this hub.") from e
+
+
 def fetch(base: str, device_id: int, transport=None) -> dict:
-    """GET /device/fullJson/<id>. Raises HubError on non-200 or non-JSON (e.g. Hub Security on,
-    or an id that is not a device)."""
+    """GET /device/fullJson/<id>. Raises HubError on non-200 or non-JSON."""
     transport = transport or _urllib_transport
     url = base.rstrip("/") + DEVICE_PATH + str(device_id)
     status, _, text = transport("GET", url, None)
     if status != 200:
-        raise HubError(f"{url} returned HTTP {status} — is {device_id} a valid device id on this hub?")
+        raise HubError(f"{url} returned HTTP {status} — check that {device_id} is a valid device id "
+                       f"and that Hub Security is off on this hub (an authed hub returns a "
+                       f"redirect/401 to the login page).")
     try:
         return json.loads(text)
     except json.JSONDecodeError as e:
@@ -133,10 +176,12 @@ def fetch(base: str, device_id: int, transport=None) -> dict:
             f"this hub and that {device_id} is a device id.") from e
 
 
-def main(argv=None) -> int:
+def main(argv=None, transport=None) -> int:
     p = argparse.ArgumentParser(
         description="Report where a Hubitat device is used (blast radius) before removing it.")
-    p.add_argument("--device", type=int, required=True, help="device id to inspect")
+    sel = p.add_mutually_exclusive_group(required=True)
+    sel.add_argument("--device", type=int, help="device id to inspect")
+    sel.add_argument("--name", help="device display name to resolve to an id (exact match)")
     p.add_argument("--ip")
     p.add_argument("--port", type=int, default=8080)
     p.add_argument("--hub", help="named hub from hubs.json (when no --ip)")
@@ -150,14 +195,16 @@ def main(argv=None) -> int:
         return 2
 
     try:
-        full = fetch(base, args.device)
+        device_id = args.device if args.device is not None else resolve_device_id(
+            fetch_devices(base, transport), args.name)
+        full = fetch(base, device_id, transport)
     except HubError as e:
         print(str(e), file=sys.stderr)
         return 1
 
     result = analyze_usage(full)
     result["hub"] = base
-    result["device_id"] = args.device
+    result["device_id"] = device_id
     print(json.dumps(result, indent=2, default=str))
     return 0
 

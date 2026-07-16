@@ -14,11 +14,13 @@ before the delete, verifies after, and restores references onto a replacement.
 
 ## Step 1 — Enumerate the device's usage
 
-Resolve the device id (from `/hub2/devicesList` if the user gave a name), then read the hub's own
-usage list:
+Read the hub's own usage list. Pass the device id, or `--name "<display name>"` to let the script
+resolve the id from `/hub2/devicesList` (exact match — it fails clearly on zero or multiple matches;
+do not resolve the name yourself):
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_device_usage.py --device <id> --ip <addr>
+python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_device_usage.py --name "<display name>" --ip <addr>
 ```
 
 Use `--hub <name>` instead of `--ip` to resolve via `hubs.json` (`hub-config` skill). Argument and
