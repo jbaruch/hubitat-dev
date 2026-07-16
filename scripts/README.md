@@ -1,8 +1,14 @@
 # scripts
 
-Deterministic mechanisms the skills call. **Python 3.8+, standard library only — no external
+Deterministic mechanisms the skills call. **Python 3.9+, standard library only — no external
 dependencies**, so nothing to install and nothing to pin. Each script is JSON-producing,
 self-error-handling (non-zero exit + stderr diagnostic on failure), and has an entry-point guard.
+
+The floor is 3.9 for `zoneinfo` (stdlib from 3.9), which `hub_mesh.py` needs to read a hub's
+naive `lastTime` stamps in the hub's own zone. Guarding the import and degrading to UTC was the
+alternative and is worse than a clear ImportError: it silently overstates every zwaveJS node's
+age by the hub's UTC offset, which is the bug the zone lookup exists to fix. Python 3.8 reached
+end-of-life on 2024-10-07; CI runs 3.11.
 
 | Script | Does | Network |
 |--------|------|---------|

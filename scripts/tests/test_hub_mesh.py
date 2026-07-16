@@ -443,11 +443,15 @@ class TestOptionalFetchDegradation(unittest.TestCase):
 
 
 class TestProbePeer(unittest.TestCase):
+    """reachable answers "does the address respond", never "did it serve usable identity".
+    /hub/details/json is undocumented and version-sensitive, so conflating the two would roll a
+    false peer_unreachable critical against a healthy peer on a firmware that lacks it."""
+
     def test_unreachable_transport_reports_finding_not_error(self):
         def boom(_method, _url, _body):
             raise m.HubError("cannot reach http://192.168.1.64:8080: timed out")
         r = m.probe_peer("192.168.1.64", 8080, transport=boom)
-        self.assertEqual(r["reachable"], False)
+        self.assertEqual(r["reachable"], False)      # nothing answered at all
         self.assertIsNone(r["hubId"])
 
     def test_reachable_peer_returns_its_hubUID(self):
@@ -456,6 +460,30 @@ class TestProbePeer(unittest.TestCase):
         r = m.probe_peer("192.168.30.17", 8080, transport=ok)
         self.assertEqual(r, {"reachable": True,
                              "hubId": "e6574b36-23fc-4164-acf4-24aed2cc6f72", "error": None})
+
+    def test_http_response_without_the_endpoint_is_reachable_identity_unknown(self):
+        def missing(_method, _url, _body):
+            return 404, {}, "Not Found"
+        r = m.probe_peer("192.168.30.17", 8080, transport=missing)
+        self.assertTrue(r["reachable"])              # something IS there ...
+        self.assertIsNone(r["hubId"])                # ... it just did not identify itself
+        self.assertIn("identity unverified", r["error"])
+
+    def test_non_json_response_is_reachable_identity_unknown(self):
+        def html(_method, _url, _body):
+            return 200, {}, "<html>login</html>"     # e.g. Hub Security on
+        r = m.probe_peer("192.168.30.17", 8080, transport=html)
+        self.assertTrue(r["reachable"])
+        self.assertIsNone(r["hubId"])
+        self.assertIn("identity unverified", r["error"])
+
+    def test_reachable_but_unidentified_peer_raises_no_critical(self):
+        # The regression the split exists for: a healthy peer on a firmware without
+        # /hub/details/json must not be reported unreachable, nor as an identity mismatch.
+        probe = {"reachable": True, "hubId": None, "error": "identity unverified"}
+        r = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.168.30.2": probe})
+        self.assertEqual(r["problems"], [])
+        self.assertEqual(r["peers"][0]["probe_error"], "identity unverified")
 
 
 if __name__ == "__main__":

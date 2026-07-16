@@ -96,7 +96,7 @@ def parse_rssi(raw) -> Optional[float]:
     if raw is None:
         return None
     s = str(raw).strip().lower()
-    if s.endswith("db"):  # 3.8-compatible suffix strip (no str.removesuffix)
+    if s.endswith("db"):  # suffix strip without str.removesuffix (3.9+ floor; see scripts/README.md)
         s = s[:-2]
     try:
         return float(s.strip())
@@ -384,6 +384,7 @@ def analyze_hub_mesh(mesh: Optional[dict], probes: Optional[dict] = None) -> Opt
         if probe is not None:
             p["reachable"] = probe.get("reachable")
             p["probed_hubId"] = probe.get("hubId")
+            p["probe_error"] = probe.get("error")
             if probe.get("reachable") is False:
                 flag(p, "peer_unreachable",
                      f"no hub answers at {p['ipAddress']} — the record is stale, and commands "
@@ -409,13 +410,30 @@ def analyze_hub_mesh(mesh: Optional[dict], probes: Optional[dict] = None) -> Opt
 
 def probe_peer(ip: str, port: int, transport=None) -> dict:
     """Network. Ask whoever answers at `ip` who they are, for analyze_hub_mesh()'s `probes`.
-    Returns {"reachable": bool, "hubId": str|None, "error": str|None} — never raises, because
-    an unreachable peer is the finding, not an error."""
+    Returns {"reachable": bool, "hubId": str|None, "error": str|None} — never raises: an
+    unreachable peer is the finding, not an error.
+
+    `reachable` means THE ADDRESS ANSWERS, never that it served usable identity. Reachability
+    and identity are probed as separate questions: /hub/details/json is itself undocumented and
+    version-sensitive, so a peer that responds without it is reachable-with-unknown-identity.
+    Collapsing the two would roll a false peer_unreachable CRITICAL against a healthy peer on a
+    firmware that lacks the endpoint. reachable:false is reserved for a connection-level failure
+    — nothing answered at all. hubId None means identity was not verified, which
+    analyze_hub_mesh treats as no evidence rather than as a mismatch."""
+    transport = transport or _urllib_transport
+    url = base_url(ip, port) + DETAILS_PATH
     try:
-        details = fetch(base_url(ip, port), DETAILS_PATH, transport)
+        status, _, text = transport("GET", url, None)
     except HubError as e:
         return {"reachable": False, "hubId": None, "error": str(e)}
-    return {"reachable": True, "hubId": details.get("hubUID"), "error": None}
+    if status != 200:
+        return {"reachable": True, "hubId": None,
+                "error": f"{DETAILS_PATH} returned HTTP {status} — identity unverified"}
+    try:
+        return {"reachable": True, "hubId": json.loads(text).get("hubUID"), "error": None}
+    except json.JSONDecodeError:
+        return {"reachable": True, "hubId": None,
+                "error": f"{DETAILS_PATH} did not return JSON — identity unverified"}
 
 
 def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime,
