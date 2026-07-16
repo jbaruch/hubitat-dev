@@ -1,0 +1,4 @@
+{
+  "description": "Mesh diagnosis against a false all-clear snapshot: zero counters, every axis green, actuators frozen while reporters stay fresh across both radios.",
+  "include": ["./inputs"]
+}
