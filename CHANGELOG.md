@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.4 — 2026-07-16
+
 ### Added
 
 - The **hub-receiver-noise** diagnostic, now validated end to end: the rule and `mesh-health` skill teach that an elevated or spiky **hub** noise floor with `hub_snr` well below `dest_snr` (from the `transmit_report` rollup) means the hub's own receiver is the bottleneck — its RF environment, not the device or distance — and the fix is to get the receiver out of the noise (relocate, external antenna, separate co-located 900 MHz hubs), never to touch the device. Proven on real hardware: a hub moved out of a crowded server closet dropped its noise floor from median −90 dBm (spikes to −85) to −97 (worst −94), eliminated retransmits and a 100 ms latency tail, and recovered 8 chronically-flapping LR devices **even though their own signal got weaker** — confirming the noise floor was the fault, not the signal. `reference/zwave-lifecycle.md` records the before/after.
