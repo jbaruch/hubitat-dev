@@ -43,4 +43,6 @@ Iterate until green, then proceed to Step 5.
 
 Wire the green suite into the repo's CI so it runs on every change. **Install a JDK 11 in CI** — the toolchain pin selects a JDK, it does not provide one, and a runner without it fails with `No matching toolchains found`. Provision it explicitly (`actions/setup-java` with `java-version: 11`, kept alongside the JDK the Gradle runtime needs), or enable Gradle's toolchain auto-provisioning. Never drop the pin to match whatever JDK the runner ships — that is the JDK ceiling reasserting itself, and the suite will not run.
 
-Document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe). Finish here.
+Document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe).
+
+State plainly what a green run does **not** prove. The harness models `state` as a plain in-memory `Map`; the real `state` round-trips through JSON between every execution. The suite is blind to non-JSON-serializable `state` values, to key-type changes across the round-trip, and to restore-only failures. A green suite is evidence about the code under test, never about the harness or the plumbing around it. Finish here.

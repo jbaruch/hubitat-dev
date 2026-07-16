@@ -53,6 +53,45 @@ Verified `/logsocket` frame captured live: `{"name":"mZone-Butler Pantry Zone","
 
 REST log pulls also exist: `GET /logs/json`, `/logs/eventsJson`, `/logs/past/json`.
 
+## Event history (undocumented — grounded 2026-07-16)
+
+Both verified on **2.5.1.128**. These answer "when did this *actually* change?", which no status field can.
+
+| Endpoint | Returns |
+|----------|---------|
+| `GET /device/eventsJson/<deviceId>` | Device event history: `date`, `name`, `value`, `descriptionText`, `source`, `type`, `producedBy`, `triggered`, `isStateChange`, `physical`, `digital`, `unit`. `[]` for a device that has never evented (measured: 23 of 156 devices) |
+| `GET /hub/eventsJson` | Hub events — `systemStart`, `update`, `manualReboot`, `cloudBackup`. `value` on `update`/`systemStart` is the **build number**, so this is the hub's firmware timeline |
+
+**Commands are events too, and they name their caller.** `/device/eventsJson` carries `command-<name>` entries (`type: "command"`) alongside attribute changes, so a command being *issued* is visible separately from the attribute *moving* — that gap is the whole diagnosis in a silent-failure case. `producedBy` names the app that issued it. Verified frame:
+
+```json
+{"name": "command-on", "value": null, "type": "command", "date": "2026-07-14T11:01:54.455-0500",
+ "descriptionText": "Command called: on()", "isStateChange": false, "deviceId": 442,
+ "producedBy": "<a href='/installedapp/configure/583' target='_blank' class='text-base'>HomeKit Integration</a>"}
+```
+
+`/hub/eventsJson` is how you correlate "it broke around Tuesday" with a platform update, and it pairs with the version-sensitivity warning at the top of this file: it is how you find out *when* the platform moved.
+
+**HTML rides inside JSON string fields.** `producedBy` above is an anchor, not a name. So is `ipAddress` in `/hub/details/json` (`<a href="http://192.168.30.16">192.168.30.16</a> (Ethernet)`), and app names in the log endpoints carry status markup (`Ecobee Suite Manager<span style="color:green"> Online</span>` — **3570 of 8205** past-log lines held markup on the measured hub). Strip tags before matching on any of these; a name compared raw will not match.
+
+## The two log endpoints disagree about time and order
+
+Measured on one C-7, one moment, hub TZ `US/Central` (`-0500`):
+
+| Source | Sample | Shape |
+|---|---|---|
+| `GET /hub/details/json` → `currentTime` | `2026-07-16T20:14:07+0000` | UTC, explicit offset |
+| `GET /logs/eventsJson` → `date` | `2026-07-16T12:00:06.874-0500` | **hub-local**, explicit offset |
+| `GET /logs/past/json` → stamp | `2026-07-16 20:12:40.424` | **UTC, and naive — no offset to warn you** |
+
+Correlating an app's log line against an event across these two silently mis-orders by the hub's offset — you conclude a handler never fired when it fired five hours "earlier". Same trap as the zwaveJS `lastTime` note above, on two endpoints a debugger uses together constantly.
+
+**They are also ordered oppositely** — `/logs/past/json` is **oldest-first**, `/logs/eventsJson` is **newest-first**. And `/logs/past/json` returns a JSON array of raw pre-formatted **strings**, not objects: three tab-separated fields, the third pipe-delimited.
+
+```
+"2026-07-16 20:12:40.424\tTRACE\tapp|4|Ecobee Suite Manager|Updates sent (132 / 2095ms)"
+```
+
 ## Hub info & identity
 
 | Endpoint | Returns |

@@ -11,9 +11,15 @@ Hubitat has no debugger — diagnosis is `log.debug` plus the live stream (`logg
 
 ## Step 1 — Frame the question
 
+Read `reference/endpoints.md` before probing for any endpoint.
+
 Establish what is wrong and which app/driver it concerns, and pick the socket:
 - `logsocket` — the debug/info/warn/error log lines (default; use for "my code does X wrong").
 - `eventsocket` — device attribute events (use for "the attribute isn't updating / the event isn't firing").
+
+For a failure that already happened, reach for history instead of a live tail:
+- `/device/eventsJson/<id>` — when an attribute actually moved, and which app issued a command.
+- `/hub/eventsJson` — whether a platform update landed near the onset.
 
 Have the source in hand so the log can be read against it. Proceed to Step 2.
 
@@ -34,8 +40,12 @@ While tailing, have the behavior exercised (press the device command, fire the a
 
 ## Step 4 — Read the frames against the source
 
-A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name or first-run-`installed()` trap. Proceed to Step 5.
+A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name, the first-run-`installed()`, or the 2.5.1 `e.statusCode` trap, where the NPE escapes the `catch` and kills the recovery below it.
+
+**A status is not a fact.** Read `lastPollDate`, `authTokenExpires`, or an event `date`; treat a status label as cached state, never a probe. Verify an action by re-reading what it changed (`/device/fullJson/<id>`, `/device/eventsJson/<id>`), never by the app's own "I did X" line. Compare a frozen attribute's event `date`, not its value. Radios: `rules/zwave-zigbee-mesh.md`. Endpoint timezone and ordering splits: `reference/endpoints.md`.
+
+Reconcile disagreeing sources before diagnosing. Proceed to Step 5.
 
 ## Step 5 — Report
 
-State the diagnosis with the evidence (the frame that showed it) and the fix. If the fix is a code change, offer to apply it and redeploy. Finish here.
+State the diagnosis with the evidence (the frame that showed it) and the fix. **Separate proven from inferred** — name which claims a frame or a timestamp demonstrates, and which are correlation you have not bisected. If the fix is a code change, offer to apply it and redeploy. Finish here.
