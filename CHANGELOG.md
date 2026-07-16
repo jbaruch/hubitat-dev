@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.11 — 2026-07-16
+
 ### Added
 
 - **Route fan-in: a repeater's blast radius** (`zwave.route_fan_in`, closes #22). `hub_mesh.py` ranked and flagged per-node and never asked how many nodes depend on a single repeater. On the grounded hub, **12 nodes route through one repeater the hub has never heard from** — 12 devices whose path runs through something there is no evidence is alive. `never_heard` has surfaced that repeater since 0.1.7, listed identically to a silent leaf in a spare bedroom, and the difference between them is twelve nodes. Nothing in the output said so. It does now: each node carries a `dependent_count`, so a `never_heard[]` entry states its own blast radius inline where the reader already looks, and `route_fan_in.load_bearing_concerns[]` crosses fan-in with the repeater's own health (`never_heard` / `FAILED` / weak-signal / packet errors), ranked worst-first.
