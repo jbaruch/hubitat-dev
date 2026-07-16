@@ -14,6 +14,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local netwo
 - **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and dead devices, then tail the live radio log sockets (`zwaveLogsocket`/`zigbeeLogsocket`) for per-frame signal (Zigbee LQI/RSSI, Z-Wave per-frame RSSI) — grounded in Hubitat's metrics and the Z-Wave Alliance/Silabs/IEEE 802.15.4 protocol specs.
 - **Lint** — catch the sandbox violations and silent-failure traps (bad imports, handler-name typos, capability→command gaps, the `installed()`/`updated()` first-run trap) before you paste.
 - **Test** — take apps and drivers off-hub for real unit tests.
+- **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`reference/playwright-ui.md`).
 
 ## Rules
 
@@ -29,6 +30,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [groovy-gotchas](rules/groovy-gotchas.md) | Silent-failure traps the compiler misses: string handler names, `0`-is-falsy, null device inputs, reserved names. |
 | [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
 | [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, the two-scale `lwrRssi` backend trap, and what counts as a real problem. |
+| [ui-automation](rules/ui-automation.md) | Driving the hub web UI with Playwright for UI-only operations — the Vue/MDL selection traps, `statusJson` blind spot, Room Lighting recapture, and verify-every-mutation. |
 
 ## Skills
 
