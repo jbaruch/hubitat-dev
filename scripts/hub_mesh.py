@@ -414,7 +414,13 @@ def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime,
     if zwave is not None:
         out["zwave"] = analyze_zwave(zwave, now, naive_tz)
         critical += len(out["zwave"]["failed"])
-        warnings += len(out["zwave"]["packet_errors"])
+        # Every non-critical Z-Wave flag has to reach the counters. weak_signal_heuristic and
+        # never_heard were computed and then dropped here, so a hub with flagged weak routes
+        # still rolled up warnings:0 — a second false all-clear, independent of the hub-mesh
+        # one. A heuristic hint is still a warning; it carries heuristic:true for the reader.
+        warnings += (len(out["zwave"]["packet_errors"])
+                     + len(out["zwave"]["weak_signal_heuristic"])
+                     + len(out["zwave"]["never_heard"]))
     if zigbee is not None:
         out["zigbee"] = analyze_zigbee(zigbee, now)
         critical += len(out["zigbee"]["network_problems"])

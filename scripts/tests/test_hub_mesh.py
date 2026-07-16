@@ -273,6 +273,25 @@ class TestAnalyzeRollup(unittest.TestCase):
         self.assertIsNone(r["zigbee"])
         self.assertIsNotNone(r["zwave"])
 
+    def test_weak_signal_and_never_heard_reach_the_counters(self):
+        # Regression: both were flagged and then dropped from the rollup, so a hub with two
+        # nodes at/below the noise floor still reported warnings:0 — enough for the old skill
+        # to call it healthy and stop. Live on the Devices hub: 2 weak + 6 never_heard, all
+        # rolled up as 0.
+        # On the legacy scale a healthy node reads POSITIVE dB above noise — the shared
+        # fixture's default "-50db" is a zwaveJS-shaped value and would flag every node here.
+        zw = zwave_details([zw_node(nodeId=1, lwrRssi="-4dB"),                   # at/below noise
+                            zw_node(nodeId=2, lwrRssi="30dB", lastTime=None),    # never heard
+                            zw_node(nodeId=3, lwrRssi="30dB", per=7)],           # packet errors
+                           zwavejs=False)
+        r = m.analyze(zw, None, NOW)
+        self.assertEqual(r["summary"], {"critical": 0, "warnings": 3})
+
+    def test_clean_hub_still_rolls_up_zero(self):
+        # The counters must stay honest in both directions — no manufactured warnings.
+        r = m.analyze(zwave_details([zw_node(lwrRssi="-40db")], zwavejs=True), None, NOW)
+        self.assertEqual(r["summary"], {"critical": 0, "warnings": 0})
+
     def test_hub_mesh_problems_count_as_critical(self):
         mesh = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.168.30.2": UNREACHABLE})
         r = m.analyze(zwave_details([zw_node()]), None, NOW, hub_mesh=mesh)
