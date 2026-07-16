@@ -28,6 +28,20 @@ These pass the sandbox compiler and then misbehave at runtime. They are the bulk
 - Don't shadow built-in methods/objects (`state`, `device`, `location`, `settings`, `log`, `app`).
 - `name` + `namespace` in `definition` must be globally unique on the hub.
 
+## `e.statusCode` throws from inside its own getter
+
+- On **2.5.1.x**, a failed `httpGet`/`httpPost` can raise a `groovyx.net.http.HttpResponseException` whose internal `response` is null. `getStatusCode()` dereferences it, so **reading `e.statusCode` throws NPE**.
+- Safe navigation does not protect you — `e` is not null, and `e?.statusCode` still enters the getter. The NPE escapes the `catch`, so every recovery below it is dead code and the real error is never logged.
+- `e.response?.data` is null for the same reason. A `(statusCode == 500 && e.response?.data?.status?.code == 14)` test cannot match on this platform **even after** the NPE is stopped — fixing only the crash leaves the bug.
+- Read it through a guarded helper that try/catches the read itself, falls back to `e?.response?.status`, and returns null when both are unreadable. Branch on a null status with a check that does not need it (compare `atomicState.authTokenExpires` to `now()`).
+- Observed on 2.5.1.125 and 2.5.1.128; not observed on 2.5.0.159. That is correlation across one hub, not a bisect — the introducing build is unconfirmed.
+
+## GString keys in `state[...]` are safe
+
+- `state["pending${zone}"] = true` is **not** a bug, despite the Groovy docs' warning that GStrings and Strings hash differently. The warning is real (verified: the two hash codes differ) and it does not apply here.
+- The subscript operator normalizes the key to `String` **on write**, so the entry survives `state`'s JSON round-trip between executions and a later GString lookup hits.
+- The warning applies to `map.put("pending${zone}", v)` and GString keys in map literals. Verified on Groovy 2.5: after an explicit `put`, `map.get("pendingKitchen")` returns **null**.
+
 ## Cross-instance data
 
 - A `@Field static` variable is shared across **all** instances of that app/driver and is lost on reboot or code re-save. It is not per-device storage — use `state` for that (see `rules/state-vs-attributes.md`), or a `ConcurrentHashMap` keyed by device id if you genuinely need shared, rebuild-on-boot data.

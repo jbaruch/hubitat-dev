@@ -11,9 +11,13 @@ Hubitat has no debugger — diagnosis is `log.debug` plus the live stream (`logg
 
 ## Step 1 — Frame the question
 
+**`reference/endpoints.md` is the first stop for "how do I see X" — read it before probing for URLs.** It already documents device usage, event history, hub firmware timeline, log pulls, mesh detail, and the `statusJson` device-input blind spot. Rediscovering these by collecting 404s is a detour past knowledge that is already here.
+
 Establish what is wrong and which app/driver it concerns, and pick the socket:
 - `logsocket` — the debug/info/warn/error log lines (default; use for "my code does X wrong").
 - `eventsocket` — device attribute events (use for "the attribute isn't updating / the event isn't firing").
+
+For a failure that already happened, reach for history instead of a live tail: `/device/eventsJson/<id>` (when an attribute actually moved, and which app issued a command) and `/hub/eventsJson` (whether a platform update landed near the onset).
 
 Have the source in hand so the log can be read against it. Proceed to Step 2.
 
@@ -34,8 +38,15 @@ While tailing, have the behavior exercised (press the device command, fire the a
 
 ## Step 4 — Read the frames against the source
 
-A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name or first-run-`installed()` trap. Proceed to Step 5.
+A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name, the first-run-`installed()`, or the 2.5.1 `e.statusCode` trap, where the NPE escapes the `catch` and kills the recovery below it.
+
+**A status is not a fact.** `rules/zwave-zigbee-mesh.md` carries this for radios ("only the probe is evidence"); it generalizes to every integration:
+- **Prefer timestamps to indicators.** `lastPollDate`, `authTokenExpires`, an event `date`. A status field reports what was cached, not what is true — an app's own label can read a cheerful green "Online" through a multi-day outage, because it is stale state, not a probe.
+- **Verify an action by re-reading the thing it changed** (`/device/fullJson/<id>`, `/device/eventsJson/<id>`) — never by the app's own "I did X" log line. That line is emitted when the command is **sent**, not when it lands.
+- **A frozen attribute looks like a working one.** Device attributes hold their last good value rather than going null, so a dashboard reads plausible while the integration is dead. Compare the event `date`, not the value.
+
+When two sources disagree, reconcile them before diagnosing — and mind that the log endpoints disagree about both timezone and ordering (`reference/endpoints.md`). Proceed to Step 5.
 
 ## Step 5 — Report
 
-State the diagnosis with the evidence (the frame that showed it) and the fix. If the fix is a code change, offer to apply it and redeploy. Finish here.
+State the diagnosis with the evidence (the frame that showed it) and the fix. **Separate proven from inferred** — name which claims a frame or a timestamp demonstrates, and which are correlation you have not bisected. If the fix is a code change, offer to apply it and redeploy. Finish here.

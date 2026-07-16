@@ -40,4 +40,6 @@ Iterate until green, then proceed to Step 5.
 
 ## Step 5 — Wire into CI
 
-Wire the green suite into the repo's CI so it runs on every change, and document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe). Finish here.
+Wire the green suite into the repo's CI so it runs on every change, and document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe).
+
+State plainly what a green run does **not** prove. The harness models `state` as a plain in-memory `Map`; the real `state` round-trips through JSON between every execution. So the suite is blind to non-JSON-serializable values stored in `state`, to key-type changes across the round-trip, and to anything that only manifests on restore — and it is blind precisely because the tests pass. A green suite is evidence about the code under test, never about the harness or the plumbing around it. Finish here.
