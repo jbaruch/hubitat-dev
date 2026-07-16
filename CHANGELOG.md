@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.14 — 2026-07-16
+
 ### Fixed
 
 - **The `test` skill's build.gradle could not evaluate, and fixing that exposed a worse problem: the suite could not run at all** (closes #26). `SKILL.md` called `example.md` *"the full, verified template … Use it"*, and it used `testCompile` — **removed in Gradle 7.0**. Reproduced verbatim on Gradle 8.4/JDK 21: `Could not find method testCompile()`, a *configuration* failure, so nobody following the skill got as far as a failing test. #26 called the fix one word, and for that error it is — `testImplementation` resolves the same pin set, hubitat_ci 0.17 and all, off the biocomp Azure feed. But a resolving build still ran **zero** tests: the template's own pins die on JDK 16, 17, 21 and 25 (`Could not initialize class org.codehaus.groovy.vmplugin.v7.Java7`; on 25, `Unsupported class file major version 69`). The one-word fix upgrades "cannot configure" to "cannot execute", which is why this landed as a measured template rather than a patch. **It now runs green — `tests=2 skipped=0 failures=0` — and the pin that makes it run is a JDK 11 toolchain.** How it rotted is the lesson worth keeping: the pins were fine and the code was fine, and *"Verified 2026-07-14"* had verified the pins, not that the file still evaluates, let alone executes. This one was verified by running it.
