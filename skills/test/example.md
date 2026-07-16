@@ -54,8 +54,8 @@ On JDK 16+ hubitat_ci additionally reaches into JDK internals it can no longer s
 (`sun.util.calendar.ZoneInfo`, then `com.sun.org.apache.xerces.internal.dom.DocumentImpl`), each
 needing its own `--add-exports`. Not worth chasing: Groovy 2.5 cannot run there regardless.
 
-This ceiling is hubitat_ci's, not Hubitat's — the hub runs Groovy 2.4, so the harness is still newer
-than production and the pin costs nothing in fidelity.
+The ceiling is hubitat_ci's, not Hubitat's. The hub runs Groovy 2.4; the harness stays newer than
+production.
 
 **Renewal:** the three pins move together (Groovy 2.5 ↔ Spock 1.2 ↔ hubitat_ci 0.17), and the
 coupling lives in Spock's artifact *name* — `spock-core:1.2-groovy-2.5` — where no scanner can read

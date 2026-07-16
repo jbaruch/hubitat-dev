@@ -41,4 +41,6 @@ Iterate until green, then proceed to Step 5.
 
 ## Step 5 — Wire into CI
 
-Wire the green suite into the repo's CI so it runs on every change, and document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe). Finish here.
+Wire the green suite into the repo's CI so it runs on every change. **Install a JDK 11 in CI** — the toolchain pin selects a JDK, it does not provide one, and a runner without it fails with `No matching toolchains found`. Provision it explicitly (`actions/setup-java` with `java-version: 11`, kept alongside the JDK the Gradle runtime needs), or enable Gradle's toolchain auto-provisioning. Never drop the pin to match whatever JDK the runner ships — that is the JDK ceiling reasserting itself, and the suite will not run.
+
+Document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe). Finish here.
