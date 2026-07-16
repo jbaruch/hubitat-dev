@@ -1,6 +1,6 @@
 ---
 name: mesh-health
-description: Diagnose Hubitat Z-Wave and Zigbee network problems — ghost/failed nodes, packet errors, weak routes, dead or unjoined Zigbee devices, an unhealthy mesh. Use when the user wants to check mesh health, find ghost nodes, debug a flaky/slow Z-Wave or Zigbee device, or figure out why the radio network misbehaves.
+description: Diagnose Hubitat Z-Wave and Zigbee network problems — ghost/failed nodes, packet errors, weak routes, dead or unjoined Zigbee devices, devices that stopped responding to commands, a broken hub-mesh link, an unhealthy mesh. Use when the user wants to check mesh health, find ghost nodes, debug a flaky/slow/dead Z-Wave or Zigbee device, or figure out why the radio network misbehaves.
 ---
 
 # Mesh-Health Skill
@@ -12,29 +12,61 @@ exposes mesh state as JSON; `hub_mesh.py` fetches and flags it, this skill inter
 and rankings against the rule. Hubitat publishes no numeric thresholds — read the rankings as
 evidence, not as pass/fail.
 
+**A clean radio is not a working device.** Commands travel app → hub mesh → owning hub → radio, and
+a broken command path leaves every radio metric green. Zero counters never license "the mesh is
+healthy, so your devices are fine" — Step 4 is what earns an all-clear.
+
 ## Step 1 — Frame the question
 
 Establish the hub (by `--ip` or `--hub` name) and the symptom: a specific slow/dropping device, or
-a whole-network health check. Note whether it is Z-Wave, Zigbee, or both. Proceed to Step 2.
+a whole-network health check. Note whether it is Z-Wave, Zigbee, or both. **When devices stopped
+responding to commands, name them** — Step 4 needs to know which devices the user expected to act.
+Proceed to Step 2.
 
 ## Step 2 — Run the analyzer
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_mesh.py --ip <addr> [--radio zwave|zigbee|both]
+python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_mesh.py --ip <addr> [--radio zwave|zigbee|both] [--no-probe]
 ```
 
 Argument contract, output shape, and every flag/rank rule: `scripts/hub_mesh.py` module docstring.
-Output is one JSON object: `{zwave, zigbee, summary:{critical, warnings}}`. If `summary.critical`
-and `summary.warnings` are both 0, report the mesh looks healthy and finish. Proceed to Step 3.
+Output is one JSON object: `{zwave, zigbee, hub_mesh, summary:{critical, warnings}, hub_timezone,
+fetch_warnings}`. `--no-probe` skips the hub-mesh peer probe — the probe is the only thing that
+detects a stale peer record, so drop it only when the peers are unreachable by design.
+
+**Read `fetch_warnings[]` before anything else.** A non-empty entry means an axis went unmeasured,
+and each names its own `consequence`. A null `hub_mesh` leaves a command-path fault unruled-out, so
+a clean radio result is **not** an all-clear — say which axis is blind rather than reporting healthy.
+Proceed to Step 3.
 
 ## Step 3 — Triage the critical signals
 
 - Z-Wave FAILED nodes — split by `failure_kind`: `zwave.orphan_ghosts[]` (no `deviceId`, safe to remove) vs `zwave.unreachable_devices[]` (a real device currently unreachable — **may be transient; recover it, do not advise deleting it**). Name the node and device; never tell the user to remove an unreachable real device as if it were a ghost.
 - Zigbee `zigbee.network_problems[]` — `weakChannel`, offline, or unhealthy network. A whole-radio issue, not one device.
+- `hub_mesh.problems[]` — a peer that cannot carry commands. `peer_unreachable` / `peer_identity_mismatch` are probe findings and outrank the hub's own `active`/`offline`/`warning` claims, which stay green on a stale record (`rules/zwave-zigbee-mesh.md` The command path). Quote `shared_device_count` as the blast radius before advising a re-add, and prefer editing the peer's address over remove-and-re-add.
 
-These are grounded and definite. Removal itself is a hub-UI + physical action the skill guides but does not perform (`rules/zwave-zigbee-mesh.md` Device lifecycle). Proceed to Step 4.
+These are grounded and definite. Removal and hub-mesh repair are hub-UI actions the skill guides but does not perform (`rules/zwave-zigbee-mesh.md` Device lifecycle). Proceed to Step 4.
 
-## Step 4 — Read the warnings and rankings against the rule
+## Step 4 — Split the staleness rankings by actuator vs reporter
+
+This is what a zero-counter all-clear has to survive. `zwave.stalest` / `zigbee.stalest` rank
+staleness and never flag it. Split the ranking (`rules/zwave-zigbee-mesh.md` The command path):
+
+- **Reporters** (lock, motion, presence, extender) transmit on their own — fresh means the radio works.
+- **Actuators** (shade, outlet, lamp) transmit only after being commanded — `lastTime` is when a command last landed, so silence is unknown, not broken.
+- **Reporters fresh + actuators frozen ⇒ the command path is broken, not the radio.** Spanning both radios at once rules out any radio fault. Check `hub_mesh.problems[]` first, then the app that commands them.
+- A cluster of actuator timestamps in one narrow window is the last moment commands worked — say when it was, and name the automation likely to have run then.
+- `zwave.never_heard[]` is not staleness: no timestamp is unknown age, not infinite age. Read it against the `deviceId` split in Step 3.
+
+**Only now can an all-clear be reported.** If `summary.critical` and `summary.warnings` are both 0,
+`fetch_warnings` is empty, **and** no actuator/reporter asymmetry appears, report the mesh healthy
+and finish. If the counters are 0 but actuators are frozen while reporters are fresh, the mesh is
+**not** healthy — say so, and proceed. Never report "healthy" on the counters alone against a
+symptom of devices not responding, and never over an unmeasured axis.
+
+Proceed to Step 5.
+
+## Step 5 — Read the warnings and rankings against the rule
 
 Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 - `zwave.packet_errors[]` — nonzero PER (cumulative error count); weigh against the node's `msgCount` and its peers, not an absolute number.
@@ -43,9 +75,9 @@ Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 - **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair.
 - `zigbee.dead_devices[]` — `active:false`; `likely_incomplete_join:true` marks the `"Device"`/`"Device"` ghost. `zigbee.stalest` ranks by activity age.
 
-Correlate a flagged node against the reported symptom. Proceed to Step 5.
+Correlate a flagged node against the reported symptom. Proceed to Step 6.
 
-## Step 5 — Watch the live radio traffic
+## Step 6 — Watch the live radio traffic
 
 The snapshot says *who* is weak; the radio log streams say *what is happening on the air* — per-frame
 signal (LQI/RSSI) and sequence continuity (soft missed-frame hints). When a suspect device needs
@@ -68,11 +100,15 @@ fitting an external antenna, or separating co-located 900 MHz hubs. Do not touch
 worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
 `lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read
 values against `rules/zwave-zigbee-mesh.md` (higher LQI/RSSI better; no absolute cutoff). Skip this step
-for a whole-network health check that needs no per-device confirmation. Proceed to Step 6.
+for a whole-network health check that needs no per-device confirmation. Proceed to Step 7.
 
-## Step 6 — Report the Diagnosis
+## Step 7 — Report the Diagnosis
 
 State the diagnosis with the evidence (the flag or ranking that showed it) and the grounded fix.
+Name the evidence that a *radio* fault was ruled out when the cause was the command path. Hub-mesh
+repair is a **hub-UI action** (Settings → Hub Mesh on the hub holding the stale record — correct the
+peer's address; re-add only if the edit will not take) and a DHCP reservation on the hub's current IP
+is what stops it recurring.
 Ghost/failed-node removal and channel changes are **hub-UI actions** (Z-Wave Details → Refresh then
 Remove; Zigbee Details → change channel/power) — this skill does not automate destructive mesh
 operations. Guide the user through the UI step, and offer `Skill(skill: "debug")` if a driver-level

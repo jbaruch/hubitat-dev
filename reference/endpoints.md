@@ -97,7 +97,39 @@ diagnostics; the `mesh-health` skill reads them via `scripts/hub_mesh.py`.
 `nodeState` (`OK` | `FAILED` — `FAILED` is a failed/ghost node), `msgCount` (int — traffic volume;
 weigh `per` against it), `per` (cumulative packet-error **count**, not a %), `averageRtt` (ms, string),
 `lwrRssi` (string — see scale note), `neighbors` (int), `routeChanges` (int or `N/A`), `route`,
-`security`, `listening`, `beaming`, `batteryPercent`.
+`security`, `listening`, `beaming`, `batteryPercent`, `lastTime` (when the hub last heard the node —
+see the timestamp trap below; **absent** on a node never heard, which is reported `nodeState:OK`).
+
+**Timestamp trap (grounded 2026-07-16, 2.5.1.128):** `lastTime` carries a different shape per Z-Wave
+backend. The **legacy** backend emits an explicit offset — `2026-07-16T00:49:14+0000`, true UTC. The
+**zwaveJS** backend emits a **naive** stamp in the hub's **local** zone — `2026-07-16T08:28:30.081`.
+Reading a naive stamp as UTC ages every zwaveJS node by the hub's offset (measured: a 70-second-old
+node read as 5.02 h on `America/Chicago`). The zone is `timeZone` in `GET /hub/details/json`. Zigbee's
+`lastActivity` carries `+0000` on both. A second backend split beside the `lwrRssi` scale.
+
+## Hub mesh (undocumented — grounded 2026-07-16)
+
+`GET /hub2/hubMeshJson` — the hub's own peer table. Hub mesh carries **commands** between hubs, so a
+peer with a stale record drops them while every radio metric stays green; `scripts/hub_mesh.py`
+analyzes it and the `mesh-health` skill reads it.
+
+| Field | Shape |
+|-------|-------|
+| `hubList[]` | Peers: `{name, hubId, ipAddress, active, offline, warning, deviceIds[], lastActive, uiSSLOnly, uiSecurityEnabled, hubVarNames[]}` |
+| `hubList[].deviceIds` | Devices shared over that link — the **blast radius** of removing the peer (each is a link an app can bind to) |
+| `hubList[].lastActive` | Epoch **milliseconds** (not an ISO string like everything else here) |
+| `sharedDevices[]` | `{id, name, appsUsing[], childCount, sourceHubId}` — `sourceHubId: null` means the device is **local** to this hub |
+| `modeHubId` | The hub that owns mode, or `null` |
+
+**`hubId` == `hubUID`:** the `hubId` here is the same identifier as `hubUID` in `GET /hub/details/json`
+(verified across three hubs). Fetching a peer's `ipAddress` and comparing its `hubUID` to the recorded
+`hubId` is what distinguishes a live peer, a dead address, and an address reassigned to another hub.
+
+**The peer fields do not detect a stale record.** A peer whose `ipAddress` pointed at a long-dead
+address on another subnet reported `active:true, offline:false, warning:null`, with `lastActive`
+refreshing every few seconds, while every command to it was silently dropped for 13.7 h. Only probing
+the address finds it. The table is asymmetric — each hub keeps its own record of the others, and one
+side can be correct while the other is stale.
 
 **Zigbee `devices[]` per-device fields:** `id`, `name`, `type`, `active` (bool), `ping`,
 `messageCount`, `lastActivity`, `lastMessage`, `shortZigbeeId` (16-bit), `zigbeeId` (64-bit IEEE).
