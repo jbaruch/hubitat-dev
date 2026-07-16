@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
-"""Fetch a Hubitat hub's Z-Wave and Zigbee mesh detail and flag network problems.
+"""Fetch a Hubitat hub's Z-Wave, Zigbee, and hub-mesh detail and flag network problems.
 
-The hub exposes two undocumented JSON endpoints (verified live on 2.5.1.125, C-8 Pro —
+The hub exposes three undocumented JSON endpoints (verified live on 2.5.1.128, C-8 Pro —
 see reference/endpoints.md):
     GET /hub/zwaveDetails/json   -> {enabled, healthy, zwaveJS, region, nodes[...]}
     GET /hub/zigbeeDetails/json  -> {networkState, healthy, channel, weakChannel, devices[...]}
+    GET /hub2/hubMeshJson        -> {hubList:[{ipAddress, hubId, active, offline, warning, ...}]}
 No auth on a local hub with Hub Security off.
+
+Radios are not the only way devices go dead. Hub mesh carries COMMANDS between hubs, and a
+mesh peer whose record holds a stale IP drops them silently while every radio metric stays
+green — the hub reports such a peer as active:true, offline:false, warning:null (grounded on
+a live 2026-07-16 outage; see CHANGELOG). Radio health cannot see that class of fault, so
+hub-mesh peer health is analyzed here alongside the two radios.
 
 Grounding (rules/zwave-zigbee-mesh.md carries the citations):
   - PER is a cumulative packet-ERROR COUNT ("accumulation of packet errors for a node"),
@@ -23,6 +30,15 @@ Grounding (rules/zwave-zigbee-mesh.md carries the citations):
     lastActivity, messageCount) and network-level state (channel, weakChannel, healthy,
     networkState, powerLevel). Per-device LQI lives in /hub/zigbee/getChildAndRouteInfo
     (neighbor table); per-frame LQI+RSSI in the live zigbeeLogsocket.
+  - lastTime/lastActivity is "when the hub last heard this device". For a device that only
+    transmits after being commanded (a shade, an outlet), that is effectively "when a command
+    last landed" — which is why staleness, not any radio metric, is what exposes a broken
+    command path. Ranked here; the actuator-vs-reporter reading is the skill's job.
+  - THE TIMESTAMP TZ TRAP: the legacy backend stamps lastTime with an explicit '+0000' (true
+    UTC); the zwaveJS backend emits a NAIVE stamp in the hub's LOCAL zone. Reading a naive
+    stamp as UTC makes every zwaveJS node read hours staler than it is (5h for America/Chicago).
+    The hub's zone comes from /hub/details/json ('timeZone'). Verified live 2026-07-16: the
+    newest zwaveJS lastTime tracked local wall-clock to within 7 seconds, not UTC.
 
 Because Hubitat gives no numeric "bad" thresholds, this script HARD-flags only unambiguous,
 grounded signals (FAILED nodes, nonzero PER, dead/incomplete Zigbee joins, an unhealthy
@@ -37,6 +53,7 @@ Usage:
     hub_mesh.py --ip 192.168.30.2
     hub_mesh.py --hub main            # resolve via ./hubs.json (hub-config skill)
     hub_mesh.py --ip 192.168.30.2 --radio zwave    # one radio only
+    hub_mesh.py --ip 192.168.30.2 --no-probe       # skip the peer reachability probe
 Output: a single JSON object on stdout (see analyze()); non-zero exit on a fetch failure.
 """
 import argparse
@@ -45,13 +62,16 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # E402: this import must follow the sys.path insert above so hubclient resolves when run as a script.
-from hubclient import HubError, _urllib_transport, resolve_base_from_args  # noqa: E402
+from hubclient import HubError, _urllib_transport, base_url, resolve_base_from_args  # noqa: E402
 
 ZWAVE_PATH = "/hub/zwaveDetails/json"
 ZIGBEE_PATH = "/hub/zigbeeDetails/json"
+HUBMESH_PATH = "/hub2/hubMeshJson"
+DETAILS_PATH = "/hub/details/json"
 
 # Silicon Labs published receiver sensitivity floor, by Z-Wave series (dBm). Used only for
 # the backend-aware RSSI heuristic on the zwaveJS (absolute-dBm) scale. Source: silabs.com.
@@ -91,9 +111,35 @@ def parse_num(raw) -> Optional[float]:
         return None
 
 
-def parse_ts(raw) -> Optional[datetime]:
+def hub_timezone(details: Optional[dict]) -> Optional[str]:
+    """Pull the hub's IANA zone name out of /hub/details/json, or None. The field is a bare
+    string ('America/Chicago') on 2.5.1.128; tolerate a dict shape ({'ID': ...}) too."""
+    tz = (details or {}).get("timeZone")
+    if isinstance(tz, dict):
+        tz = tz.get("ID") or tz.get("id")
+    return tz if isinstance(tz, str) and tz else None
+
+
+def naive_zone(tz_name: Optional[str]):
+    """Resolve an IANA name to a tzinfo, or None if absent/unknown. None means naive stamps
+    fall back to UTC — correct for the legacy backend, and the least-wrong default elsewhere."""
+    if not tz_name:
+        return None
+    try:
+        return ZoneInfo(tz_name)
+    except (ZoneInfoNotFoundError, ValueError):
+        return None
+
+
+def parse_ts(raw, naive_tz=None) -> Optional[datetime]:
     """Parse a hub timestamp to an aware UTC datetime, or None. Handles '+0000' (no colon),
-    trailing 'Z', and naive stamps (assumed UTC)."""
+    trailing 'Z', and naive stamps.
+
+    A NAIVE stamp is hub-LOCAL, not UTC: the legacy Z-Wave backend stamps lastTime '+0000'
+    (true UTC), while the zwaveJS backend emits a naive stamp in the hub's own zone. Pass
+    naive_tz (from hub_timezone()) to localize it. Without naive_tz a naive stamp is read as
+    UTC, which makes a hub west of Greenwich look hours staler than it is — 5h for
+    America/Chicago. Explicitly-offset stamps ignore naive_tz entirely."""
     if not raw:
         return None
     s = str(raw).strip().replace("Z", "+00:00")
@@ -104,7 +150,9 @@ def parse_ts(raw) -> Optional[datetime]:
         dt = datetime.fromisoformat(s)
     except ValueError:
         return None
-    return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt.astimezone(timezone.utc)
+    if dt.tzinfo is None:
+        dt = dt.replace(tzinfo=naive_tz or timezone.utc)
+    return dt.astimezone(timezone.utc)
 
 
 def _age_seconds(ts: Optional[datetime], now: datetime) -> Optional[int]:
@@ -153,8 +201,10 @@ def node_topology(node_id) -> str:
     return "unknown"
 
 
-def normalize_zwave_node(node: dict) -> dict:
-    """Project a raw hub node to the fields the analysis ranks/flags on."""
+def normalize_zwave_node(node: dict, now: datetime, naive_tz=None) -> dict:
+    """Project a raw hub node to the fields the analysis ranks/flags on. `now` and `naive_tz`
+    are injected so age is deterministic under test (never call the clock in here)."""
+    last = parse_ts(node.get("lastTime"), naive_tz)
     return {
         "nodeId": node.get("nodeId"),
         "topology": node_topology(node.get("nodeId")),  # 'lr' | 'mesh' — remediation differs
@@ -171,14 +221,19 @@ def normalize_zwave_node(node: dict) -> dict:
         "route": node.get("route") or "",
         "security": node.get("security"),
         "battery": node.get("batteryPercent"),
+        "lastTime": node.get("lastTime"),
+        # "when the hub last heard this node" — for a command-only device (shade, outlet) that
+        # is "when a command last landed". None = never heard since the stats last reset.
+        "age_seconds": _age_seconds(last, now),
     }
 
 
-def analyze_zwave(details: dict) -> dict:
-    """Pure. Flag failed/ghost nodes and nonzero PER; rank worst-first by PER, RTT, RSSI."""
+def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
+    """Pure. Flag failed/ghost nodes and nonzero PER; rank worst-first by PER, RTT, RSSI, and
+    staleness. `now`/`naive_tz` are injected (see normalize_zwave_node)."""
     backend = zwave_backend(details)
     series = "700" if "700" in str(details.get("firmwareVersion", "")) else "800"
-    nodes = [normalize_zwave_node(n) for n in details.get("nodes") or []]
+    nodes = [normalize_zwave_node(n, now, naive_tz) for n in details.get("nodes") or []]
 
     failed, packet_errors, weak_signal = [], [], []
     for n in nodes:
@@ -199,6 +254,10 @@ def analyze_zwave(details: dict) -> dict:
         have = [n for n in nodes if n[key] is not None]
         return sorted(have, key=lambda n: n[key], reverse=reverse)
 
+    # lastTime absent entirely = the hub has never heard this node since its stats last reset.
+    # Distinct from FAILED: such a node is reported nodeState:OK and passes every radio check.
+    never_heard = [n for n in nodes if n["age_seconds"] is None]
+
     return {
         "backend": backend,
         "healthy": details.get("healthy"),
@@ -208,6 +267,7 @@ def analyze_zwave(details: dict) -> dict:
         "unreachable_devices": [n for n in failed if n["failure_kind"] == "unreachable_device"],
         "packet_errors": sorted(packet_errors, key=lambda n: n["per"], reverse=True),
         "weak_signal_heuristic": weak_signal,
+        "never_heard": never_heard,
         "ranked": {
             "by_per": [n for n in worst("per", True) if n["per"]][:10],
             "by_rtt_ms": worst("rtt_ms", True)[:10],
@@ -215,6 +275,10 @@ def analyze_zwave(details: dict) -> dict:
             # worst-first is always ascending. Backend only changes the floor heuristic, not this.
             "by_rssi": worst("rssi", False)[:10],
         },
+        # The Z-Wave counterpart of zigbee.stalest. Staleness is not itself a fault — a
+        # command-only device is silent until commanded — so this ranks, never flags. The
+        # skill reads it against which devices self-report.
+        "stalest": worst("age_seconds", True)[:10],
     }
 
 
@@ -262,19 +326,102 @@ def analyze_zigbee(details: dict, now: datetime) -> dict:
     }
 
 
-def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime) -> dict:
-    """Combine the two radios and roll up a summary count. Either may be None (radio not
+def normalize_peer(peer: dict) -> dict:
+    """Project a raw hubMeshJson hubList entry to the fields the analysis judges on."""
+    return {
+        "name": peer.get("name") or "",
+        "hubId": peer.get("hubId"),
+        "ipAddress": peer.get("ipAddress"),
+        "active": peer.get("active"),
+        "offline": peer.get("offline"),
+        "warning": peer.get("warning"),
+        # Devices THIS hub shares with that peer. This is the blast radius of removing the
+        # peer: each id is a link an app can be bound to. Re-adding a 3-device peer is cheap;
+        # a 148-device peer unbinds every app using them. The skill quotes it before advising.
+        "shared_device_count": len(peer.get("deviceIds") or []),
+        "lastActive": peer.get("lastActive"),
+    }
+
+
+def analyze_hub_mesh(mesh: Optional[dict], probes: Optional[dict] = None) -> Optional[dict]:
+    """Pure. Flag hub-mesh peers that cannot carry commands.
+
+    `probes` maps ipAddress -> {"reachable": bool, "hubId": str|None} (built by probe_peer);
+    None skips the address checks and judges on the hub's self-reported fields alone.
+
+    Why the probe matters: in the grounded outage the hub's OWN fields were unanimous and
+    wrong — the peer holding a dead IP read active:true, offline:false, warning:null while
+    every command to it was dropped. Only asking who actually answers at that address finds
+    it. hubUID in /hub/details/json is the same identifier as hubId here (verified across
+    three hubs on 2.5.1.128), so a reachable address can also be checked for IDENTITY — an
+    address reassigned to a different hub is as stale as one that answers nothing.
+    """
+    if mesh is None:
+        return None
+    peers = [normalize_peer(p) for p in mesh.get("hubList") or []]
+    problems = []
+
+    def flag(peer, signal, detail):
+        problems.append({"peer": peer["name"], "ipAddress": peer["ipAddress"],
+                         "signal": signal, "detail": detail,
+                         "shared_device_count": peer["shared_device_count"]})
+
+    for p in peers:
+        probe = (probes or {}).get(p["ipAddress"] or "")
+        if probe is not None:
+            p["reachable"] = probe.get("reachable")
+            p["probed_hubId"] = probe.get("hubId")
+            if probe.get("reachable") is False:
+                flag(p, "peer_unreachable",
+                     f"no hub answers at {p['ipAddress']} — the record is stale, and commands "
+                     f"to this peer are dropped silently")
+            elif probe.get("hubId") and p["hubId"] and probe.get("hubId") != p["hubId"]:
+                flag(p, "peer_identity_mismatch",
+                     f"{p['ipAddress']} answers as hubId {probe['hubId']}, but the record "
+                     f"claims {p['hubId']} — the address was reassigned")
+        if p["offline"] is True:
+            flag(p, "peer_offline", f"{p['name']} reports offline=true")
+        if p["active"] is False:
+            flag(p, "peer_inactive", f"{p['name']} reports active=false")
+        if p["warning"]:
+            flag(p, "peer_warning", f"{p['name']} carries warning: {p['warning']}")
+
+    return {
+        "peer_count": len(peers),
+        "probed": probes is not None,
+        "peers": peers,
+        "problems": problems,                            # CRITICAL when non-empty
+    }
+
+
+def probe_peer(ip: str, port: int, transport=None) -> dict:
+    """Network. Ask whoever answers at `ip` who they are, for analyze_hub_mesh()'s `probes`.
+    Returns {"reachable": bool, "hubId": str|None, "error": str|None} — never raises, because
+    an unreachable peer is the finding, not an error."""
+    try:
+        details = fetch(base_url(ip, port), DETAILS_PATH, transport)
+    except HubError as e:
+        return {"reachable": False, "hubId": None, "error": str(e)}
+    return {"reachable": True, "hubId": details.get("hubUID"), "error": None}
+
+
+def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime,
+            hub_mesh: Optional[dict] = None, naive_tz=None) -> dict:
+    """Combine the two radios plus hub mesh and roll up a summary count. Any may be None (not
     fetched / not enabled)."""
-    out: dict = {"zwave": None, "zigbee": None}
+    out: dict = {"zwave": None, "zigbee": None, "hub_mesh": None}
     critical = warnings = 0
     if zwave is not None:
-        out["zwave"] = analyze_zwave(zwave)
+        out["zwave"] = analyze_zwave(zwave, now, naive_tz)
         critical += len(out["zwave"]["failed"])
         warnings += len(out["zwave"]["packet_errors"])
     if zigbee is not None:
         out["zigbee"] = analyze_zigbee(zigbee, now)
         critical += len(out["zigbee"]["network_problems"])
         warnings += len(out["zigbee"]["dead_devices"])
+    if hub_mesh is not None:
+        out["hub_mesh"] = hub_mesh
+        critical += len(hub_mesh["problems"])
     out["summary"] = {"critical": critical, "warnings": warnings}
     return out
 
@@ -300,6 +447,8 @@ def main(argv=None) -> int:
     p.add_argument("--hub", help="named hub from hubs.json (when no --ip)")
     p.add_argument("--hubs", help="path to hubs.json (default ./hubs.json when --hub is given)")
     p.add_argument("--radio", choices=["zwave", "zigbee", "both"], default="both")
+    p.add_argument("--no-probe", action="store_true",
+                   help="skip the hub-mesh peer reachability/identity probe (one HTTP call per peer)")
     args = p.parse_args(argv)
 
     try:
@@ -308,18 +457,30 @@ def main(argv=None) -> int:
         print(str(e), file=sys.stderr)
         return 2
 
-    zwave = zigbee = None
+    zwave = zigbee = mesh_raw = None
+    tz_name = None
     try:
         if args.radio in ("zwave", "both"):
             zwave = fetch(base, ZWAVE_PATH)
         if args.radio in ("zigbee", "both"):
             zigbee = fetch(base, ZIGBEE_PATH)
+        # The hub's zone decides how a naive lastTime reads (see parse_ts). Fetched, never
+        # assumed from the local machine — the analyzer may run in a different zone than the hub.
+        tz_name = hub_timezone(fetch(base, DETAILS_PATH))
+        mesh_raw = fetch(base, HUBMESH_PATH)
     except HubError as e:
         print(str(e), file=sys.stderr)
         return 1
 
-    result = analyze(zwave, zigbee, datetime.now(timezone.utc))
+    probes = None
+    if not args.no_probe:
+        probes = {p["ipAddress"]: probe_peer(p["ipAddress"], args.port)
+                  for p in (mesh_raw.get("hubList") or []) if p.get("ipAddress")}
+
+    result = analyze(zwave, zigbee, datetime.now(timezone.utc),
+                     hub_mesh=analyze_hub_mesh(mesh_raw, probes), naive_tz=naive_zone(tz_name))
     result["hub"] = base
+    result["hub_timezone"] = tz_name
     print(json.dumps(result, indent=2, default=str))
     return 0
 

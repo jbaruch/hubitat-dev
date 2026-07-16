@@ -22,7 +22,8 @@ NOW = datetime(2026, 7, 15, 18, 0, 0, tzinfo=timezone.utc)
 def zw_node(**kw):
     base = {"nodeId": 10, "deviceId": 100, "deviceName": "Dev", "nodeState": "OK",
             "per": 0, "averageRtt": "30.0", "lwrRssi": "-50db", "neighbors": 5,
-            "routeChanges": 0, "route": "01 -> 0A", "security": "S2_Authenticated"}
+            "routeChanges": 0, "route": "01 -> 0A", "security": "S2_Authenticated",
+            "lastTime": "2026-07-15T17:00:00+0000"}
     base.update(kw)
     return base
 
@@ -105,7 +106,7 @@ class TestAnalyzeZwave(unittest.TestCase):
     def test_failed_node_flagged_critical(self):
         d = zwave_details([zw_node(nodeId=1, nodeState="OK"),
                            zw_node(nodeId=2, nodeState="FAILED", deviceName="Ghost")])
-        r = m.analyze_zwave(d)
+        r = m.analyze_zwave(d, NOW)
         self.assertEqual([n["nodeId"] for n in r["failed"]], [2])
         self.assertEqual(r["failed"][0]["deviceName"], "Ghost")
 
@@ -113,7 +114,7 @@ class TestAnalyzeZwave(unittest.TestCase):
         # FAILED + deviceId = real device (unreachable, don't delete); FAILED + no deviceId = ghost
         d = zwave_details([zw_node(nodeId=1, nodeState="FAILED", deviceId=300, deviceName="Real Light"),
                            zw_node(nodeId=2, nodeState="FAILED", deviceId=None, deviceName="Device")])
-        r = m.analyze_zwave(d)
+        r = m.analyze_zwave(d, NOW)
         self.assertEqual([n["nodeId"] for n in r["unreachable_devices"]], [1])
         self.assertEqual([n["nodeId"] for n in r["orphan_ghosts"]], [2])
         kinds = {n["nodeId"]: n["failure_kind"] for n in r["failed"]}
@@ -122,26 +123,26 @@ class TestAnalyzeZwave(unittest.TestCase):
     def test_packet_errors_ranked_worst_first(self):
         d = zwave_details([zw_node(nodeId=1, per=5), zw_node(nodeId=2, per=0),
                            zw_node(nodeId=3, per=300)])
-        r = m.analyze_zwave(d)
+        r = m.analyze_zwave(d, NOW)
         self.assertEqual([n["nodeId"] for n in r["packet_errors"]], [3, 1])  # 0 excluded
 
     def test_by_rtt_ranking_slowest_first(self):
         d = zwave_details([zw_node(nodeId=1, averageRtt="30"), zw_node(nodeId=2, averageRtt="150"),
                            zw_node(nodeId=3, averageRtt="")])  # empty RTT dropped from ranking
-        r = m.analyze_zwave(d)
+        r = m.analyze_zwave(d, NOW)
         self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rtt_ms"]], [2, 1])
 
     def test_zwavejs_rssi_ranking_lowest_dbm_worst(self):
         d = zwave_details([zw_node(nodeId=1, lwrRssi="-40db"), zw_node(nodeId=2, lwrRssi="-90db")],
                           zwavejs=True)
-        r = m.analyze_zwave(d)
+        r = m.analyze_zwave(d, NOW)
         self.assertEqual(r["backend"], "zwavejs")
         self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rssi"]], [2, 1])  # -90 worst
 
     def test_legacy_rssi_ranking_lowest_above_noise_worst(self):
         d = zwave_details([zw_node(nodeId=1, lwrRssi="30dB"), zw_node(nodeId=2, lwrRssi="5dB")],
                           zwavejs=False)
-        r = m.analyze_zwave(d)
+        r = m.analyze_zwave(d, NOW)
         self.assertEqual(r["backend"], "legacy")
         self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rssi"]], [2, 1])  # 5 (near noise) worst
 
@@ -190,9 +191,73 @@ class TestTopology(unittest.TestCase):
 
     def test_topology_surfaced_on_analyzed_nodes(self):
         d = zwave_details([zw_node(nodeId=268), zw_node(nodeId=100)])
-        nodes = {n["nodeId"]: n["topology"] for n in m.analyze_zwave(d)["ranked"]["by_rssi"]}
+        nodes = {n["nodeId"]: n["topology"] for n in m.analyze_zwave(d, NOW)["ranked"]["by_rssi"]}
         self.assertEqual(nodes[268], "lr")
         self.assertEqual(nodes[100], "mesh")
+
+
+class TestTimestampBackendSplit(unittest.TestCase):
+    """The legacy backend stamps lastTime '+0000' (true UTC); zwaveJS emits a NAIVE stamp in
+    the hub's local zone. Verified live 2026-07-16 on 2.5.1.128."""
+
+    def test_naive_stamp_localized_to_hub_zone(self):
+        # 13:00 naive in America/Chicago (CDT, UTC-5) is 18:00 UTC — NOT 13:00 UTC.
+        got = m.parse_ts("2026-07-15T13:00:00.081", m.naive_zone("America/Chicago"))
+        self.assertEqual(got, datetime(2026, 7, 15, 18, 0, 0, 81000, tzinfo=timezone.utc))
+
+    def test_naive_stamp_without_zone_falls_back_to_utc(self):
+        got = m.parse_ts("2026-07-15T13:00:00.081", None)
+        self.assertEqual(got, datetime(2026, 7, 15, 13, 0, 0, 81000, tzinfo=timezone.utc))
+
+    def test_explicit_offset_ignores_hub_zone(self):
+        # A legacy '+0000' stamp is already absolute; the hub zone must not shift it again.
+        got = m.parse_ts("2026-07-15T18:00:00+0000", m.naive_zone("America/Chicago"))
+        self.assertEqual(got, datetime(2026, 7, 15, 18, 0, 0, tzinfo=timezone.utc))
+
+    def test_zwavejs_node_age_not_inflated_by_five_hours(self):
+        # Regression: reading the naive zwaveJS stamp as UTC made every node read 5h staler
+        # than reality, which would have buried real staleness under a false one.
+        d = zwave_details([zw_node(lastTime="2026-07-15T12:30:00.000")], zwavejs=True)
+        r = m.analyze_zwave(d, NOW, m.naive_zone("America/Chicago"))
+        self.assertEqual(r["stalest"][0]["age_seconds"], 1800)  # 17:30 UTC -> 18:00 NOW
+
+    def test_hub_timezone_reads_string_dict_and_absent(self):
+        self.assertEqual(m.hub_timezone({"timeZone": "America/Chicago"}), "America/Chicago")
+        self.assertEqual(m.hub_timezone({"timeZone": {"ID": "Europe/Riga"}}), "Europe/Riga")
+        self.assertIsNone(m.hub_timezone({}))
+        self.assertIsNone(m.hub_timezone(None))
+
+    def test_unknown_zone_degrades_to_none_not_crash(self):
+        self.assertIsNone(m.naive_zone("Mars/Olympus_Mons"))
+        self.assertIsNone(m.naive_zone(None))
+
+
+class TestZwaveStaleness(unittest.TestCase):
+    def test_age_seconds_surfaced_per_node(self):
+        d = zwave_details([zw_node(lastTime="2026-07-15T17:00:00+0000")])
+        self.assertEqual(m.analyze_zwave(d, NOW)["stalest"][0]["age_seconds"], 3600)
+
+    def test_stalest_ranks_oldest_first(self):
+        d = zwave_details([
+            zw_node(nodeId=1, lastTime="2026-07-15T17:59:00+0000"),   # 1 min
+            zw_node(nodeId=2, lastTime="2026-07-15T04:00:00+0000"),   # 14 h
+            zw_node(nodeId=3, lastTime="2026-07-15T17:00:00+0000"),   # 1 h
+        ])
+        self.assertEqual([n["nodeId"] for n in m.analyze_zwave(d, NOW)["stalest"]], [2, 3, 1])
+
+    def test_never_heard_node_flagged_though_state_is_ok(self):
+        # nodeState OK + no lastTime: passes every radio check, yet the hub has never heard it.
+        d = zwave_details([zw_node(nodeId=27, nodeState="OK", lastTime=None, msgCount=0),
+                           zw_node(nodeId=10)])
+        r = m.analyze_zwave(d, NOW)
+        self.assertEqual([n["nodeId"] for n in r["never_heard"]], [27])
+        self.assertEqual(r["failed"], [])                    # and it is NOT a FAILED node
+
+    def test_never_heard_node_excluded_from_stalest_ranking(self):
+        # No timestamp means unknown age, not infinite age — it must not outrank real staleness.
+        d = zwave_details([zw_node(nodeId=27, lastTime=None),
+                           zw_node(nodeId=10, lastTime="2026-07-15T04:00:00+0000")])
+        self.assertEqual([n["nodeId"] for n in m.analyze_zwave(d, NOW)["stalest"]], [10])
 
 
 class TestAnalyzeRollup(unittest.TestCase):
@@ -207,6 +272,94 @@ class TestAnalyzeRollup(unittest.TestCase):
         r = m.analyze(zwave_details([zw_node()]), None, NOW)
         self.assertIsNone(r["zigbee"])
         self.assertIsNotNone(r["zwave"])
+
+    def test_hub_mesh_problems_count_as_critical(self):
+        mesh = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.168.30.2": UNREACHABLE})
+        r = m.analyze(zwave_details([zw_node()]), None, NOW, hub_mesh=mesh)
+        # A radio-clean hub is NOT all-clear when a mesh peer cannot carry commands.
+        self.assertEqual(r["summary"]["critical"], 1)
+
+    def test_hub_mesh_absent_is_none_and_adds_nothing(self):
+        r = m.analyze(zwave_details([zw_node()]), None, NOW, hub_mesh=None)
+        self.assertIsNone(r["hub_mesh"])
+        self.assertEqual(r["summary"]["critical"], 0)
+
+
+# --- hub mesh -----------------------------------------------------------------------------
+# Shapes mirror /hub2/hubMeshJson verified live on 2.5.1.128 across three hubs (2026-07-16).
+
+def peer(**kw):
+    """A peer the hub reports as perfectly healthy — which is exactly what the hub said about
+    the dead peer in the grounded outage."""
+    base = {"name": "Apps", "hubId": "1ec9f270-bda8-465a-b240-f4ea79d85e4a",
+            "ipAddress": "192.168.30.2", "active": True, "offline": False, "warning": None,
+            "deviceIds": [6, 57, 471], "lastActive": 1784212155639}
+    base.update(kw)
+    return base
+
+
+def hub_mesh_json(peers):
+    return {"hubList": peers, "modeHubId": None, "sharedDevices": []}
+
+
+REACHABLE = {"reachable": True, "hubId": "1ec9f270-bda8-465a-b240-f4ea79d85e4a", "error": None}
+UNREACHABLE = {"reachable": False, "hubId": None, "error": "cannot reach"}
+
+
+class TestAnalyzeHubMesh(unittest.TestCase):
+    def test_unreachable_peer_flagged_though_hub_reports_it_healthy(self):
+        # The grounded 2026-07-16 outage: peer record held a stale IP from the old subnet and
+        # dropped every command, while the hub reported active/offline/warning all clean.
+        # Nothing but probing the address finds this — the regression test for the whole PR.
+        r = m.analyze_hub_mesh(hub_mesh_json([peer(ipAddress="192.168.1.64")]),
+                               {"192.168.1.64": UNREACHABLE})
+        self.assertEqual([p["signal"] for p in r["problems"]], ["peer_unreachable"])
+        self.assertTrue(r["peers"][0]["active"])       # hub's own fields stayed green ...
+        self.assertFalse(r["peers"][0]["offline"])
+        self.assertIsNone(r["peers"][0]["warning"])
+        self.assertFalse(r["peers"][0]["reachable"])   # ... and the probe is what disagreed
+
+    def test_identity_mismatch_flagged_when_address_reassigned(self):
+        r = m.analyze_hub_mesh(hub_mesh_json([peer()]),
+                               {"192.168.30.2": {"reachable": True, "hubId": "other-hub-uid",
+                                                 "error": None}})
+        self.assertEqual([p["signal"] for p in r["problems"]], ["peer_identity_mismatch"])
+
+    def test_healthy_probed_peer_has_no_problems(self):
+        r = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.168.30.2": REACHABLE})
+        self.assertEqual(r["problems"], [])
+        self.assertTrue(r["probed"])
+
+    def test_self_reported_faults_flagged_without_probe(self):
+        r = m.analyze_hub_mesh(hub_mesh_json([
+            peer(name="A", offline=True), peer(name="B", active=False),
+            peer(name="C", warning="hub not responding")]), None)
+        self.assertEqual([p["signal"] for p in r["problems"]],
+                         ["peer_offline", "peer_inactive", "peer_warning"])
+        self.assertFalse(r["probed"])
+
+    def test_shared_device_count_surfaced_as_blast_radius(self):
+        r = m.analyze_hub_mesh(hub_mesh_json([peer(deviceIds=list(range(148)))]), None)
+        self.assertEqual(r["peers"][0]["shared_device_count"], 148)
+
+    def test_no_mesh_json_is_none(self):
+        self.assertIsNone(m.analyze_hub_mesh(None, None))
+
+
+class TestProbePeer(unittest.TestCase):
+    def test_unreachable_transport_reports_finding_not_error(self):
+        def boom(_method, _url, _body):
+            raise m.HubError("cannot reach http://192.168.1.64:8080: timed out")
+        r = m.probe_peer("192.168.1.64", 8080, transport=boom)
+        self.assertEqual(r["reachable"], False)
+        self.assertIsNone(r["hubId"])
+
+    def test_reachable_peer_returns_its_hubUID(self):
+        def ok(_method, _url, _body):
+            return 200, {}, '{"hubUID": "e6574b36-23fc-4164-acf4-24aed2cc6f72"}'
+        r = m.probe_peer("192.168.30.17", 8080, transport=ok)
+        self.assertEqual(r, {"reachable": True,
+                             "hubId": "e6574b36-23fc-4164-acf4-24aed2cc6f72", "error": None})
 
 
 if __name__ == "__main__":
