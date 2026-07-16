@@ -62,6 +62,21 @@ REST log pulls also exist: `GET /logs/json`, `/logs/eventsJson`, `/logs/past/jso
 | `GET /hub2/devicesList` | Devices: `{devices:[{key, data:{id, name, ...}}]}` |
 | `GET /hub2/appsList` | Installed apps + `systemAppTypes` |
 
+## Device usage / blast radius (undocumented — grounded 2026-07-16)
+
+`GET /device/fullJson/<deviceId>` returns the hub's own **computed** "in use by" list for a device — verified live on 2.5.1.128 (C-8 Pro, Hub Security off). This is the removal blast radius, straight from the hub; `scripts/hub_device_usage.py` projects it and the `device-removal` skill reads it.
+
+| Field | Shape |
+|-------|-------|
+| `appsUsing` | Array of `{id, name, label, trueLabel, disabled}` — the apps referencing the device. `disabled` is the **load-bearing (enabled) vs inert (disabled)** split the removal warning turns on |
+| `appsUsingCount` | **String** on the wire (`"2"`) |
+| `appsUsingForDialog` / `appsUsingForDialogMore` | The same list shaped for the "in use by N apps" confirm dialog |
+| `dashboards` | Array of dashboards showing the device (`[]` when none) |
+| `parentApp` | The app that created the device, or `null` (non-null for app-managed integrations like CoCoHue / HubiThings Replica) |
+| `childDevices` / `hasChildren` | `childDevices` is a dict `{parentId: [child device objects]}`; a delete of the parent takes the children with it |
+
+**`statusJson` blind spot:** `/installedapp/statusJson/<appId>` reports device-input `settings` as `None` even when set (its `eventSubscriptions` covers event subscriptions only). Verify a specific device input via `/installedapp/configure/json/<appId>/<page>` (the `settings` object) — that page also carries `removeButton` (an app with `removeButton:false` cannot be removed from the UI). `fullJson.appsUsing` is the hub's computed list and does not have the `statusJson` blind spot.
+
 ## Device control (official — Maker API)
 
 Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/apps/api/<makerAppId>/<path>?access_token=<token>`. Key paths: `/devices` (list), `/devices/all` (full JSON: capabilities, attributes, commands), `/devices/<id>`, `/devices/<id>/<command>/<secondaryValue>` (send command), `/devices/<id>/events`. Multi-hub note: with hubs meshed, one Maker API instance can expose devices from secondary hubs too — but **code** endpoints are per-hub and have no mesh.

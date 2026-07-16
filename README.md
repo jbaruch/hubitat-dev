@@ -15,6 +15,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local netwo
 - **Lint** — catch the sandbox violations and silent-failure traps (bad imports, handler-name typos, capability→command gaps, the `installed()`/`updated()` first-run trap) before you paste.
 - **Test** — take apps and drivers off-hub for real unit tests.
 - **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`reference/playwright-ui.md`).
+- **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`), warn with the concrete blast radius (enabled automations vs inert references, dashboards, parent/child), and verify the references cleared after. A replacement device gets a new id, so capture the old memberships and re-wire them onto the new one.
 
 ## Rules
 
@@ -31,6 +32,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
 | [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, the two-scale `lwrRssi` backend trap, and what counts as a real problem. |
 | [ui-automation](rules/ui-automation.md) | Driving the hub web UI with Playwright for UI-only operations — the Vue/MDL selection traps, `statusJson` blind spot, Room Lighting recapture, and verify-every-mutation. |
+| [device-lifecycle](rules/device-lifecycle.md) | Removing a device — enumerate its usage and warn before deleting, verify after, and re-wire references onto a replacement (which gets a new id). |
 
 ## Skills
 
@@ -43,6 +45,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [lint-review](skills/lint-review/SKILL.md) | Linting Groovy for sandbox violations and silent-failure traps, then judging each finding. |
 | [test](skills/test/SKILL.md) | Setting up offline unit tests (biocomp/hubitat_ci) so logic is exercised off-hub. |
 | [hub-config](skills/hub-config/SKILL.md) | Managing `hubs.json` — register, list, and set the default hub (action router). |
+| [device-removal](skills/device-removal/SKILL.md) | Safely removing a device — enumerate usage, warn on blast radius, verify after, and restore references onto a replacement. |
 
 Typical loop: `scaffold` → `lint-review` → `deploy` → `debug`, with `hub-config` set up once and `test` for anything with real logic. `mesh-health` is orthogonal — reach for it when the problem is the radio network (a flaky device, a ghost node) rather than the code.
 
