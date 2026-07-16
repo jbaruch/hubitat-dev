@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **UI automation via Playwright MCP** for the operations the hub exposes only through its web UI — installing an app instance, configuring built-in/community apps (Room Lighting, Notifications, CoCoHue, HubiThings Replica), deleting a device or app, importing devices, reading a backup. New always-on `ui-automation` rule plus `reference/playwright-ui.md` document the navigate → snapshot → act → verify workflow and nine hard-won gotchas, three of them load-bearing: MDL/Vue pickers keep selection in a `label.is-checked` class while `input.checked` stays `false` (reading the property nearly wiped 15 selected scene members); a device input persists on the page's **Done** over a WebSocket, not the picker's "Update" or any observable HTTP, so synthetic `.checked`/events do not stick; and Room Lighting re-captures the physical state of every scene light on "Done with Room Lights" (an on light silently overwrote a live scene before this was understood — set captured state directly instead). Also documents `statusJson` reporting device inputs as `None` (verify via `configure/json`), `element.click()` in `browser_evaluate` not firing framework handlers, the `mainPage`-vs-sub-page column-layout mismatch, `removeButton: false` apps being remove-not-automatable, and backups being a restore-only encrypted H2 blob. Grounded on a C-8 Pro with Hub Security off; the Playwright MCP is added at user scope, not shipped with the plugin.
+
 ## 0.1.4 — 2026-07-16
 
 ### Added
