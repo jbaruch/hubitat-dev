@@ -1,25 +1,41 @@
 ---
 alwaysApply: true
-description: What Hubitat's Z-Wave/Zigbee mesh metrics mean, the backend RSSI-scale trap, and what counts as a real problem
+description: What Hubitat's Z-Wave/Zigbee mesh metrics mean, the backend RSSI/timestamp traps, the command path vs the radio path, and what counts as a real problem
 ---
 
 # Z-Wave & Zigbee Mesh Health
 
-Radio-mesh diagnosis is a different axis from code debugging. The data comes from two
+Radio-mesh diagnosis is a different axis from code debugging. The data comes from three
 undocumented JSON endpoints (`reference/endpoints.md`); `scripts/hub_mesh.py` fetches and flags,
 the `mesh-health` skill interprets. Hubitat publishes **no numeric "bad" thresholds** — flag
 unambiguous signals and rank the rest; never assert an invented cutoff.
 
+**A clean radio is not a working device.** Every metric here describes the *radio* path. Commands
+reach a device over a separate *command* path (app → hub mesh → owning hub → radio), and a broken
+command path leaves every radio metric green. Radio evidence can never conclude "the mesh is
+healthy, so the devices are fine" — see `The command path`.
+
 ## Z-Wave node metrics (grounded meanings)
 
 - `nodeState` `FAILED` — the node is unreachable. **Split it by `deviceId`** (`hub_mesh.py` tags `failure_kind`): FAILED **with** a bound `deviceId` is a *real device currently unreachable* — may be transient (recover it, do NOT delete); FAILED with **no** `deviceId` is an *orphan ghost* (a pairing that never bound a device) — safe to remove. Never force-remove a real device thinking it is a ghost.
+- `lastTime` — when the hub last heard the node; **absent** on a node never heard at all (`zwave.never_heard[]`). Such a node is reported `nodeState:OK` and passes every radio check, so no FAILED-keyed check sees it. A never-heard node with **no** `deviceId` is a ghost by the split above; with a `deviceId` it is a real device that has never spoken — judge it, don't assume either way.
 - `per` — cumulative packet-**error count** ("accumulation of packet errors for a node"), not a percentage. Lower is better; `0` is ideal. Nonzero means errors are occurring; judge severity relative to the node's `msgCount` and to peers.
 - `averageRtt` — round-trip time in ms; lower is better. No spec cutoff — rank, don't threshold.
 - `routeChanges` — classic-mesh stability indicator; frequent changes mean the Last Working Route keeps failing. Reported by the **legacy** backend; `N/A` on the zwaveJS backend.
 - `neighbors` — how many nodes a **classic-mesh** node hears. `0` for Long Range nodes (a star has none — see below), not a backend artifact.
 
-## The backend split (RSSI scale trap)
+## The command path (hub mesh)
 
+- **Actuator vs reporter is the diagnostic split**, not Z-Wave vs Zigbee. A **reporter** (lock, motion, presence) transmits on its own, so a fresh `lastTime` proves the radio works. An **actuator** (shade, outlet, lamp) transmits only *after* being commanded, so its `lastTime` is **when a command last landed** — silence is unknown, not broken.
+- **Reporters fresh + actuators frozen = the command path is broken, not the radio.** When it spans *both* radios at once, no radio fault can explain it — two radios do not fail in the same second. Read `zwave.stalest` / `zigbee.stalest` this way; `hub_mesh.py` ranks staleness and never flags it, because the classification is yours.
+- A mass of actuator timestamps clustered in one narrow window is the last moment commands worked — the outage's high-water mark, and a scheduled automation is usually what put it there.
+- `hub_mesh.problems[]` is **critical**: a peer that cannot carry commands is as dead as a failed radio. `peer_unreachable` / `peer_identity_mismatch` come from probing the recorded address; `peer_offline` / `peer_inactive` / `peer_warning` are the hub's own claims.
+- **The hub's peer fields do not detect a stale record** — a peer holding a dead address reports `active:true, offline:false, warning:null` with `lastActive` ticking. Never read those three as an all-clear; only the probe is evidence. The peer table is **asymmetric** — each hub keeps its own record, and one side can be right while the other is stale.
+- Re-adding a peer is **hub-UI** work, and `shared_device_count` is its blast radius: every shared device is a link an app can bind to, and removing the peer unbinds them. Quote the count before advising a re-add, and prefer editing the address over remove-and-re-add. A hub whose address drifts re-breaks the record — a **DHCP reservation on the hub's current IP** is the durable fix.
+
+## The backend split (RSSI scale + timestamp traps)
+
+- `lastTime` is stamped **differently per backend**: legacy emits an explicit `+0000` (true UTC); zwaveJS emits a **naive** stamp in the hub's **local** zone (`timeZone` in `/hub/details/json`). Reading naive as UTC ages every zwaveJS node by the hub's offset — measured, a 70-second-old node read as 5.02 h. Zigbee's `lastActivity` carries `+0000` on both.
 - `lwrRssi` is reported on **two different scales** depending on the Z-Wave backend. Read `zwaveJS` first.
 - `zwaveJS:true` — absolute dBm (negative, e.g. `-78db`); closer to `0` is stronger. Silicon Labs receiver sensitivity: −97 dBm (700-series, 100 kbps GFSK) and −110 dBm (800-series LR channel, 100 kbps O-QPSK); the classic GFSK floor on 800 is a few dB higher. A route near the floor is genuinely weak.
 - `zwaveJS:false` (legacy) — dB *above the noise floor* (positive, e.g. `27dB`); `≤ 0` is at/below noise.

@@ -11,7 +11,7 @@ self-error-handling (non-zero exit + stderr diagnostic on failure), and has an e
 | `hub_pull.py` | Pull an app or driver's source + version from a hub | HTTP |
 | `hub_deploy.py` | Deploy source to a hub (create/update, version optimistic-concurrency) | HTTP |
 | `hub_logtail.py` | Tail the `/logsocket` or `/eventsocket` websocket, filtered | WebSocket |
-| `hub_mesh.py` | Fetch Z-Wave/Zigbee mesh detail and flag failed/ghost nodes, PER, weak routes | HTTP |
+| `hub_mesh.py` | Fetch Z-Wave/Zigbee mesh detail **and hub-mesh peer health**; flag failed/ghost nodes, PER, weak routes, unreachable peers; rank staleness | HTTP |
 | `hub_radiolog.py` | Tail the `zwaveLogsocket`/`zigbeeLogsocket` for per-frame radio traffic | WebSocket |
 | `hub_device_usage.py` | Report where a device is used (blast radius) before removing it | HTTP |
 | `hubs_config.py` | Owner of `hubs.json` — init/add/set-default/remove/list hubs (imported + CLI) | — |
