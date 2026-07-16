@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.7 — 2026-07-16
+
 ### Added
 
 - **The command path is now a first-class axis of mesh diagnosis.** Grounded on a live outage: every Z-Wave *and* Zigbee actuator on one hub (22 shades, lamps, an outlet) went dead for 13.7 h while sensors kept reporting — and `hub_mesh.py` said `critical: 0, warnings: 0`. The cause was not a radio at all. The hub's hub-mesh peer record for its companion hub still held an IP from the owner's *previous house's subnet*, so commands crossing the mesh were accepted, logged by the app, and silently dropped. The hub reported that dead peer as `active: true, offline: false, warning: null` with `lastActive` ticking every few seconds. No radio metric can see this class of fault, so `hub_mesh.py` now analyzes `GET /hub2/hubMeshJson` (newly documented) beside the two radios: peers are probed for reachability and identity (`hubUID` in `/hub/details/json` is the same identifier as `hubId`, verified across three hubs — so a reassigned address is caught as well as a dead one), and `hub_mesh.problems[]` rolls into `summary.critical`. Replaying the outage's captured bytes through the new code yields `critical: 1 / peer_unreachable` where the shipped code said all-clear. Each problem carries `shared_device_count`, the blast radius of a re-add — the asymmetry mattered live: the broken link shared 3 devices (cheap to re-add) while the *other* direction shared 148, whose removal would have unbound every app using them.
