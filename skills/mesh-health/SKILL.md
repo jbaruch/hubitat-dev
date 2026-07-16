@@ -45,8 +45,7 @@ These are grounded and definite. Removal and hub-mesh repair are hub-UI actions 
 ## Step 4 — Split the staleness rankings by actuator vs reporter
 
 This is what a zero-counter all-clear has to survive. `zwave.stalest` / `zigbee.stalest` rank
-staleness and never flag it, because only this split makes silence meaningful
-(`rules/zwave-zigbee-mesh.md` The command path):
+staleness and never flag it. Split the ranking (`rules/zwave-zigbee-mesh.md` The command path):
 
 - **Reporters** (lock, motion, presence, extender) transmit on their own — fresh means the radio works.
 - **Actuators** (shade, outlet, lamp) transmit only after being commanded — `lastTime` is when a command last landed, so silence is unknown, not broken.
