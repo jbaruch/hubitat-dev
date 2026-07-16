@@ -64,6 +64,11 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 
 4. **`element.click()` in `browser_evaluate` does not trigger framework handlers** (jQuery/Vue
    toggles, MDL buttons). Use a real Playwright `browser_click` for anything with a bound handler.
+   The same trap catches `browser_select_option` on a Vue-wrapped `<select>`: on **Settings → Swap
+   Device**, selecting the "old" device that way sets the native `<select>`'s value while the app
+   never reacts — the dependent "new" picker stays `disabled` and empty (verified 2.5.1.128). Click
+   the real "Click to set" control instead, and read the dependent list to confirm the selection
+   registered rather than trusting the value you just set.
 
 5. **Room Lighting auto-captures physical state.** Adding devices to a Room Lighting scene and
    clicking "Done with Room Lights" **re-captures the current physical state of every light in the

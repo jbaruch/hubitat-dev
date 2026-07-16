@@ -57,7 +57,11 @@ referencing app. Report what cleared and what did not. If retiring, finish here.
 
 ## Step 6 — Restore onto the replacement
 
-Only when replacing. After the new device is created or imported, it has a new id — re-select it in
-each app, dashboard, and scene the old device belonged to (from the Step 1 capture), a UI action per
-`reference/playwright-ui.md`. Verify each one stuck, then report exactly what was re-wired versus
-left for the user. Finish here.
+Only when replacing. The new device has a new id, so every reference from the Step 1 capture has to
+be moved onto it. Do not re-select app by app by reflex — **Settings → Swap Device** moves every app
+at once where it is available, and the fallbacks depend on why it is not:
+`Skill(skill: "device-migration")` owns that decision and the verification.
+
+Prefer migrating **before** this skill's Step 4 delete where the hardware allows it — a deleted
+device cannot be swapped from, and the references have to be parked on a virtual device instead
+(`rules/device-lifecycle.md`). Finish here.

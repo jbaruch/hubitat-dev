@@ -32,3 +32,6 @@ venv/
 
 # Scratch
 /scratch/
+
+# Playwright MCP scratch output (contains live hub/device names — never commit)
+.playwright-mcp/
