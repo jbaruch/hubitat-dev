@@ -38,9 +38,8 @@ These pass the sandbox compiler and then misbehave at runtime. They are the bulk
 
 ## GString keys in `state[...]` are safe
 
-- `state["pending${zone}"] = true` is **not** a bug, despite the Groovy docs' warning that GStrings and Strings hash differently. The warning is real (verified: the two hash codes differ) and it does not apply here.
-- The subscript operator normalizes the key to `String` **on write**, so the entry survives `state`'s JSON round-trip between executions and a later GString lookup hits.
-- The warning applies to `map.put("pending${zone}", v)` and GString keys in map literals. Verified on Groovy 2.5: after an explicit `put`, `map.get("pendingKitchen")` returns **null**.
+- `state["pending${zone}"] = true` is **not** a bug. The subscript operator normalizes the key to `String` on write, so the entry survives `state`'s JSON round-trip and a later GString lookup hits.
+- The Groovy hash-code warning applies to `map.put("pending${zone}", v)` and to GString keys in map literals — not to the subscript assignment path. After an explicit `put`, `map.get("pendingKitchen")` returns **null**.
 
 ## Cross-instance data
 

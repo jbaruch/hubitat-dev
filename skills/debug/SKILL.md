@@ -41,9 +41,9 @@ While tailing, have the behavior exercised (press the device command, fire the a
 A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name, the first-run-`installed()`, or the 2.5.1 `e.statusCode` trap, where the NPE escapes the `catch` and kills the recovery below it.
 
 **A status is not a fact.** `rules/zwave-zigbee-mesh.md` carries this for radios ("only the probe is evidence"); it generalizes to every integration:
-- **Prefer timestamps to indicators.** `lastPollDate`, `authTokenExpires`, an event `date`. A status field reports what was cached, not what is true — an app's own label can read a cheerful green "Online" through a multi-day outage, because it is stale state, not a probe.
-- **Verify an action by re-reading the thing it changed** (`/device/fullJson/<id>`, `/device/eventsJson/<id>`) — never by the app's own "I did X" log line. That line is emitted when the command is **sent**, not when it lands.
-- **A frozen attribute looks like a working one.** Device attributes hold their last good value rather than going null, so a dashboard reads plausible while the integration is dead. Compare the event `date`, not the value.
+- **Prefer timestamps to indicators.** Read `lastPollDate`, `authTokenExpires`, an event `date`. Treat an app's own status label as cached state, never as a probe — it can read a green "Online" through a multi-day outage.
+- **Verify an action by re-reading the thing it changed** (`/device/fullJson/<id>`, `/device/eventsJson/<id>`), never by the app's own "I did X" log line. That line fires when the command is **sent**, not when it lands.
+- **Compare a frozen attribute's event `date`, not its value.** Attributes hold their last good value rather than going null — a dashboard reads plausible while the integration is dead.
 
 When two sources disagree, reconcile them before diagnosing — and mind that the log endpoints disagree about both timezone and ordering (`reference/endpoints.md`). Proceed to Step 5.
 
