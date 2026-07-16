@@ -12,7 +12,7 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `referenc
 ## Reach for HTTP first
 
 - Source deploy/pull, log/event tail, mesh detail, and device control (Maker API) have grounded HTTP endpoints — use them (`reference/endpoints.md`).
-- Drive the UI only for the operations with no endpoint: installing an app instance, configuring built-in/community apps (Room Lighting, Notifications, CoCoHue, HubiThings Replica), deleting a device or app, importing devices, reading/downloading a backup.
+- Drive the UI only for the operations with no endpoint: installing an app instance, configuring built-in/community apps (Room Lighting, Notifications, CoCoHue, HubiThings Replica), deleting a device or app, importing devices, reading/downloading a backup, swapping a device's app references (`skills/device-migration/SKILL.md`).
 
 ## Read state the way the framework stores it
 

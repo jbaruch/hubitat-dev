@@ -18,6 +18,7 @@ and device control via Maker API. The UI is required for:
 - **Deleting** a device or an app (also a physical step for radio devices — `rules/zwave-zigbee-mesh.md`).
 - Importing devices (e.g. CoCoHue "Select Lights").
 - Reading the backup list / downloading a backup.
+- **Swapping a device's app references** — Settings → Swap Device (`skills/device-migration/SKILL.md`).
 
 Reach for HTTP first every time; open the UI only when the operation is on this list.
 

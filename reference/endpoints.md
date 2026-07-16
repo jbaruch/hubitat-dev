@@ -61,6 +61,8 @@ REST log pulls also exist: `GET /logs/json`, `/logs/eventsJson`, `/logs/past/jso
 | `GET /hub2/hubData` | Newer JSON hub backend |
 | `GET /hub2/devicesList` | Devices: `{suggestBackup, devices:[{key, data:{id, name, ...}, children[], parent, child}]}` — a **tree**: `parent`/`child` are bools ("is a parent" / "is a child"), and children appear **only nested** in `children[]`, never at the top level. Iterating `devices[]` flat misses every child device (`reference/parent-child-devices.md`) |
 | `GET /hub2/appsList` | Installed apps + `systemAppTypes` |
+| `GET /hub/edit` | The **Settings** page (UI). Not `/hub/settings`, which 404s — the nav link is the authority |
+| `GET /installedapp/direct/<builtInAppType>` | Opens a built-in app, redirecting to a transient instance at `/installedapp/configure/<newId>/mainPage` (e.g. `swapDevice` → Settings → Swap Device). The instance takes the next app id and is **not** a persistent install: its **Cancel** discards it, after which `/installedapp/statusJson/<id>` returns `{}` and it is absent from `/hub2/appsList`. Verified 2.5.1.128 |
 
 ## Device usage / blast radius (undocumented — grounded 2026-07-16)
 
