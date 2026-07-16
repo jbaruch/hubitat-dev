@@ -15,7 +15,7 @@ script.on()
 then: 1 * api.sendEvent([name: "switch", value: "on"])
 ```
 
-`skills/test/example.md` has the full, verified template: the complete build.gradle (hubitat_ci 0.17 on the biocomp Azure feed) plus runnable app and driver Spock tests. Use it.
+`skills/test/example.md` has the full template — build.gradle (hubitat_ci 0.17 on the biocomp Azure feed) plus runnable app and driver Spock tests — verified 2026-07-16 by running it green. Use it, including its **JDK 11 toolchain pin**: hubitat_ci 0.17 is binary-locked to Groovy 2.5, which does not run on JDK 16+, so the suite cannot execute on a default modern JDK. `example.md` has the evidence and the failure signatures.
 
 ## Step 1 — Separate logic from platform I/O
 
@@ -23,7 +23,7 @@ Identify the pure logic worth testing — value conversions, `parse()` decoding,
 
 ## Step 2 — Set up the harness
 
-Add hubitat_ci and Spock per the `example.md` build.gradle (hubitat_ci ships on the biocomp Azure feed, not Maven Central). Create a test that constructs `HubitatAppSandbox`/`HubitatDeviceSandbox` from the script file. `sandbox.run()` compiles it and validates metadata/preferences/capabilities; `sandbox.run(api: mockExecutor)` gives you a mocked `AppExecutor`/`DeviceExecutor` to assert platform calls against. Proceed to Step 3.
+Add hubitat_ci and Spock per the `example.md` build.gradle (hubitat_ci ships on the biocomp Azure feed, not Maven Central), and keep its JDK 11 toolchain pin. Create a test that constructs `HubitatAppSandbox`/`HubitatDeviceSandbox` from the script file. `sandbox.run()` compiles it and validates metadata/preferences/capabilities; `sandbox.run(api: mockExecutor)` gives you a mocked `AppExecutor`/`DeviceExecutor` to assert platform calls against. Proceed to Step 3.
 
 ## Step 3 — Write deterministic tests
 
@@ -32,7 +32,8 @@ Per `testing-standards`: fixed inputs (a captured Zigbee/Z-Wave description stri
 ## Step 4 — Run the suite
 
 Run the suite with Gradle. On failure, read the mode:
-- a validation error from `sandbox.run()` (bad input type, unsupported API, bad command signature) is a **script** bug — fix the driver, it would fail on the hub too.
+- a validation error from `sandbox.run()` (bad input type, unsupported API, bad command signature) is usually a **script** bug — fix the driver, it would fail on the hub too. **Confirm before editing the app**: hubitat_ci's validator is stricter than the hub on `definition()` metadata, so `mandatory parameters '[iconX3Url]' not set` is the harness talking, not the platform (`example.md` Notes). Relax it with `validationFlags`; never add junk to a working app to satisfy the harness.
+- a build that cannot evaluate, or dies before any spec runs, is a **toolchain** failure, not a code one — check the JDK ceiling first (`example.md`).
 - an unmet interaction (`0 * ... sendEvent`) means the code path wasn't reached — check the branch and inputs.
 - an `hubitat_ci` stub gap on a newer API — fall back to extracting the logic and testing it with Spock + `groovy.mock.interceptor`.
 
@@ -40,6 +41,8 @@ Iterate until green, then proceed to Step 5.
 
 ## Step 5 — Wire into CI
 
-Wire the green suite into the repo's CI so it runs on every change, and document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe).
+Wire the green suite into the repo's CI so it runs on every change. **Install a JDK 11 in CI** — the toolchain pin selects a JDK, it does not provide one, and a runner without it fails with `No matching toolchains found`. Provision it explicitly (`actions/setup-java` with `java-version: 11`, kept alongside the JDK the Gradle runtime needs), or enable Gradle's toolchain auto-provisioning. Never drop the pin to match whatever JDK the runner ships — that is the JDK ceiling reasserting itself, and the suite will not run.
+
+Document a manual validation procedure for the device-I/O layer that can't run off-hub (what to deploy, what to trigger, what to observe).
 
 State plainly what a green run does **not** prove. The harness models `state` as a plain in-memory `Map`; the real `state` round-trips through JSON between every execution. The suite is blind to non-JSON-serializable `state` values, to key-type changes across the round-trip, and to restore-only failures. A green suite is evidence about the code under test, never about the harness or the plumbing around it. Finish here.
