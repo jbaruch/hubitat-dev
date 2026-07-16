@@ -48,16 +48,19 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 
 ## The gotchas
 
-1. **MDL/Vue checkbox & radio pickers lie about `input.checked`.** The device/capability pickers
-   (notifier selection, Room Lighting "Devices to Automate") render selection state as a CSS class
-   on the label — `label.is-checked` — while the underlying `input.checked` stays `false`. Read the
-   class, never the property. Reading the property once made 15 selected members look unselected and
-   nearly wiped them.
+1. **Read selection from `label.is-checked`, never from `input.checked`.** The device/capability
+   pickers (notifier selection, Room Lighting "Devices to Automate") render selection state as a CSS
+   class on the label. `input.checked` is **unreliable — it may or may not track, depending on the
+   element and the platform version**, and it gives no warning which case you are in. Reading the
+   property once made 15 selected members look unselected and nearly wiped them; on 2.5.1.128 the
+   property agreed with the class on a device radio and on 14 multi-select checkboxes. Both
+   observations are real, which is the point: the class is the safe superset in every case measured.
 
 2. **Selections persist over a WebSocket, not observable HTTP.** The picker's "Update" button fires
-   no HTTP request; the value commits on the page's **Done**. To make a device input actually save,
-   do a genuine trusted click on the option, then Done. JS-forcing `.checked` or dispatching synthetic
-   events bypasses the Vue model and does not persist.
+   no HTTP request; the value persists to the hub on the page's **Done**. To make a device input
+   actually save, do a genuine trusted click on the option, then Update, then Done. JS-forcing
+   `.checked` or dispatching synthetic events bypasses the Vue model and does not persist.
+   Update is not a no-op, though — it commits into the form, and gotcha 10 is how you check that.
 
 3. **`statusJson` hides device settings.** `/installedapp/statusJson/<id>` reports capability/device
    inputs as `None` even when set. Verify device inputs via
@@ -94,9 +97,74 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 9. **Screenshots aren't visually inspectable** in this setup. Rely on `browser_snapshot` (the
    accessibility tree) and DOM reads via `browser_evaluate` for state — not `browser_take_screenshot`.
 
+10. **Snapshot `ref`s resolve to the wrong element on MDL divs — silently.** Hubitat's controls are
+    MDL **`<div>`s, not `<button>`s**, so the accessibility snapshot labels a generic wrapper and the
+    selector generated from a `ref` grabs the wrapper's class soup. `browser_find` returned a `ref`
+    for a picker's "Update"; the click it generated was
+    `page.locator('.w-full.flex.flex-row').first().click()` — a **container**. No error, the picker
+    looked fine, and `settings[thermostatA]` stayed `""`. Anything resting on `ref` or
+    `getByRole('button')` is unreliable here (verified 2.5.1.128).
+
+11. **The pattern that works: tag-then-click.** Walk up from the hidden input — the only stable
+    identifier on the page — tag the real control, then click the tag for real. Assigning an `id`
+    inside `browser_evaluate` is not what gotcha 4 forbids: the ban is on synthetic `element.click()`,
+    not on DOM tagging. This gets a precise target *and* a genuine event.
+
+    ```js
+    // browser_evaluate — tag only, never click here
+    const hidden = document.querySelector('input[name="settings[thermostatA]"]');
+    let box = hidden;
+    for (let i = 0; i < 6 && box; i++) {
+      box = box.parentElement;
+      const save = box && box.querySelector('.device-save');
+      if (save && save.offsetParent !== null) { save.id = 'claude-update-thermostatA'; break; }
+    }
+    ```
+    ```js
+    // then: browser_click(target: '#claude-update-thermostatA')   <- real click, exact element
+    ```
+
+12. **The picker's "Update" is `div.device-save`, and there are N of them.** Class
+    `mdl-button mdl-js-button mdl-button--raised device-save` — not a `<button>`. There is **one per
+    device input on the page**, so a bare `.device-save` selector hits the wrong picker. Scope by
+    walking up from that input's `input[name="settings[<name>]"]` and filter on
+    `offsetParent !== null` — only the open picker's Update is visible. Same for the picker's
+    *trigger*, the "Click to set" control.
+
+13. **The hidden input is the commit signal — check it after every Update.**
+    `input[name="settings[<name>]"]` is `""` until the picker's Update commits, and holds a
+    comma-separated id list after (`"35,33,26,21,…"`). Cheapest possible check, and it catches
+    gotcha 10 immediately. `.value` order is **selection order, not sorted** — compare as a set.
+
+14. **`submitOnChange` device inputs gate the sections below them.** A device input with
+    `submitOnChange: true` re-renders its dependent sections only **after its picker's Update
+    commits** — not when the option is clicked. Dropdowns built from the selected device's data do
+    not exist before then, so there is nothing to `selectOption`. **Order matters: commit the device
+    input first, then fill what it gates.** Selections already made in dependent sections survive a
+    later `submitOnChange` re-render (verified: five dropdown values intact after a second device
+    picker committed).
+
+15. **Opening an app config page creates a transient instance — protect it with a second tab.**
+    Opening a user app from **Add user app** lands on `/installedapp/configure/<newId>/mainPage` with
+    a real id, but nothing persists until **Done**, and the form carries `_cancellable: false`.
+    **Never navigate the configuring tab.** To touch another app mid-configuration, open a second tab
+    (`browser_tabs(action: "new")`), do the work there, then select back and re-verify before Done.
+    Config survived the tab switch intact (verified 2.5.1.128). Same family as the built-in app's
+    transient instance discarded on Cancel (`reference/endpoints.md`, `/installedapp/direct/`).
+
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
-`reference/endpoints.md`). Gotchas 1, 2, and 5 are the load-bearing ones — each was reached the
-expensive way in real usage, and 5 corrupted a live scene. The Vue/MDL selection model and the
-`statusJson` vs `configure/json` split are hub-firmware behavior; re-verify after a platform update.
+`reference/endpoints.md`); gotchas 10–15 verified on 2.5.1.128 while installing a user app instance
+end-to-end (2 device radios, 25 contact-sensor checkboxes across two multi-selects, 5 enum dropdowns,
+Done). Gotchas 1, 2, 5 and 10 are the load-bearing ones — each was reached the expensive way in real
+usage; 5 corrupted a live scene, and 10 silently discarded a setting while the page looked correct.
+
+**Everything here fails silently, which is why 13 is the habit that pays**: a `ref` that clicks a
+container, an Update that never commits, and a working page are indistinguishable on screen. Read the
+hidden input.
+
+The Vue/MDL selection model and the `statusJson` vs `configure/json` split are hub-firmware behavior;
+re-verify after a platform update. Gotcha 1 is the standing warning about *how* they drift — the
+`input.checked` mechanism documented before 2.5.1.128 did not reproduce on it, while the guidance
+built on `label.is-checked` held. Prefer the safe superset over the mechanism.
