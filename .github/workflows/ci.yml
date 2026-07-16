@@ -19,9 +19,20 @@ jobs:
       - name: Install dev tooling
         run: pip install -r requirements-dev.txt
       - name: Pyright (zero-findings gate)
-        run: pyright scripts/
+        run: pyright scripts/ evals/
       - name: Unit tests
         run: python -m unittest discover -s scripts/tests -p 'test_*.py'
+      # plugin-evals Fixture Hygiene: a generated fixture must stay replayable from its
+      # generator. Loops rather than naming one scenario, so a new generator is gated the
+      # moment it lands. Each --check exits non-zero on drift and names the regen command.
+      - name: Eval fixtures match their generators
+        run: |
+          set -euo pipefail
+          for gen in evals/*/generate.py; do
+            [ -e "$gen" ] || continue
+            echo "checking $gen"
+            python3 "$gen" --check
+          done
 
   plugin:
     runs-on: ubuntu-latest
