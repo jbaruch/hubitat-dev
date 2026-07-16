@@ -44,6 +44,45 @@ baseline reliably gets wrong.
   counters invite; prescribe no repair/repeater/re-pair. This is the grounded 0.1.7
   outage (see CHANGELOG) turned into a measurement.
 
+## Measured and not kept
+
+Absence is a result. `plugin-evals` makes lift an **admission gate**, so a candidate is run
+before it is committed and a flat one never lands. What was measured and rejected is
+recorded here, so the same candidate is not re-proposed as an obvious gap.
+
+- **device-migration, the swap-blocked diagnosis** (#23, measured 2026-07-16 against
+  `hubitat-dev@0.1.11`). Candidate: the `device-migration` Step 3 fork — *why* a device is
+  absent from Settings → Swap Device, which decides which fallback can work. A child device
+  was the case, where the plugin's counterintuitive claim is that a virtual hop **provably
+  cannot** help — the last swap of any chain still targets the child.
+  **Baseline 100%, with-context 100% — zero lift** (`deepseek-v4-flash`, 3 runs each). Not
+  shipped.
+
+  The predicted baseline failure did not occur. The floor model read the `/hub2/devicesList`
+  tree, found the device nested in its parent's `children[]`, concluded child devices are not
+  offered for swap, and went **straight to the manual path** — never reaching for the virtual
+  hop the ladder was supposed to bait it into. It also named the affected apps and both
+  dashboards from the usage capture unaided.
+
+  The lesson generalizes past this scenario. The fixture had to make the device's parentage
+  *genuinely inferable from the data*, or the diagnosis would have been a guess — and anything
+  genuinely inferable, a capable model infers. That is `plugin-evals` cause 1 (coincidence with
+  universal competence), and the retire is the prescribed outcome, not a failure of the
+  scenario's construction.
+
+  One fix was considered and rejected: tightening the virtual-hop criterion to demand an
+  *explicit* rebuttal would have manufactured ~34 points of lift: the with-context run rejects
+  the hop by name while the baseline never raises it. That grades **verbosity, not
+  correctness** — both answers walk the owner to the same correct migration — and
+  `plugin-evals` is explicit: *"do not rewrite toward 'testing reasoning' if baseline already
+  reasons to the same outcome."*
+
+  What would still be worth measuring is the **parent-app** child (a Hue/CoCoHue device, which
+  is *not* indented anywhere and whose only tell is a `parentApp` row), where the tree
+  inference that carried the baseline here is unavailable. That case is **not grounded yet**:
+  the live 2.5.1.128 verification covered parent-*device* children only, and inventing the
+  grounding to make an eval work is how a fixture starts lying.
+
 ## Criteria discipline
 
 Each criterion grades one plugin-prescribed fact or reading, never a technique the
