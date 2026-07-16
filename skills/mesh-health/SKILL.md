@@ -30,9 +30,14 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_mesh.py --ip <addr> [--ra
 ```
 
 Argument contract, output shape, and every flag/rank rule: `scripts/hub_mesh.py` module docstring.
-Output is one JSON object: `{zwave, zigbee, hub_mesh, summary:{critical, warnings}, hub_timezone}`.
-`--no-probe` skips the hub-mesh peer probe — the probe is the only thing that detects a stale peer
-record, so drop it only when the peers are unreachable by design. Proceed to Step 3.
+Output is one JSON object: `{zwave, zigbee, hub_mesh, summary:{critical, warnings}, hub_timezone,
+fetch_warnings}`. `--no-probe` skips the hub-mesh peer probe — the probe is the only thing that
+detects a stale peer record, so drop it only when the peers are unreachable by design.
+
+**Read `fetch_warnings[]` before anything else.** A non-empty entry means an axis went unmeasured,
+and each names its own `consequence`. A null `hub_mesh` leaves a command-path fault unruled-out, so
+a clean radio result is **not** an all-clear — say which axis is blind rather than reporting healthy.
+Proceed to Step 3.
 
 ## Step 3 — Triage the critical signals
 
@@ -53,10 +58,11 @@ staleness and never flag it. Split the ranking (`rules/zwave-zigbee-mesh.md` The
 - A cluster of actuator timestamps in one narrow window is the last moment commands worked — say when it was, and name the automation likely to have run then.
 - `zwave.never_heard[]` is not staleness: no timestamp is unknown age, not infinite age. Read it against the `deviceId` split in Step 3.
 
-**Only now can an all-clear be reported.** If `summary.critical` and `summary.warnings` are both 0
-**and** no actuator/reporter asymmetry appears, report the mesh healthy and finish. If the counters
-are 0 but actuators are frozen while reporters are fresh, the mesh is **not** healthy — say so, and
-proceed. Never report "healthy" on the counters alone against a symptom of devices not responding.
+**Only now can an all-clear be reported.** If `summary.critical` and `summary.warnings` are both 0,
+`fetch_warnings` is empty, **and** no actuator/reporter asymmetry appears, report the mesh healthy
+and finish. If the counters are 0 but actuators are frozen while reporters are fresh, the mesh is
+**not** healthy — say so, and proceed. Never report "healthy" on the counters alone against a
+symptom of devices not responding, and never over an unmeasured axis.
 
 Proceed to Step 5.
 

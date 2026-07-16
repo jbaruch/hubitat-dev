@@ -54,7 +54,13 @@ Usage:
     hub_mesh.py --hub main            # resolve via ./hubs.json (hub-config skill)
     hub_mesh.py --ip 192.168.30.2 --radio zwave    # one radio only
     hub_mesh.py --ip 192.168.30.2 --no-probe       # skip the peer reachability probe
-Output: a single JSON object on stdout (see analyze()); non-zero exit on a fetch failure.
+Output: a single JSON object on stdout (see analyze()).
+Exit is non-zero only when a REQUESTED RADIO endpoint fails — that is the asked-for capability.
+The auxiliary endpoints (/hub2/hubMeshJson, /hub/details/json) are undocumented and
+version-sensitive, so a hub lacking one still gets its radios analyzed: the affected key degrades
+to null and the gap lands in `fetch_warnings` (and on stderr) naming what is now unknown. Never
+silently — a null `hub_mesh` means a command-path fault could not be ruled out, so a clean radio
+result alongside a fetch_warning is not an all-clear.
 """
 import argparse
 import json
@@ -256,7 +262,11 @@ def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
 
     # lastTime absent entirely = the hub has never heard this node since its stats last reset.
     # Distinct from FAILED: such a node is reported nodeState:OK and passes every radio check.
-    never_heard = [n for n in nodes if n["age_seconds"] is None]
+    # Keyed on the RAW field, never on age_seconds being None: parse_ts also returns None for a
+    # timestamp that is PRESENT but unparseable, and calling that "never heard" would invent a
+    # diagnosis out of a malformed string. Those surface separately as a data anomaly.
+    never_heard = [n for n in nodes if not n["lastTime"]]
+    unparsed_timestamps = [n for n in nodes if n["lastTime"] and n["age_seconds"] is None]
 
     return {
         "backend": backend,
@@ -268,6 +278,9 @@ def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
         "packet_errors": sorted(packet_errors, key=lambda n: n["per"], reverse=True),
         "weak_signal_heuristic": weak_signal,
         "never_heard": never_heard,
+        # lastTime present but unparseable — a shape this script does not know, not a mesh
+        # fault. Surfaced rather than silently folded into never_heard.
+        "unparsed_timestamps": unparsed_timestamps,
         "ranked": {
             "by_per": [n for n in worst("per", True) if n["per"]][:10],
             "by_rtt_ms": worst("rtt_ms", True)[:10],
@@ -420,7 +433,8 @@ def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime,
         # one. A heuristic hint is still a warning; it carries heuristic:true for the reader.
         warnings += (len(out["zwave"]["packet_errors"])
                      + len(out["zwave"]["weak_signal_heuristic"])
-                     + len(out["zwave"]["never_heard"]))
+                     + len(out["zwave"]["never_heard"])
+                     + len(out["zwave"]["unparsed_timestamps"]))
     if zigbee is not None:
         out["zigbee"] = analyze_zigbee(zigbee, now)
         critical += len(out["zigbee"]["network_problems"])
@@ -446,7 +460,7 @@ def fetch(base: str, path: str, transport=None) -> dict:
             f"is off on this hub and that the endpoint is valid on its firmware.") from e
 
 
-def main(argv=None) -> int:
+def main(argv=None, transport=None) -> int:
     p = argparse.ArgumentParser(description="Flag Z-Wave/Zigbee mesh problems on a Hubitat hub.")
     p.add_argument("--ip")
     p.add_argument("--port", type=int, default=8080)
@@ -465,28 +479,53 @@ def main(argv=None) -> int:
 
     zwave = zigbee = mesh_raw = None
     tz_name = None
+    fetch_warnings: list = []
+
+    # The radio endpoints are what the caller asked for: their failure is fatal.
     try:
         if args.radio in ("zwave", "both"):
-            zwave = fetch(base, ZWAVE_PATH)
+            zwave = fetch(base, ZWAVE_PATH, transport)
         if args.radio in ("zigbee", "both"):
-            zigbee = fetch(base, ZIGBEE_PATH)
-        # The hub's zone decides how a naive lastTime reads (see parse_ts). Fetched, never
-        # assumed from the local machine — the analyzer may run in a different zone than the hub.
-        tz_name = hub_timezone(fetch(base, DETAILS_PATH))
-        mesh_raw = fetch(base, HUBMESH_PATH)
+            zigbee = fetch(base, ZIGBEE_PATH, transport)
     except HubError as e:
         print(str(e), file=sys.stderr)
         return 1
 
+    def optional_fetch(path: str, consequence: str):
+        """Auxiliary endpoints degrade instead of sinking the radio diagnostics the caller
+        asked for. Both are undocumented and version-sensitive (reference/endpoints.md), so a
+        hub that lacks one must still get its radios analyzed — analyze() already models a
+        missing hub_mesh, and naive_zone(None) already has a documented fallback.
+
+        Degrades LOUDLY, never silently: the failure lands in the output as a structured
+        fetch_warnings entry naming what is now unknown, and on stderr. Catches HubError
+        specifically — an unexpected exception still propagates."""
+        try:
+            return fetch(base, path, transport)
+        except HubError as e:
+            fetch_warnings.append({"endpoint": path, "error": str(e), "consequence": consequence})
+            print(f"warning: {path} unavailable — {e}. {consequence}", file=sys.stderr)
+            return None
+
+    # The hub's zone decides how a naive lastTime reads (see parse_ts). Fetched, never assumed
+    # from the local machine — the analyzer may run in a different zone than the hub.
+    tz_name = hub_timezone(optional_fetch(
+        DETAILS_PATH, "Naive zwaveJS lastTime stamps fall back to UTC, so on a hub outside UTC "
+                      "every zwaveJS node age is overstated by the hub's offset."))
+    mesh_raw = optional_fetch(
+        HUBMESH_PATH, "hub_mesh is null: a peer that cannot carry commands would go undetected, "
+                      "so a clean radio result here is not an all-clear.")
+
     probes = None
-    if not args.no_probe:
-        probes = {p["ipAddress"]: probe_peer(p["ipAddress"], args.port)
+    if mesh_raw is not None and not args.no_probe:
+        probes = {p["ipAddress"]: probe_peer(p["ipAddress"], args.port, transport)
                   for p in (mesh_raw.get("hubList") or []) if p.get("ipAddress")}
 
     result = analyze(zwave, zigbee, datetime.now(timezone.utc),
                      hub_mesh=analyze_hub_mesh(mesh_raw, probes), naive_tz=naive_zone(tz_name))
     result["hub"] = base
     result["hub_timezone"] = tz_name
+    result["fetch_warnings"] = fetch_warnings
     print(json.dumps(result, indent=2, default=str))
     return 0
 

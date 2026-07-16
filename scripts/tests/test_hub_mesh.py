@@ -5,7 +5,10 @@ Fixtures mirror the real /hub/zwaveDetails/json and /hub/zigbeeDetails/json shap
 on 2.5.1.125 (both Z-Wave backends). `now` is injected so activity-age assertions are
 deterministic — no wall-clock reads (testing-standards)."""
 
+import contextlib
 import importlib.util
+import io
+import json
 import unittest
 from datetime import datetime, timezone
 from pathlib import Path
@@ -253,6 +256,17 @@ class TestZwaveStaleness(unittest.TestCase):
         self.assertEqual([n["nodeId"] for n in r["never_heard"]], [27])
         self.assertEqual(r["failed"], [])                    # and it is NOT a FAILED node
 
+    def test_unparseable_timestamp_is_not_never_heard(self):
+        # parse_ts returns None for an unparseable stamp as well as an absent one. Keying
+        # never_heard on age_seconds would call a malformed string "the hub has never heard
+        # this node" — a diagnosis invented from a parse failure.
+        d = zwave_details([zw_node(nodeId=1, lastTime="not-a-timestamp"),
+                           zw_node(nodeId=2, lastTime=None),
+                           zw_node(nodeId=3, lastTime="")])
+        r = m.analyze_zwave(d, NOW)
+        self.assertEqual([n["nodeId"] for n in r["never_heard"]], [2, 3])
+        self.assertEqual([n["nodeId"] for n in r["unparsed_timestamps"]], [1])
+
     def test_never_heard_node_excluded_from_stalest_ranking(self):
         # No timestamp means unknown age, not infinite age — it must not outrank real staleness.
         d = zwave_details([zw_node(nodeId=27, lastTime=None),
@@ -363,6 +377,69 @@ class TestAnalyzeHubMesh(unittest.TestCase):
 
     def test_no_mesh_json_is_none(self):
         self.assertIsNone(m.analyze_hub_mesh(None, None))
+
+
+class TestOptionalFetchDegradation(unittest.TestCase):
+    """The radio endpoints are the requested capability and stay fatal. /hub2/hubMeshJson and
+    /hub/details/json are undocumented and version-sensitive, so a hub lacking them must still
+    get its radios analyzed — degraded loudly, never silently."""
+
+    def _run(self, fail_paths, argv=("--ip", "1.2.3.4", "--radio", "zwave", "--no-probe")):
+        def transport(_method, url, _body):
+            if any(p in url for p in fail_paths):
+                raise m.HubError(f"cannot reach {url}: HTTP 404")
+            if m.ZWAVE_PATH in url:
+                return 200, {}, json.dumps(zwave_details([zw_node()], zwavejs=False))
+            if m.DETAILS_PATH in url:
+                return 200, {}, '{"timeZone": "America/Chicago"}'
+            if m.HUBMESH_PATH in url:
+                return 200, {}, json.dumps(hub_mesh_json([peer()]))
+            raise AssertionError(f"unexpected fetch: {url}")
+
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = m.main(list(argv), transport=transport)
+        payload = json.loads(out.getvalue()) if out.getvalue().strip() else None
+        return rc, payload, err.getvalue()
+
+    def test_missing_hub_mesh_endpoint_still_returns_radio_analysis(self):
+        rc, payload, err = self._run([m.HUBMESH_PATH])
+        self.assertEqual(rc, 0)                              # radios asked for, radios delivered
+        assert payload is not None
+        self.assertIsNotNone(payload["zwave"])
+        self.assertIsNone(payload["hub_mesh"])
+        # Degraded, but never quietly: the gap names what is now unknown, on both channels.
+        self.assertEqual([w["endpoint"] for w in payload["fetch_warnings"]], [m.HUBMESH_PATH])
+        self.assertIn("not an all-clear", payload["fetch_warnings"][0]["consequence"])
+        self.assertIn(m.HUBMESH_PATH, err)
+
+    def test_missing_details_endpoint_degrades_timezone_not_the_run(self):
+        rc, payload, err = self._run([m.DETAILS_PATH])
+        self.assertEqual(rc, 0)
+        assert payload is not None
+        self.assertIsNone(payload["hub_timezone"])
+        self.assertEqual([w["endpoint"] for w in payload["fetch_warnings"]], [m.DETAILS_PATH])
+        self.assertIn("overstated by the hub's offset", payload["fetch_warnings"][0]["consequence"])
+        self.assertIn(m.DETAILS_PATH, err)
+
+    def test_both_optional_endpoints_missing_still_succeeds(self):
+        rc, payload, _ = self._run([m.HUBMESH_PATH, m.DETAILS_PATH])
+        self.assertEqual(rc, 0)
+        assert payload is not None
+        self.assertEqual(len(payload["fetch_warnings"]), 2)
+
+    def test_requested_radio_endpoint_failure_is_still_fatal(self):
+        rc, payload, err = self._run([m.ZWAVE_PATH])
+        self.assertEqual(rc, 1)
+        self.assertIsNone(payload)
+        self.assertIn(m.ZWAVE_PATH, err)
+
+    def test_healthy_hub_emits_no_fetch_warnings(self):
+        rc, payload, _ = self._run([])
+        self.assertEqual(rc, 0)
+        assert payload is not None
+        self.assertEqual(payload["fetch_warnings"], [])
+        self.assertEqual(payload["hub_timezone"], "America/Chicago")
 
 
 class TestProbePeer(unittest.TestCase):
