@@ -523,5 +523,203 @@ class TestProbePeer(unittest.TestCase):
         self.assertEqual(r["peers"][0]["probe_error"], "identity unverified")
 
 
+# --- route fan-in ---------------------------------------------------------------------------
+# A repeater's blast radius: how many classic-mesh nodes route THROUGH it. The grounded case is
+# the Devices hub, where 12 nodes routed through a repeater the hub had never heard from.
+
+
+class TestParseRoute(unittest.TestCase):
+    def test_hex_hops_to_ints(self):
+        self.assertEqual(m.parse_route("01 -> 07 -> 0A"), [1, 7, 10])
+
+    def test_direct_route_is_two_hops(self):
+        self.assertEqual(m.parse_route("01 -> 0A"), [1, 10])
+
+    def test_lowercase_and_tight_spacing(self):
+        self.assertEqual(m.parse_route("01->0f->1c"), [1, 15, 28])
+
+    def test_three_digit_lr_id(self):
+        self.assertEqual(m.parse_route("01 -> 12C"), [1, 300])
+
+    def test_absent_route_is_none(self):
+        for raw in ("", None):
+            self.assertIsNone(m.parse_route(raw))
+
+    def test_unparseable_route_is_none(self):
+        # 'ZZ' is not hex. None means "no route information", never an empty hop list that would
+        # read as a direct route.
+        for raw in ("01 -> ZZ", "not a route", "01 -> -> 0A"):
+            self.assertIsNone(m.parse_route(raw))
+
+
+class TestRouteFanIn(unittest.TestCase):
+    def fan_in(self, nodes, **kw):
+        details = zwave_details(nodes, **kw)
+        return m.analyze_zwave(details, NOW)["route_fan_in"]
+
+    def test_counts_nodes_routing_through_a_repeater(self):
+        nodes = [zw_node(nodeId=7, deviceName="Extender", route="01 -> 07"),
+                 zw_node(nodeId=10, route="01 -> 07 -> 0A"),
+                 zw_node(nodeId=11, route="01 -> 07 -> 0B"),
+                 zw_node(nodeId=12, route="01 -> 0C")]  # direct — depends on no repeater
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeater_count"], 1)
+        self.assertEqual(r["repeaters"][0]["nodeId"], 7)
+        self.assertEqual(r["repeaters"][0]["dependent_count"], 2)
+        self.assertEqual(r["repeaters"][0]["dependents"], [10, 11])
+
+    def test_direct_routes_produce_no_repeaters(self):
+        nodes = [zw_node(nodeId=10, route="01 -> 0A"), zw_node(nodeId=11, route="01 -> 0B")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeater_count"], 0)
+        self.assertEqual(r["load_bearing_concerns"], [])
+
+    def test_multi_hop_counts_every_intermediate(self):
+        # Both 07 and 08 carry node 10; neither the hub nor the node itself is a repeater.
+        nodes = [zw_node(nodeId=7, route="01 -> 07"), zw_node(nodeId=8, route="01 -> 07 -> 08"),
+                 zw_node(nodeId=10, route="01 -> 07 -> 08 -> 0A")]
+        r = self.fan_in(nodes)
+        counts = {x["nodeId"]: x["dependent_count"] for x in r["repeaters"]}
+        self.assertEqual(counts, {7: 2, 8: 1})
+        self.assertNotIn(1, counts)   # the hub is never a repeater
+        self.assertNotIn(10, counts)  # a node does not repeat for itself
+
+    def test_ranked_worst_first_by_dependent_count(self):
+        nodes = [zw_node(nodeId=7, route="01 -> 07"), zw_node(nodeId=8, route="01 -> 08"),
+                 zw_node(nodeId=10, route="01 -> 08 -> 0A"),
+                 zw_node(nodeId=11, route="01 -> 07 -> 0B"),
+                 zw_node(nodeId=12, route="01 -> 07 -> 0C"),
+                 zw_node(nodeId=13, route="01 -> 07 -> 0D")]
+        r = self.fan_in(nodes)
+        self.assertEqual([x["nodeId"] for x in r["repeaters"]], [7, 8])
+        self.assertEqual([x["dependent_count"] for x in r["repeaters"]], [3, 1])
+
+    def test_healthy_repeater_carrying_many_is_not_a_concern(self):
+        # The issue's explicit instruction: fan-in is a topology fact, not a fault. 12 nodes
+        # behind a healthy repeater is a normal mesh.
+        nodes = [zw_node(nodeId=7, deviceName="Extender", route="01 -> 07")]
+        nodes += [zw_node(nodeId=i, route=f"01 -> 07 -> {i:02X}") for i in range(10, 22)]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeaters"][0]["dependent_count"], 12)
+        self.assertEqual(r["repeaters"][0]["concerns"], [])
+        self.assertEqual(r["load_bearing_concerns"], [])
+
+    def test_never_heard_repeater_carrying_twelve_is_the_signal(self):
+        # The grounded case this was filed for. lastTime absent => the hub has never heard it,
+        # while nodeState stays OK and every radio check passes.
+        nodes = [zw_node(nodeId=7, deviceName="Extender", route="01 -> 07", lastTime=None)]
+        nodes += [zw_node(nodeId=i, route=f"01 -> 07 -> {i:02X}") for i in range(10, 22)]
+        r = self.fan_in(nodes)
+        concern = r["load_bearing_concerns"][0]
+        self.assertEqual(concern["nodeId"], 7)
+        self.assertEqual(concern["dependent_count"], 12)
+        self.assertEqual(concern["concerns"], ["never_heard"])
+        self.assertEqual(len(concern["dependents"]), 12)
+
+    def test_failed_and_weak_repeaters_are_crossed(self):
+        nodes = [zw_node(nodeId=7, route="01 -> 07", nodeState="FAILED"),
+                 zw_node(nodeId=8, route="01 -> 08", lwrRssi="-105db"),
+                 zw_node(nodeId=9, route="01 -> 09", per=4),
+                 zw_node(nodeId=10, route="01 -> 07 -> 0A"),
+                 zw_node(nodeId=11, route="01 -> 08 -> 0B"),
+                 zw_node(nodeId=12, route="01 -> 09 -> 0C")]
+        r = self.fan_in(nodes)
+        crossed = {x["nodeId"]: x["concerns"] for x in r["load_bearing_concerns"]}
+        self.assertEqual(crossed[7], ["failed"])
+        self.assertEqual(crossed[8], ["weak_signal_heuristic"])
+        self.assertEqual(crossed[9], ["packet_errors"])
+
+    def test_lr_nodes_are_excluded_entirely(self):
+        # LR is a star: no repeaters exist to depend on, and an LR node can serve as none.
+        # Reading its route here would manufacture a repeater the topology forbids.
+        nodes = [zw_node(nodeId=300, route="01 -> 12C"), zw_node(nodeId=301, route="01 -> 12D")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeater_count"], 0)
+        self.assertEqual(r["anomalies"], [])
+
+    def test_lr_node_never_counted_as_a_repeater_for_a_mesh_node(self):
+        # Even if a mesh node's route named an LR id as a hop, the LR node is still a star node.
+        # The mesh node's route is read (it is mesh); the hop is simply not in nodes[].
+        nodes = [zw_node(nodeId=300, route="01 -> 12C"),
+                 zw_node(nodeId=10, route="01 -> 12C -> 0A")]
+        r = self.fan_in(nodes)
+        self.assertEqual([x["nodeId"] for x in r["repeaters"]], [300])
+        self.assertEqual(r["repeaters"][0]["concerns"], [])  # 300 IS in nodes[], so not unknown
+
+    def test_unknown_hop_is_reported_not_dropped(self):
+        # A route naming a hop absent from nodes[]. The dependents are real either way.
+        nodes = [zw_node(nodeId=10, route="01 -> 07 -> 0A")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeaters"][0]["nodeId"], 7)
+        self.assertEqual(r["repeaters"][0]["concerns"], ["unknown_node"])
+        self.assertEqual(r["repeaters"][0]["dependent_count"], 1)
+
+    def test_incoherent_route_is_an_anomaly_and_counts_nothing(self):
+        # The shape the pre-0.1.10 eval fixture carried: every node claiming route '01 -> 0A'.
+        # For node 11 that path terminates at a different node. Guessing which hops are
+        # repeaters out of it would invent dependents.
+        nodes = [zw_node(nodeId=10, route="01 -> 0A"), zw_node(nodeId=11, route="01 -> 0A")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeater_count"], 0)
+        self.assertEqual(len(r["anomalies"]), 1)
+        self.assertEqual(r["anomalies"][0]["nodeId"], 11)
+        self.assertIn("does not run from the hub", r["anomalies"][0]["reason"])
+
+    def test_unparseable_route_is_an_anomaly(self):
+        nodes = [zw_node(nodeId=10, route="01 -> ZZ -> 0A")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeater_count"], 0)
+        self.assertIn("not parseable", r["anomalies"][0]["reason"])
+
+    def test_absent_route_is_silent_not_an_anomaly(self):
+        # No route information is not a malformed route.
+        nodes = [zw_node(nodeId=10, route="")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["anomalies"], [])
+        self.assertEqual(r["repeater_count"], 0)
+
+
+class TestFanInEnrichment(unittest.TestCase):
+    def test_never_heard_entry_carries_its_blast_radius(self):
+        # The gap the issue names: never_heard[] listed the load-bearing repeater and a silent
+        # leaf identically. dependent_count is what tells them apart, inline where it is read.
+        nodes = [zw_node(nodeId=7, deviceName="Extender", route="01 -> 07", lastTime=None),
+                 zw_node(nodeId=9, deviceName="Leaf", route="01 -> 09", lastTime=None)]
+        nodes += [zw_node(nodeId=i, route=f"01 -> 07 -> {i:02X}") for i in range(10, 22)]
+        z = m.analyze_zwave(zwave_details(nodes), NOW)
+        by_id = {n["nodeId"]: n for n in z["never_heard"]}
+        self.assertEqual(by_id[7]["dependent_count"], 12)
+        self.assertEqual(by_id[9]["dependent_count"], 0)
+
+    def test_lr_dependent_count_is_none_not_zero(self):
+        # A star node repeats for nobody by construction, so "0 dependents" would read as a
+        # measurement where the question does not apply.
+        nodes = [zw_node(nodeId=300, route="01 -> 12C"), zw_node(nodeId=10, route="01 -> 0A")]
+        z = m.analyze_zwave(zwave_details(nodes), NOW)
+        by_id = {n["nodeId"]: n for n in z["stalest"]}
+        self.assertIsNone(by_id[300]["dependent_count"])
+        self.assertEqual(by_id[10]["dependent_count"], 0)
+
+
+class TestFanInStaysOutOfTheCounters(unittest.TestCase):
+    def test_healthy_high_fan_in_hub_rolls_up_clean(self):
+        # A repeater carrying 12 nodes is a normal mesh. If fan-in reached the counters, every
+        # healthy hub with a repeater would warn — and the reader would learn to ignore it.
+        nodes = [zw_node(nodeId=7, route="01 -> 07")]
+        nodes += [zw_node(nodeId=i, route=f"01 -> 07 -> {i:02X}") for i in range(10, 22)]
+        out = m.analyze(zwave_details(nodes), None, NOW)
+        self.assertEqual(out["zwave"]["route_fan_in"]["repeaters"][0]["dependent_count"], 12)
+        self.assertEqual(out["summary"], {"critical": 0, "warnings": 0})
+
+    def test_never_heard_repeater_counts_once_not_twice(self):
+        # The never-heard repeater is already counted through never_heard[]. Counting it again
+        # for its fan-in would double-count one node.
+        nodes = [zw_node(nodeId=7, route="01 -> 07", lastTime=None)]
+        nodes += [zw_node(nodeId=i, route=f"01 -> 07 -> {i:02X}") for i in range(10, 22)]
+        out = m.analyze(zwave_details(nodes), None, NOW)
+        self.assertEqual(len(out["zwave"]["route_fan_in"]["load_bearing_concerns"]), 1)
+        self.assertEqual(out["summary"], {"critical": 0, "warnings": 1})
+
+
 if __name__ == "__main__":
     unittest.main()

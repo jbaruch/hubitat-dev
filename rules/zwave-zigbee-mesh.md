@@ -23,6 +23,16 @@ healthy, so the devices are fine" — see `The command path`.
 - `averageRtt` — round-trip time in ms; lower is better. No spec cutoff — rank, don't threshold.
 - `routeChanges` — classic-mesh stability indicator; frequent changes mean the Last Working Route keeps failing. Reported by the **legacy** backend; `N/A` on the zwaveJS backend.
 - `neighbors` — how many nodes a **classic-mesh** node hears. `0` for Long Range nodes (a star has none — see below), not a backend artifact.
+- `route` — the path the hub uses to reach the node: hub (`01`) first, the node itself last, repeaters in between. `hub_mesh.py` reads the intermediate hops into `zwave.route_fan_in`.
+
+## Route fan-in (a repeater's blast radius)
+
+- **Fan-in is how many nodes route THROUGH a repeater** — the classic-mesh counterpart of a hub-mesh peer's `shared_device_count`, and read the same way: **blast radius, not a fault**. `zwave.route_fan_in.repeaters[]` ranks every repeater by `dependent_count`; each node also carries its own `dependent_count`.
+- **A repeater carrying 12 nodes is a normal mesh.** Fan-in alone is never a finding, reaches neither `summary` counter, and needs no remedy. Hubitat publishes no "too many dependents" cutoff — **rank, never threshold**.
+- **What fan-in changes is the reading of a repeater that is itself flagged.** `zwave.route_fan_in.load_bearing_concerns[]` is that cross: a repeater that is `never_heard`, `FAILED`, weak, or carrying packet errors, ranked by how many nodes sit behind it. A **never-heard leaf** is one silent device; a **never-heard repeater carrying 12** is 12 nodes whose path runs through something the hub has no evidence is alive. Both sit in `never_heard[]` and only `dependent_count` tells them apart.
+- **The concern is already counted; the fan-in is not a second finding.** A never-heard repeater warns once, via `never_heard`. Quote its `dependent_count` as the scope of that one warning — never add it up as extra faults.
+- **Fresh dependents behind a flagged repeater are evidence the repeater relays.** A repeater cannot be dropping everything while a node behind it reported a minute ago. Read the dependents' freshness before blaming the hop.
+- **Classic mesh only.** LR is a star with no repeaters, so LR nodes are excluded and carry `dependent_count: null` — the question does not apply, which is not the same as zero. `route_fan_in.anomalies[]` holds routes that do not run hub → node (stale or malformed records) and `unknown_node` marks a hop absent from `nodes[]`; both are data gaps, not mesh faults.
 
 ## The command path (hub mesh)
 

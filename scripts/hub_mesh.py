@@ -30,6 +30,13 @@ Grounding (rules/zwave-zigbee-mesh.md carries the citations):
     lastActivity, messageCount) and network-level state (channel, weakChannel, healthy,
     networkState, powerLevel). Per-device LQI lives in /hub/zigbee/getChildAndRouteInfo
     (neighbor table); per-frame LQI+RSSI in the live zigbeeLogsocket.
+  - ROUTE FAN-IN is a repeater's blast radius, the classic-mesh counterpart of a hub-mesh peer's
+    shared_device_count: how many nodes route THROUGH it (zwave.route_fan_in). Like that count it
+    is context, never a fault — a repeater carrying 12 nodes is a normal mesh — so it is ranked,
+    never flagged, and reaches neither summary counter (see analyze()). It changes the reading of
+    a repeater that is itself flagged: a never-heard leaf is one silent device; a never-heard
+    repeater carrying 12 is 12 nodes pathing through something the hub has no evidence is alive.
+    Classic mesh only — LR is a star with no repeaters.
   - lastTime/lastActivity is "when the hub last heard this device". For a device that only
     transmits after being commanded (a shade, an outlet), that is effectively "when a command
     last landed" — which is why staleness, not any radio metric, is what exposes a broken
@@ -88,6 +95,8 @@ SILABS_SENSITIVITY_DBM = {"700": -97, "800": -110}
 # A zwaveJS RSSI within this margin of the floor is flagged "near sensitivity floor". Margin,
 # not an absolute cutoff — the floor itself is the grounded number; the margin is judgment.
 RSSI_FLOOR_MARGIN_DB = 10
+# The hub is always node 1 — the first hop of every route ('01 -> ...').
+HUB_NODE_ID = 1
 
 
 def parse_rssi(raw) -> Optional[float]:
@@ -102,6 +111,27 @@ def parse_rssi(raw) -> Optional[float]:
         return float(s.strip())
     except ValueError:
         return None
+
+
+def parse_route(raw) -> Optional[list]:
+    """'01 -> 07 -> 0A' -> [1, 7, 10]. Hops are HEX. None when absent or unparseable.
+
+    The route is the full path the hub uses to reach the node: the hub first, the node itself
+    last, and every repeater in between. The LR star's direct route is the two-hop case
+    '01 -> <node>' (rules/zwave-zigbee-mesh.md), and a classic-mesh node reached directly has
+    the same two-hop shape."""
+    if not raw:
+        return None
+    hops = []
+    for part in str(raw).split("->"):
+        part = part.strip()
+        if not part:
+            return None
+        try:
+            hops.append(int(part, 16))
+        except ValueError:
+            return None
+    return hops or None
 
 
 def parse_num(raw) -> Optional[float]:
@@ -234,12 +264,110 @@ def normalize_zwave_node(node: dict, now: datetime, naive_tz=None) -> dict:
     }
 
 
+def analyze_route_fan_in(nodes: list, backend: str, series: str = "800") -> dict:
+    """Pure. Count how many classic-mesh nodes route THROUGH each repeater, and cross that count
+    with the repeater's own health.
+
+    Fan-in is a repeater's blast radius, exactly as shared_device_count is a hub-mesh peer's —
+    and like that count it is CONTEXT, never a fault. A repeater carrying 12 nodes is a normal,
+    healthy mesh; nothing here flags it, and nothing here reaches summary.critical/warnings (see
+    analyze()). What the count changes is how a repeater that is ITSELF flagged reads: a
+    never-heard leaf is one silent device, while a never-heard repeater carrying 12 is 12 nodes
+    whose path runs through something the hub has no evidence is alive. Both were already in
+    never_heard[] and nothing distinguished them.
+
+    RANKS, NEVER THRESHOLDS. Hubitat publishes no "too many dependents" cutoff, so this invents
+    none: every repeater is listed with its count, and the ones carrying a concern are listed
+    again worst-first for the reader to judge (rules/zwave-zigbee-mesh.md).
+
+    CLASSIC MESH ONLY. LR is a star — every LR node talks directly to the hub, so it depends on
+    no repeater and can serve as none. Reading an LR node's route here would manufacture a
+    repeater the topology forbids.
+    """
+    by_id = {n["nodeId"]: n for n in nodes}
+    dependents: dict = {}
+    anomalies = []
+
+    for n in nodes:
+        if n["topology"] != "mesh":
+            continue  # LR star, or the reserved 233..255 gap: no routing to read
+        hops = parse_route(n["route"])
+        if hops is None:
+            if n["route"]:
+                # Present but unreadable. A shape this script does not know, not a mesh fault —
+                # surfaced like unparsed_timestamps rather than silently counted as "direct".
+                anomalies.append({"nodeId": n["nodeId"], "route": n["route"],
+                                  "reason": "route is present but not parseable as hex hops"})
+            continue
+        if hops[0] != HUB_NODE_ID or hops[-1] != n["nodeId"]:
+            # A coherent route starts at the hub and ends at the node it belongs to. Anything
+            # else is a stale or malformed record, and guessing which hops are repeaters out of
+            # it would invent dependents. Surface it and count nothing.
+            anomalies.append({
+                "nodeId": n["nodeId"], "route": n["route"],
+                "reason": f"route does not run from the hub (node {HUB_NODE_ID}) to node "
+                          f"{n['nodeId']} — parsed hops {hops}"})
+            continue
+        for hop in hops[1:-1]:
+            dependents.setdefault(hop, []).append(n["nodeId"])
+
+    repeaters = []
+    for node_id, deps in dependents.items():
+        node = by_id.get(node_id)
+        entry = {"nodeId": node_id, "dependent_count": len(deps), "dependents": sorted(deps)}
+        concerns = []
+        if node is None:
+            # A route names a hop absent from nodes[]. Not a mesh fault — a data gap. The
+            # dependents are real either way, so it is reported rather than dropped.
+            concerns.append("unknown_node")
+        else:
+            entry.update({
+                "deviceId": node["deviceId"], "deviceName": node["deviceName"],
+                "nodeState": node["nodeState"], "lastTime": node["lastTime"],
+                "age_seconds": node["age_seconds"], "per": node["per"],
+                "rssi": node["rssi"], "rssi_raw": node["rssi_raw"],
+            })
+            # Each concern mirrors a flag the node already carries elsewhere in the output. The
+            # fan-in count is what says how far that flag reaches.
+            if not node["lastTime"]:
+                concerns.append("never_heard")
+            if str(node["nodeState"]).upper() == "FAILED":
+                concerns.append("failed")
+            if node["per"] and node["per"] > 0:
+                concerns.append("packet_errors")
+            if rssi_heuristic(node["rssi"], backend, series):
+                concerns.append("weak_signal_heuristic")
+        entry["concerns"] = concerns
+        repeaters.append(entry)
+
+    repeaters.sort(key=lambda r: (r["dependent_count"], r["nodeId"]), reverse=True)
+    return {
+        "repeater_count": len(repeaters),
+        # Every repeater, worst-first by dependent count. Topology, not a fault list.
+        "repeaters": repeaters,
+        # The signal the issue was filed for: repeaters that are themselves flagged, ranked by
+        # how many nodes sit behind them. Empty on a healthy mesh however high the fan-in.
+        "load_bearing_concerns": [r for r in repeaters if r["concerns"]],
+        "anomalies": anomalies,
+    }
+
+
 def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
     """Pure. Flag failed/ghost nodes and nonzero PER; rank worst-first by PER, RTT, RSSI, and
     staleness. `now`/`naive_tz` are injected (see normalize_zwave_node)."""
     backend = zwave_backend(details)
     series = "700" if "700" in str(details.get("firmwareVersion", "")) else "800"
     nodes = [normalize_zwave_node(n, now, naive_tz) for n in details.get("nodes") or []]
+
+    # Before the flag lists are built, so a node's blast radius rides along wherever it surfaces.
+    # This is the point of the whole section: never_heard[] already listed the never-heard
+    # repeater and the never-heard leaf identically, and the difference between them is 12 nodes.
+    fan_in = analyze_route_fan_in(nodes, backend, series)
+    fan_in_counts = {r["nodeId"]: r["dependent_count"] for r in fan_in["repeaters"]}
+    for n in nodes:
+        # None, not 0, off the classic mesh: an LR star node repeats for nobody by construction,
+        # and "0 dependents" would read as a measurement where the question does not apply.
+        n["dependent_count"] = fan_in_counts.get(n["nodeId"], 0) if n["topology"] == "mesh" else None
 
     failed, packet_errors, weak_signal = [], [], []
     for n in nodes:
@@ -292,6 +420,10 @@ def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
         # command-only device is silent until commanded — so this ranks, never flags. The
         # skill reads it against which devices self-report.
         "stalest": worst("age_seconds", True)[:10],
+        # How many nodes depend on each repeater, crossed with that repeater's own health.
+        # Ranked, never flagged, and deliberately absent from the summary counters — see
+        # analyze_route_fan_in() and analyze().
+        "route_fan_in": fan_in,
     }
 
 
@@ -459,6 +591,14 @@ def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime,
                      + len(out["zwave"]["weak_signal_heuristic"])
                      + len(out["zwave"]["never_heard"])
                      + len(out["zwave"]["unparsed_timestamps"]))
+        # route_fan_in deliberately reaches NEITHER counter. Fan-in is a topology fact: a
+        # repeater carrying 12 nodes is a normal mesh, so counting repeaters would warn about
+        # healthy hubs and train the reader to ignore the number. Every repeater fan-in marks as
+        # a concern is ALREADY counted through the flag it mirrors — a never-heard repeater in
+        # never_heard, a FAILED one in failed — so counting it here would double-count the same
+        # node. Fan-in changes what those flags MEAN, not how many there are; that reading is the
+        # skill's job (rules/zwave-zigbee-mesh.md), exactly as shared_device_count informs a
+        # hub-mesh re-add without being a fault of its own.
     if zigbee is not None:
         out["zigbee"] = analyze_zigbee(zigbee, now)
         critical += len(out["zigbee"]["network_problems"])
