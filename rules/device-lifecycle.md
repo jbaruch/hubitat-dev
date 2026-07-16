@@ -20,7 +20,7 @@ them onto the new id.
 
 - Surface the actual list before deleting — name each enabled app, dashboard, parent app, and child device that references the device.
 - Distinguish load-bearing from inert: an enabled app is a live automation; a disabled app or an idle monitor is inert. State which is which, never a bare count.
-- The delete itself is a hub-UI action, and a radio device also needs physical exclusion (`rules/zwave-zigbee-mesh.md`, `reference/playwright-ui.md`) — the tooling enumerates and confirms, it does not trigger the removal.
+- The usage script only reads — it never deletes. The delete itself is a hub-UI action: drive it with Playwright after reading the confirm dialog (`reference/playwright-ui.md`). A radio (Z-Wave/Zigbee) device also needs a physical exclusion/factory-reset the agent cannot perform (`rules/zwave-zigbee-mesh.md`).
 
 ## Verify after removing
 
