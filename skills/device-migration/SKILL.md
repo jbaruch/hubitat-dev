@@ -8,14 +8,13 @@ argument-hint: "[old device] [new device] [--hub <name>]"
 
 Process steps in order. Do not skip ahead.
 
-Replacing hardware strands references: a new device gets a **new device id**, and every app pointing
-at the old one silently breaks (`rules/device-lifecycle.md`). **Settings → Swap Device** re-points
-apps in one shot — when it is available. It often is not, and the fallbacks are not
-interchangeable: Step 3 picks one by *why* the swap is blocked, because the wrong fallback wastes
-work that provably cannot succeed.
+A replacement device gets a **new device id**, and every app pointing at the old one silently breaks
+(`rules/device-lifecycle.md`). **Settings → Swap Device** re-points apps in one shot when it is
+available. It often is not, and the fallbacks are not interchangeable — Step 3 picks one by *why*
+the swap is blocked.
 
 This skill moves **references**. It does not delete the old device — `Skill(skill: "device-removal")`
-owns that, and runs after.
+owns that. Run this **before** that skill's delete: a deleted device cannot be swapped from.
 
 ## Step 1 — Capture what the old device is used by
 
@@ -63,12 +62,12 @@ Do not reach for a fallback until you know which one can work. The reason decide
 
 - **Missing from the OLD list entirely ⇒ it is a child device.** Devices owned by a parent device or
   a parent app are excluded by design (`reference/parent-child-devices.md`) — the page says so:
-  *"Most child devices are not swappable and are not listed here."* **A virtual bridge cannot rescue
-  this**, because the final swap still has to target the child, which stays ineligible. Go to Step 6.
+  *"Most child devices are not swappable and are not listed here."* **A virtual hop cannot lift that
+  exclusion.** The last swap of any chain still targets the child, still ineligible. Go to Step 6.
   (Exceptions Hubitat allows: AirPlay, Bluetooth, HomeKit Controller, Tuya, Wiz.)
-- **Old device listed, new device missing from the NEW list ⇒ no overlapping capability**, since that
-  list is filtered to at least one shared capability. If the new device is itself a child, it is the
-  case above. Otherwise go to Step 4.
+- **Old device listed, new device missing from the NEW list ⇒ no overlapping capability.** That list
+  is filtered to at least one shared capability. If the new device is itself a child, it is the case
+  above. Otherwise go to Step 4.
 - **The new device does not exist yet**, or the old must be excluded/factory-reset before the
   replacement can pair (`rules/zwave-zigbee-mesh.md`) ⇒ nothing to swap *to* yet. Go to Step 4 and
   park.

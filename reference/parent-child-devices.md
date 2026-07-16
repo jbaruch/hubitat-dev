@@ -20,8 +20,7 @@ devices and one parent owning 5 children.
   and its only tell is a **"Parent app"** row in the Device Details table on the device page's
   Device Info tab (`/device/fullJson/<id>` exposes it as `parentApp` — `reference/endpoints.md`).
 
-The distinction matters because the two are reported differently, not because they behave
-differently: both make the device a child.
+Both make the device a child. Only the reporting differs.
 
 ## Reading the tree — `GET /hub2/devicesList`
 

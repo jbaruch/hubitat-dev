@@ -34,11 +34,22 @@ child device. Distinguish load-bearing (enabled apps — live automations that b
 (disabled apps, idle monitors). If nothing references the device, say so and proceed. Do not delete
 anything in this step. Proceed to Step 3.
 
-## Step 3 — Confirm retire vs replace
+## Step 3 — Branch on retire vs replace
 
 Ask whether the device is being **retired** (gone for good) or **replaced** (new hardware stands
-in). On replace, the Step 1 report **is** the capture of memberships to restore later — keep it.
-Proceed to Step 4.
+in). On replace, the Step 1 report **is** the capture of memberships to restore — keep it.
+
+**Retiring** — proceed to Step 4.
+
+**Replacing** — move the references now, before the delete in Step 4:
+`Skill(skill: "device-migration")`. Settings → Swap Device needs the old device to still exist, and
+this skill's Step 4 destroys it. Migrating after the delete forfeits the swap and forces the
+virtual/manual fallback (`rules/device-lifecycle.md`).
+
+Where the hardware forces the old device out first — a radio exclusion, or reusing its physical
+slot — the replacement cannot exist yet, so there is nothing to swap to: `device-migration` parks
+the references on a virtual device instead. Take that path there, then return here. Proceed to
+Step 4 once the references are off the old device.
 
 ## Step 4 — Guide the removal
 
@@ -55,13 +66,12 @@ Re-run the Step 1 command. Do not assume the hub auto-pruned — a reference tha
 (a dashboard tile, a device input, a parent/child link) is a dangling pointer to fix on the
 referencing app. Report what cleared and what did not. If retiring, finish here.
 
-## Step 6 — Restore onto the replacement
+## Step 6 — Land a parked migration
 
-Only when replacing. The new device has a new id, so every reference from the Step 1 capture has to
-be moved onto it. Do not re-select app by app by reflex — **Settings → Swap Device** moves every app
-at once where it is available, and the fallbacks depend on why it is not:
-`Skill(skill: "device-migration")` owns that decision and the verification.
+Only when Step 3 parked the references on a virtual device. The replacement now exists, so the
+references still sitting on the virtual have to reach it: return to
+`Skill(skill: "device-migration")` for the second hop and its verification, and delete the virtual
+device once it is empty.
 
-Prefer migrating **before** this skill's Step 4 delete where the hardware allows it — a deleted
-device cannot be swapped from, and the references have to be parked on a virtual device instead
-(`rules/device-lifecycle.md`). Finish here.
+If Step 3 migrated the references directly, they are already on the replacement and Step 5 verified
+them — nothing is left here. Finish here.
