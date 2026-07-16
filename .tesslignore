@@ -5,6 +5,9 @@
 .tessl/
 scratch/
 scripts/**/tests/
+# Fixture-authoring tooling. Lives beside the fixture it generates so a contract change can be
+# replayed rather than hand-patched; the eval runner needs the fixture, never the generator.
+evals/**/generate.py
 __pycache__/
 *.pyc
 .DS_Store

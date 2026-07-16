@@ -55,3 +55,26 @@ A scenario needing input files ships them under `<scenario>/inputs/`, declared v
 `{"include": ["./inputs"]}` in the scenario's `scenario.json`; the runner copies them
 into the agent's working directory. Fixtures carry a date in the filename and are
 synthetic — no live hub data.
+
+## Generated fixtures
+
+A fixture that is meant to be a shape one of this plugin's scripts **actually emits** is
+generated, never hand-written: synthetic raw hub JSON pushed through the real analyzer
+with an injected clock, so the output shape and every computed counter come from the
+shipped code rather than from an author's belief about it. `mesh-health-command-path-not-radio`
+depends on that property — a *false all-clear* is its premise, so a hand-asserted
+`summary {critical:0, warnings:0}` would beg the question the scenario poses.
+
+The generator lives at `<scenario>/generate.py`, beside the fixture it writes:
+
+```
+python3 evals/mesh-health-command-path-not-radio/generate.py          # rewrite the fixture
+python3 evals/mesh-health-command-path-not-radio/generate.py --check  # exit 1 on drift
+```
+
+It is authoring tooling, not a plugin surface — `.tesslignore`d out of the published
+plugin, and deliberately not a `scripts/` module (that would pull a production test
+burden onto a one-fixture tool). CI runs `--check` over every `evals/*/generate.py`, so a
+fixture that stops matching its generator fails the build instead of rotting quietly. When
+an analyzer's contract changes, **regenerate — do not hand-patch the JSON.** Hand-patching
+forfeits the exact property that makes the fixture worth trusting.

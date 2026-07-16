@@ -1,10 +1,14 @@
 {
-  "include": ["scripts"],
+  "include": ["scripts", "evals"],
   "exclude": ["**/__pycache__", "scratch"],
   "typeCheckingMode": "standard",
   "executionEnvironments": [
     {
       "root": "scripts",
+      "extraPaths": ["scripts"]
+    },
+    {
+      "root": "evals",
       "extraPaths": ["scripts"]
     }
   ]
