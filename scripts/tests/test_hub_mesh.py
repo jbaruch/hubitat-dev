@@ -637,14 +637,38 @@ class TestRouteFanIn(unittest.TestCase):
         self.assertEqual(r["repeater_count"], 0)
         self.assertEqual(r["anomalies"], [])
 
-    def test_lr_node_never_counted_as_a_repeater_for_a_mesh_node(self):
-        # Even if a mesh node's route named an LR id as a hop, the LR node is still a star node.
-        # The mesh node's route is read (it is mesh); the hop is simply not in nodes[].
+    def test_lr_hop_in_a_mesh_route_is_an_anomaly_not_a_repeater(self):
+        # An LR node is a star node: it repeats for nobody. A mesh route naming one as an
+        # intermediate hop is incoherent, not a discovery — counting it would manufacture the
+        # repeater the topology forbids. True whether or not the LR node is in nodes[].
         nodes = [zw_node(nodeId=300, route="01 -> 12C"),
                  zw_node(nodeId=10, route="01 -> 12C -> 0A")]
         r = self.fan_in(nodes)
-        self.assertEqual([x["nodeId"] for x in r["repeaters"]], [300])
-        self.assertEqual(r["repeaters"][0]["concerns"], [])  # 300 IS in nodes[], so not unknown
+        self.assertEqual(r["repeater_count"], 0)
+        self.assertEqual(r["repeaters"], [])
+        self.assertEqual(len(r["anomalies"]), 1)
+        self.assertEqual(r["anomalies"][0]["nodeId"], 10)
+        self.assertIn("non-mesh hop", r["anomalies"][0]["reason"])
+
+    def test_reserved_range_hop_is_an_anomaly(self):
+        # 233..255 is a gap the spec does not assign — classified 'unknown', never 'mesh', so it
+        # gets no mesh-only reading (see node_topology).
+        nodes = [zw_node(nodeId=10, route="01 -> F0 -> 0A")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["repeater_count"], 0)
+        self.assertIn("non-mesh hop", r["anomalies"][0]["reason"])
+
+    def test_a_rejected_route_credits_no_hop(self):
+        # Validation precedes counting: node 11's route is rejected for its LR hop, so the valid
+        # hop 07 in that same route must not collect a dependent from a path called impossible.
+        nodes = [zw_node(nodeId=7, route="01 -> 07"),
+                 zw_node(nodeId=10, route="01 -> 07 -> 0A"),
+                 zw_node(nodeId=11, route="01 -> 07 -> 12C -> 0B")]
+        r = self.fan_in(nodes)
+        self.assertEqual([x["nodeId"] for x in r["repeaters"]], [7])
+        self.assertEqual(r["repeaters"][0]["dependent_count"], 1)   # node 10 only, never 11
+        self.assertEqual(r["repeaters"][0]["dependents"], [10])
+        self.assertEqual(len(r["anomalies"]), 1)
 
     def test_unknown_hop_is_reported_not_dropped(self):
         # A route naming a hop absent from nodes[]. The dependents are real either way.

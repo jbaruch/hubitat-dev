@@ -308,7 +308,20 @@ def analyze_route_fan_in(nodes: list, backend: str, series: str = "800") -> dict
                 "reason": f"route does not run from the hub (node {HUB_NODE_ID}) to node "
                           f"{n['nodeId']} — parsed hops {hops}"})
             continue
-        for hop in hops[1:-1]:
+        # Every intermediate hop must itself be a classic-mesh node. An LR id (>= 256) or one in
+        # the reserved 233..255 gap cannot repeat for anyone — LR is a star, and a star node
+        # relays nothing — so a mesh route naming one is incoherent, not a discovery. Validated
+        # before any counting: a route rejected halfway would leave its earlier hops credited
+        # with a dependent from a path this function just called impossible.
+        intermediates = hops[1:-1]
+        non_mesh = [h for h in intermediates if node_topology(h) != "mesh"]
+        if non_mesh:
+            anomalies.append({
+                "nodeId": n["nodeId"], "route": n["route"],
+                "reason": f"route names non-mesh hop(s) {non_mesh} as repeaters — a Long Range "
+                          f"or reserved-range id repeats for nobody, so the route is incoherent"})
+            continue
+        for hop in intermediates:
             dependents.setdefault(hop, []).append(n["nodeId"])
 
     repeaters = []
