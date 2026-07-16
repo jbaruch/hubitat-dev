@@ -18,7 +18,7 @@ scenario, so a hand-asserted summary would beg the question it exists to pose.
 
 Hand-patching the JSON forfeits that property. The previous generator lived in a scratch
 directory and was lost; the fixture it left behind had drifted from the script in three ways
-that only a real round-trip would have caught (see CHANGELOG 0.1.10):
+that only a real round-trip would have caught (see the CHANGELOG entry for PR #27):
   - `hub_mesh` carried a hand-written `peers[].probe.{reachable,identity_match}` that the real
     `analyze_hub_mesh()` never emits. `analyze()` takes hub_mesh already-analyzed and passes it
     through untouched, so nothing validated it.
@@ -282,6 +282,19 @@ def assert_ground_truth(result: dict) -> None:
         raise SystemExit("fixture ground truth broken:\n  - " + "\n  - ".join(problems))
 
 
+def _regen_hint() -> Path:
+    """The path to print in the drift message: repo-relative when the cwd is an ancestor,
+    absolute otherwise. Never raises — this builds the text of an error message, and a
+    message that dies computing itself takes the drift report down with it. `relative_to`
+    raises ValueError whenever the cwd is not an ancestor (CI invoking the script by
+    absolute path, a run from anywhere but the repo root), which is exactly the moment
+    --check has something to say."""
+    try:
+        return Path(__file__).resolve().relative_to(Path.cwd().resolve())
+    except ValueError:
+        return Path(__file__).resolve()
+
+
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(
         description="Regenerate this scenario's mesh-snapshot fixture.")
@@ -300,7 +313,7 @@ def main(argv=None) -> int:
             return 1
         if FIXTURE.read_text() != rendered:
             print(f"{FIXTURE} is stale — regenerate it:\n"
-                  f"    python3 {Path(__file__).relative_to(Path.cwd())}", file=sys.stderr)
+                  f"    python3 {_regen_hint()}", file=sys.stderr)
             return 1
         print(f"{FIXTURE.name} is up to date.")
         return 0
