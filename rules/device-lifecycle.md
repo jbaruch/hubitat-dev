@@ -36,7 +36,7 @@ them onto the new id.
 ## Swap before re-selecting by hand
 
 - **Settings → Swap Device** re-points every app from one device to another in one action — reach for it before any manual re-select (`skills/device-migration/SKILL.md`).
-- It is **not** available for a child device: devices owned by a parent device or parent app are excluded from its lists by design (`reference/parent-child-devices.md`), which is exactly why an app-managed replacement above re-wires by hand. A virtual-device hop does not lift that exclusion — the swap still has to target the child.
+- It is **not** available for a child device: devices owned by a parent device or parent app are excluded from its lists by design (`reference/parent-child-devices.md`). An app-managed replacement above re-wires by hand for that reason. A virtual-device hop does not lift the exclusion. The last swap of any chain still targets the child.
 - The swap is **bidirectional**: apps already using the *new* device are moved onto the *old* one. Check the replacement's usage before swapping, not after.
 - Hubitat scopes the swap to apps and claims nothing about **dashboards** — verify dashboard tiles separately rather than reporting them migrated.
-- Order the work **references first, delete second**: swap while the old device still exists, since a deleted device cannot be swapped from. When the old must go first (a radio exclusion), park the references on a virtual device and swap them onto the replacement afterwards.
+- Order the work **references first, delete second** — swap while the old device still exists. A deleted device cannot be swapped from. When the old must go first (a radio exclusion), park the references on a virtual device and swap them onto the replacement afterwards.
