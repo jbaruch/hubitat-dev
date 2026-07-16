@@ -1,0 +1,36 @@
+{
+  "context": "Grades the plugin-prescribed actuator-vs-reporter split (rules/zwave-zigbee-mesh.md 'The command path'; skills/mesh-health/SKILL.md Step 4) against a snapshot engineered as a false all-clear. Ground truth of the fixture: summary is {critical:0, warnings:0}, zwave.healthy is true, there are no FAILED nodes, no packet errors, no weak-signal flags, no never-heard nodes, fetch_warnings is empty, and hub_mesh.problems is empty with both peers probing reachable+identity-matched. EVERY axis was measured and every axis is green — so the only evidence available is the staleness pattern. In that pattern: every command-only device (shades, lamps, outlets, switches, dimmers, relay) has age_seconds ~49300 (13.7h), clustered inside a ~53-second window ending 2026-07-15 19:33 local, while every self-reporting device (locks, motion, sensors, repeater) has age_seconds of 60-720 (1-12 minutes). The Zigbee outlet 'Plug Media Shelf' froze at 13.7h inside that same window while the other Zigbee devices are fresh — a fault spanning BOTH radios at once, which no radio fault explains. Correct diagnosis: the COMMAND path is broken, not the radio; hub mesh is clean so the peer link is not the culprit; the suspect is the app/automation that commands these devices and last succeeded at ~19:32. The baseline failure this measures is real and grounded (a 13.7h outage behind a clean radio report) and is exactly what the skill instructed before the fix: report 'the mesh is healthy' off the zero counters. Criteria deliberately do NOT score universal competence (noticing timestamps differ, general troubleshooting politeness) — only the specific manner the plugin teaches.",
+  "type": "weighted_checklist",
+  "checklist": [
+    {
+      "name": "declines_all_clear",
+      "max_score": 16,
+      "description": "Refuses to report the mesh healthy despite summary {critical:0, warnings:0} and zwave.healthy:true — states that something is genuinely wrong and that the zero counters do not mean the network is fine. FAIL (0) if the answer concludes the mesh/radio network is healthy or that the analyzer found no problem, or if it treats the clean counters as licensing 'the mesh is fine, so your devices must be individually broken'."
+    },
+    {
+      "name": "names_command_path_not_radio",
+      "max_score": 28,
+      "description": "Identifies the fault as the COMMAND path — the hub-side chain that issues commands to the devices (app/automation -> hub mesh -> owning hub -> radio) — and explicitly states this is NOT a radio/RF/signal fault. This is the single most plugin-specific judgement under test. FAIL (0) if the diagnosis is a radio, signal, interference, routing, or per-device hardware fault. Partial (~14) if it says the radio looks fine but never localizes the fault to the command/control path."
+    },
+    {
+      "name": "cites_reporter_actuator_asymmetry",
+      "max_score": 22,
+      "description": "Cites the split as the EVIDENCE: devices that transmit on their own (locks, motion, sensors, repeater — fresh, 1-12 minutes) prove the radio is working, while devices that only transmit after being commanded (shades, lamps, outlets, switches — all ~13.7h) have a lastTime that means 'when a command last landed', not 'when the radio last worked'. Must connect self-reporter freshness to the radio being demonstrably alive. FAIL (0) if the answer merely observes that some timestamps are old without drawing the actuator-vs-reporter distinction or without using reporter freshness as proof the radio works."
+    },
+    {
+      "name": "cites_cross_radio_span",
+      "max_score": 14,
+      "description": "Notes that the Zigbee outlet ('Plug Media Shelf', age ~49300s) froze in the SAME window as the Z-Wave command-only devices while other Zigbee devices stayed fresh, and reasons that a fault hitting both radios simultaneously cannot be a radio fault (two independent radios do not fail in the same second). FAIL (0) if the Zigbee freeze is not mentioned, or is mentioned as a separate/second problem rather than as evidence ruling out a radio cause."
+    },
+    {
+      "name": "rules_out_hub_mesh_points_upstream",
+      "max_score": 10,
+      "description": "Reads hub_mesh: notes problems[] is empty and both peers probed reachable with matching identity, so the hub-mesh peer link is NOT the culprit here, and therefore points at the app/automation that commands these devices as the suspect — anchored to the ~53-second cluster ending 2026-07-15 ~19:33 local as the moment commands last landed. FAIL (0) if it blames a stale/broken hub-mesh peer despite the clean probe, or never advances to a hub-side suspect."
+    },
+    {
+      "name": "no_radio_remedy",
+      "max_score": 10,
+      "description": "Prescribes no radio-level remedy. FAIL (0) if the recommended fix includes a Z-Wave repair/heal, adding a repeater or extender, changing the Zigbee channel, moving the hub/antenna, or excluding/re-pairing/replacing the unresponsive shades, lamps, or outlets. These are the remedies a radio-fault reading produces, and every one of them is wasted work against a command-path fault."
+    }
+  ]
+}
