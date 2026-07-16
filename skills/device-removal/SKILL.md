@@ -42,11 +42,12 @@ Proceed to Step 4.
 
 ## Step 4 — Guide the removal
 
-The delete is a hub-UI action, and a radio (Z-Wave/Zigbee) device also needs physical
-exclusion/factory-reset — an agent cannot do the physical step (`rules/zwave-zigbee-mesh.md`). Drive
-the UI remove with Playwright and read the "in use by N apps" confirm dialog first
-(`reference/playwright-ui.md`). An app with `removeButton:false` (e.g. HubiThings Replica) is
-remove-not-automatable — tell the user. Proceed to Step 5.
+Deletion is irreversible — the **user** performs it, not the agent. Navigate to the device's remove
+control with Playwright and read the "in use by N apps" confirm dialog (`reference/playwright-ui.md`),
+then have the user confirm the final removal. A radio (Z-Wave/Zigbee) device also needs a physical
+exclusion/factory-reset only the user can do (`rules/zwave-zigbee-mesh.md`). An app with
+`removeButton:false` (e.g. HubiThings Replica) is remove-not-automatable — tell the user. Proceed to
+Step 5.
 
 ## Step 5 — Verify references cleared
 
