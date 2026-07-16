@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.13 — 2026-07-16
+
 ### Added
 
 - **Snapshot `ref`s resolve to the wrong element on Hubitat's MDL controls, and say nothing about it** (`reference/playwright-ui.md` gotchas 10–15, closes #30). From installing a user app instance end-to-end on 2.5.1.128 — 2 device radios, 25 contact-sensor checkboxes, 5 enum dropdowns, Done. The expensive one: `browser_find` returned a `ref` for a picker's "Update", and the click it generated was `page.locator('.w-full.flex.flex-row').first().click()` — a **container**. No error, the picker looked right, and `settings[thermostatA]` stayed `""`. The cause is structural rather than incidental: Hubitat's controls are MDL **`<div>`s, not `<button>`s**, so the accessibility snapshot labels a generic wrapper and the generated selector takes the wrapper's class soup. Every technique resting on `ref` or `getByRole('button')` inherits it.
