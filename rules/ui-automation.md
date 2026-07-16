@@ -16,7 +16,7 @@ Selectors, setup, the full workflow, and every gotcha's detail live in `referenc
 
 ## Read state the way the framework stores it
 
-- MDL/Vue checkbox and radio pickers keep selection in a `label.is-checked` CSS class, and leave `input.checked` at `false`. Read the class, never the property — reading `input.checked` once made 15 selected members look unselected and nearly wiped them.
+- MDL/Vue checkbox and radio pickers keep selection in a `label.is-checked` CSS class, and leave `input.checked` at `false`. Read the class, never the property.
 - Act with real `browser_click` / `browser_type`. `element.click()` inside `browser_evaluate` does not fire jQuery/Vue/MDL handlers.
 - A device input commits on the page's **Done** over a WebSocket, not on the picker's "Update" and not over observable HTTP. Forcing `.checked` or dispatching synthetic events does not persist.
 
