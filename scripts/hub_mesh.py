@@ -430,10 +430,16 @@ def probe_peer(ip: str, port: int, transport=None) -> dict:
         return {"reachable": True, "hubId": None,
                 "error": f"{DETAILS_PATH} returned HTTP {status} — identity unverified"}
     try:
-        return {"reachable": True, "hubId": json.loads(text).get("hubUID"), "error": None}
+        hub_id = json.loads(text).get("hubUID")
     except json.JSONDecodeError:
         return {"reachable": True, "hubId": None,
                 "error": f"{DETAILS_PATH} did not return JSON — identity unverified"}
+    if not hub_id:
+        # 200 + JSON, no hubUID: still unverified. Reporting hubId None with error None would
+        # read as "identity checked and fine" — the one shape that must never look verified.
+        return {"reachable": True, "hubId": None,
+                "error": f"{DETAILS_PATH} carried no hubUID — identity unverified"}
+    return {"reachable": True, "hubId": hub_id, "error": None}
 
 
 def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime,
@@ -526,10 +532,14 @@ def main(argv=None, transport=None) -> int:
             return None
 
     # The hub's zone decides how a naive lastTime reads (see parse_ts). Fetched, never assumed
-    # from the local machine — the analyzer may run in a different zone than the hub.
-    tz_name = hub_timezone(optional_fetch(
-        DETAILS_PATH, "Naive zwaveJS lastTime stamps fall back to UTC, so on a hub outside UTC "
-                      "every zwaveJS node age is overstated by the hub's offset."))
+    # from the local machine — the analyzer may run in a different zone than the hub. Only the
+    # Z-Wave path needs it: Zigbee's lastActivity carries an explicit offset, so fetching it for
+    # --radio zigbee would risk a fetch_warning about Z-Wave ages this run never computes, and
+    # the skill reads any fetch_warning as a blind axis blocking an all-clear.
+    if args.radio in ("zwave", "both"):
+        tz_name = hub_timezone(optional_fetch(
+            DETAILS_PATH, "Naive zwaveJS lastTime stamps fall back to UTC, so on a hub outside "
+                          "UTC every zwaveJS node age is overstated by the hub's offset."))
     mesh_raw = optional_fetch(
         HUBMESH_PATH, "hub_mesh is null: a peer that cannot carry commands would go undetected, "
                       "so a clean radio result here is not an all-clear.")

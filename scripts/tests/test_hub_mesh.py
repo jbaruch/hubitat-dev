@@ -11,6 +11,7 @@ import io
 import json
 import unittest
 from datetime import datetime, timezone
+from typing import cast
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parent.parent / "hub_mesh.py"
@@ -405,7 +406,8 @@ class TestOptionalFetchDegradation(unittest.TestCase):
     def test_missing_hub_mesh_endpoint_still_returns_radio_analysis(self):
         rc, payload, err = self._run([m.HUBMESH_PATH])
         self.assertEqual(rc, 0)                              # radios asked for, radios delivered
-        assert payload is not None
+        self.assertIsNotNone(payload)
+        payload = cast(dict, payload)
         self.assertIsNotNone(payload["zwave"])
         self.assertIsNone(payload["hub_mesh"])
         # Degraded, but never quietly: the gap names what is now unknown, on both channels.
@@ -416,7 +418,8 @@ class TestOptionalFetchDegradation(unittest.TestCase):
     def test_missing_details_endpoint_degrades_timezone_not_the_run(self):
         rc, payload, err = self._run([m.DETAILS_PATH])
         self.assertEqual(rc, 0)
-        assert payload is not None
+        self.assertIsNotNone(payload)
+        payload = cast(dict, payload)
         self.assertIsNone(payload["hub_timezone"])
         self.assertEqual([w["endpoint"] for w in payload["fetch_warnings"]], [m.DETAILS_PATH])
         self.assertIn("overstated by the hub's offset", payload["fetch_warnings"][0]["consequence"])
@@ -425,7 +428,8 @@ class TestOptionalFetchDegradation(unittest.TestCase):
     def test_both_optional_endpoints_missing_still_succeeds(self):
         rc, payload, _ = self._run([m.HUBMESH_PATH, m.DETAILS_PATH])
         self.assertEqual(rc, 0)
-        assert payload is not None
+        self.assertIsNotNone(payload)
+        payload = cast(dict, payload)
         self.assertEqual(len(payload["fetch_warnings"]), 2)
 
     def test_requested_radio_endpoint_failure_is_still_fatal(self):
@@ -434,10 +438,33 @@ class TestOptionalFetchDegradation(unittest.TestCase):
         self.assertIsNone(payload)
         self.assertIn(m.ZWAVE_PATH, err)
 
+    def test_zigbee_only_run_does_not_warn_about_zwave_timestamps(self):
+        # /hub/details/json exists only to date Z-Wave's naive stamps; Zigbee's lastActivity
+        # carries its own offset. Fetching it for --radio zigbee would raise a fetch_warning
+        # about node ages this run never computes — and the skill reads any fetch_warning as a
+        # blind axis blocking an all-clear, so an irrelevant one is a false blind axis.
+        def transport(_method, url, _body):
+            if m.DETAILS_PATH in url:
+                raise AssertionError("details must not be fetched for a zigbee-only run")
+            if m.ZIGBEE_PATH in url:
+                return 200, {}, json.dumps(zigbee_details([zb_device()]))
+            if m.HUBMESH_PATH in url:
+                return 200, {}, json.dumps(hub_mesh_json([]))
+            raise AssertionError(f"unexpected fetch: {url}")
+
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            rc = m.main(["--ip", "1.2.3.4", "--radio", "zigbee", "--no-probe"], transport=transport)
+        payload = json.loads(out.getvalue())
+        self.assertEqual(rc, 0)
+        self.assertEqual(payload["fetch_warnings"], [])
+        self.assertIsNone(payload["zwave"])
+
     def test_healthy_hub_emits_no_fetch_warnings(self):
         rc, payload, _ = self._run([])
         self.assertEqual(rc, 0)
-        assert payload is not None
+        self.assertIsNotNone(payload)
+        payload = cast(dict, payload)
         self.assertEqual(payload["fetch_warnings"], [])
         self.assertEqual(payload["hub_timezone"], "America/Chicago")
 
@@ -473,6 +500,16 @@ class TestProbePeer(unittest.TestCase):
         def html(_method, _url, _body):
             return 200, {}, "<html>login</html>"     # e.g. Hub Security on
         r = m.probe_peer("192.168.30.17", 8080, transport=html)
+        self.assertTrue(r["reachable"])
+        self.assertIsNone(r["hubId"])
+        self.assertIn("identity unverified", r["error"])
+
+    def test_json_without_hubUID_is_identity_unverified_not_verified(self):
+        # 200 + JSON but no hubUID. hubId None with error None would read as "identity checked
+        # and fine" — the one shape that must never look verified.
+        def no_uid(_method, _url, _body):
+            return 200, {}, '{"hubName": "Some Hub"}'
+        r = m.probe_peer("192.168.30.17", 8080, transport=no_uid)
         self.assertTrue(r["reachable"])
         self.assertIsNone(r["hubId"])
         self.assertIn("identity unverified", r["error"])

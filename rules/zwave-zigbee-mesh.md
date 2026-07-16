@@ -28,14 +28,14 @@ healthy, so the devices are fine" — see `The command path`.
 
 - **Actuator vs reporter is the diagnostic split**, not Z-Wave vs Zigbee. A **reporter** (lock, motion, presence) transmits on its own, so a fresh `lastTime` proves the radio works. An **actuator** (shade, outlet, lamp) transmits only *after* being commanded, so its `lastTime` is **when a command last landed** — silence is unknown, not broken.
 - **Reporters fresh + actuators frozen = the command path is broken, not the radio.** When it spans *both* radios at once, no radio fault can explain it — two radios do not fail in the same second. Read `zwave.stalest` / `zigbee.stalest` this way. `hub_mesh.py` ranks staleness and never flags it — the classification is yours.
-- A mass of actuator timestamps clustered in one narrow window is the last moment commands worked — the outage's high-water mark, and a scheduled automation is usually what put it there.
+- Actuator timestamps clustered in one narrow window mark the last window in which commands landed; a scheduled automation is the usual source.
 - `hub_mesh.problems[]` is **critical**: a peer that cannot carry commands is as dead as a failed radio. `peer_unreachable` / `peer_identity_mismatch` come from probing the recorded address; `peer_offline` / `peer_inactive` / `peer_warning` are the hub's own claims.
 - **The hub's peer fields do not detect a stale record** — a peer holding a dead address reports `active:true, offline:false, warning:null` with `lastActive` ticking. Never read those three as an all-clear; only the probe is evidence. The peer table is **asymmetric** — each hub keeps its own record, and one side can be right while the other is stale.
 - Re-adding a peer is **hub-UI** work, and `shared_device_count` is its blast radius: every shared device is a link an app can bind to, and removing the peer unbinds them. Quote the count before advising a re-add, and prefer editing the address over remove-and-re-add. A hub whose address drifts re-breaks the record — a **DHCP reservation on the hub's current IP** is the durable fix.
 
 ## The backend split (RSSI scale + timestamp traps)
 
-- `lastTime` is stamped **differently per backend**: legacy emits an explicit `+0000` (true UTC); zwaveJS emits a **naive** stamp in the hub's **local** zone (`timeZone` in `/hub/details/json`). Reading naive as UTC ages every zwaveJS node by the hub's offset — measured, a 70-second-old node read as 5.02 h. Zigbee's `lastActivity` carries `+0000` on both.
+- `lastTime` is stamped **differently per backend**: legacy emits an explicit `+0000` (true UTC); zwaveJS emits a **naive** stamp in the hub's **local** zone (`timeZone` in `/hub/details/json`). Reading naive as UTC ages every zwaveJS node by the hub's UTC offset. Zigbee's `lastActivity` carries `+0000` on both.
 - `lwrRssi` is reported on **two different scales** depending on the Z-Wave backend. Read `zwaveJS` first.
 - `zwaveJS:true` — absolute dBm (negative, e.g. `-78db`); closer to `0` is stronger. Silicon Labs receiver sensitivity: −97 dBm (700-series, 100 kbps GFSK) and −110 dBm (800-series LR channel, 100 kbps O-QPSK); the classic GFSK floor on 800 is a few dB higher. A route near the floor is genuinely weak.
 - `zwaveJS:false` (legacy) — dB *above the noise floor* (positive, e.g. `27dB`); `≤ 0` is at/below noise.
