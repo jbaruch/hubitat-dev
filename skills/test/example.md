@@ -1,8 +1,8 @@
 # hubitat_ci — worked example
 
-Verified 2026-07-16 by running it: Gradle 8.4, this build.gradle, the app test below — `tests=2
-skipped=0 failures=0`. `HubitatAppSandbox`/`HubitatDeviceSandbox` load a script with GroovyShell,
-validate its metadata/preferences/capabilities, and let you drive its methods with a mocked executor.
+Verified 2026-07-16 by running it — Gradle 8.4, this build.gradle, the app test below, `tests=2 skipped=0 failures=0`.
+`HubitatAppSandbox`/`HubitatDeviceSandbox` load a script with GroovyShell, validate its
+metadata/preferences/capabilities, and let you drive its methods with a mocked executor.
 
 ## build.gradle
 
@@ -29,8 +29,8 @@ dependencies {
 }
 ```
 
-`testCompile` was removed in Gradle 7.0 — a build using it cannot evaluate at all (`Could not find
-method testCompile()`), which is a configuration failure, not a test failure.
+`testCompile` was removed in Gradle 7.0. A build using it cannot evaluate at all, failing with
+`Could not find method testCompile()` — a configuration failure, not a test failure.
 
 ## The JDK 11 ceiling
 
@@ -68,8 +68,11 @@ curl -s 'https://biocomp.pkgs.visualstudio.com/HubitatCiRelease/_packaging/hubit
 
 As of 2026-07-16 it reports `<release>0.17</release>`; 0.18 returns HTTP 404. Do **not** renew against
 the [GitHub releases page](https://github.com/biocomp/hubitat_ci/releases) alone — it tops out at
-**v0.16**, older than the pinned 0.17, so it under-reports what the feed actually serves. If a newer
-hubitat_ci ever ships, bump all three pins and re-check the JDK ceiling as one focused change.
+**v0.16**, older than the pinned 0.17, so it under-reports what the feed actually serves.
+
+**Cadence:** check that metadata when adopting the template and on **each dependency-review pass**.
+If a newer hubitat_ci ever ships, bump all three pins and re-check the JDK ceiling as one focused
+change.
 
 ## App test — validation + a mocked callback
 
