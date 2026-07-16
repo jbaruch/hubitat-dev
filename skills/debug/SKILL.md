@@ -17,7 +17,9 @@ Establish what is wrong and which app/driver it concerns, and pick the socket:
 - `logsocket` — the debug/info/warn/error log lines (default; use for "my code does X wrong").
 - `eventsocket` — device attribute events (use for "the attribute isn't updating / the event isn't firing").
 
-For a failure that already happened, reach for history instead of a live tail: `/device/eventsJson/<id>` (when an attribute actually moved, and which app issued a command) and `/hub/eventsJson` (whether a platform update landed near the onset).
+For a failure that already happened, reach for history instead of a live tail:
+- `/device/eventsJson/<id>` — when an attribute actually moved, and which app issued a command.
+- `/hub/eventsJson` — whether a platform update landed near the onset.
 
 Have the source in hand so the log can be read against it. Proceed to Step 2.
 
