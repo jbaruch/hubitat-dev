@@ -10,7 +10,7 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 ## The capability contract
 
 - Declaring `capability "X"` is a **promise to implement every command X requires**, as a Groovy method with the matching name and parameters. `capability "Switch"` obliges `on()` and `off()`; `capability "SwitchLevel"` obliges `setLevel(level, duration)`.
-- The authoritative capability → attributes/commands mapping is `reference/capabilities.json`. A declared capability with a missing command method is a real defect the `lint-review` skill flags.
+- The authoritative capability → attributes/commands mapping is `skills/_reference/capabilities.json`. A declared capability with a missing command method is a real defect the `lint-review` skill flags.
 - Marker capabilities (`Actuator`, `Sensor`) carry no commands — they only classify a device as controllable vs. reporting.
 - Custom `command`/`attribute` declarations go inside `definition`. Attributes surface as **Current States**; update them with `sendEvent` (see `rules/state-vs-attributes.md`).
 

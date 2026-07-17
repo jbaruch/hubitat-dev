@@ -6,7 +6,7 @@ description: What Hubitat's Z-Wave/Zigbee mesh metrics mean, the backend RSSI/ti
 # Z-Wave & Zigbee Mesh Health
 
 Radio-mesh diagnosis is a different axis from code debugging. The data comes from three
-undocumented JSON endpoints (`reference/endpoints.md`); `scripts/hub_mesh.py` fetches and flags,
+undocumented JSON endpoints (`skills/_reference/endpoints.md`); `skills/_scripts/hub_mesh.py` fetches and flags,
 the `mesh-health` skill interprets. Hubitat publishes **no numeric "bad" thresholds** — flag
 unambiguous signals and rank the rest; never assert an invented cutoff.
 
@@ -67,7 +67,7 @@ healthy, so the devices are fine" — see `The command path`.
 
 ## Live radio traffic (the log sockets)
 
-- `ws://<ip>/zwaveLogsocket` and `ws://<ip>/zigbeeLogsocket` stream per-frame decoded traffic — distinct from the driver `/logsocket`. Tail via `scripts/hub_radiolog.py`; the snapshot says who is weak, the log shows it happening.
+- `ws://<ip>/zwaveLogsocket` and `ws://<ip>/zigbeeLogsocket` stream per-frame decoded traffic — distinct from the driver `/logsocket`. Tail via `skills/_scripts/hub_radiolog.py`; the snapshot says who is weak, the log shows it happening.
 - Read them for live signal (Zigbee `lastHopLqi`/`lastHopRssi`, Z-Wave per-frame `RSSI: -NN dBm`), `sequence` gaps (a soft missed-frame hint, not a hard drop count — the counter is shared across the device's traffic), and which cluster/command a device uses.
 - `lastHopLqi`/`lastHopRssi` are the **last hop into the hub** — for a routed device that is the repeater→hub link, not the end device's own radio. ZCL cluster names for the common clusters; `0xFC00–0xFFFE` is manufacturer-specific, `0xE000–0xEFFF` is reserved space vendors (Tuya) use off-spec.
 - The Z-Wave **TransmitReport** (`hub_radiolog --summary` → `transmit_report`) gives the noise floor and SNR at *both* ends. An elevated or spiky **hub** noise floor with `hub_snr` well below `dest_snr` means the hub's own receiver is the bottleneck, from its RF environment rather than the device or distance. Common culprits are co-located 900 MHz radios, USB3, and gear clusters. The fix gets the hub's receiver out of that noise by relocating the hub, fitting an external antenna, or separating co-located hubs. Never the device.
@@ -76,7 +76,7 @@ healthy, so the devices are fine" — see `The command path`.
 
 - **LR devices join via SmartStart, not classic inclusion** — the DSK/QR is added to the hub's provisioning list and the device auto-includes on power-up (no add-mode, no button). LR inclusion is S2-mandatory; the new node gets an id ≥ 256.
 - **Graceful removal is two steps and one is physical**: remove the device from the SmartStart provisioning list (else it re-includes), *and* exclude/factory-reset the physical device. An agent cannot do the physical step — so removal is guide-the-user, not automate.
-- **The tooling confirms a removal, it does not trigger one.** No groundable zwaveJS action endpoint exists (only `/hub/dismissWeakZigbee`); inclusion/exclusion/remove are hub-UI + physical. Confirm a removal two ways: the snapshot node-count/id diff, and the radio-log signature (`reference/zwave-lifecycle.md`).
+- **The tooling confirms a removal, it does not trigger one.** No groundable zwaveJS action endpoint exists (only `/hub/dismissWeakZigbee`); inclusion/exclusion/remove are hub-UI + physical. Confirm a removal two ways: the snapshot node-count/id diff, and the radio-log signature (`skills/_reference/zwave-lifecycle.md`).
 - Force-remove (`RemoveFailedNode`) applies only to a FAILED **orphan ghost**, never a recoverable real device.
 
 ## Grounding sources
@@ -84,4 +84,4 @@ healthy, so the devices are fine" — see `The command path`.
 - Field meanings: Hubitat docs (Z-Wave Details, Zigbee Details, Troubleshoot Z-Wave/Zigbee) and staff mesh-details explanations.
 - LR star topology, no repeaters, node-id ≥ 256, dynamic power, S2-only: Z-Wave Alliance and Silicon Labs LR overview.
 - Protocol constants: Silicon Labs Z-Wave 700/800 receiver sensitivity (per modulation); IEEE 802.15.4 §8.1.2.2 (channels 11–26), LQI 0–255.
-- Backend-vs-topology split and node/device shapes: verified live on 2.5.1.128 across a zwaveJS ("Apps") and a legacy ("Devices") hub (`reference/endpoints.md`).
+- Backend-vs-topology split and node/device shapes: verified live on 2.5.1.128 across a zwaveJS ("Apps") and a legacy ("Devices") hub (`skills/_reference/endpoints.md`).

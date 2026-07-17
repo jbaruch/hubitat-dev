@@ -2,7 +2,7 @@
 """Report where a Hubitat device is used — the blast radius before removing it.
 
 The hub computes a device's usage itself and exposes it on one undocumented endpoint
-(verified live on 2.5.1.128, C-8 Pro, Hub Security off — see reference/endpoints.md):
+(verified live on 2.5.1.128, C-8 Pro, Hub Security off — see ../_reference/endpoints.md):
 
     GET /device/fullJson/<deviceId>  -> {device, appsUsing[], appsUsingCount,
                                          dashboards, parentApp, childDevices, hasChildren, ...}
@@ -17,7 +17,7 @@ references a delete would strand.
 This is the CAPTURE half of safe removal (rules/device-lifecycle.md): it enumerates the references
 so an agent can warn before deleting and, on a replacement, re-wire them onto the new device id.
 It does NOT delete anything and does NOT judge whether removal is safe — device deletion is a
-hub-UI + physical action (rules/zwave-zigbee-mesh.md, reference/playwright-ui.md), and the
+hub-UI + physical action (rules/zwave-zigbee-mesh.md, ../_reference/playwright-ui.md), and the
 load-bearing-vs-inert judgment is the skill's, not the script's.
 
 Grounding notes:
@@ -30,8 +30,8 @@ Grounding notes:
     unit-tested without a hub. Only fetch() touches the network.
 
 Usage:
-    hub_device_usage.py --ip 192.168.30.17 --device 252
-    hub_device_usage.py --ip 192.168.30.17 --name "Alice Office Closet Motion Sensor"
+    hub_device_usage.py --ip 192.0.2.11 --device 252
+    hub_device_usage.py --ip 192.0.2.11 --name "Alice Office Closet Motion Sensor"
     hub_device_usage.py --hub devices --device 252   # resolve via ./hubs.json (hub-config skill)
 Exactly one of --device / --name is required; --name resolves the id from /hub2/devicesList (exact
 name match, fails clearly on zero or multiple matches). Output: a single JSON object on stdout (see
@@ -125,7 +125,7 @@ def _walk_devices(entries) -> list:
     """Pure. Flatten a /hub2/devicesList `devices` forest to every entry, at any depth.
 
     The body is a TREE, not a flat list: a child device appears ONLY nested in its parent's
-    `children[]`, never at the top level (`reference/parent-child-devices.md`, verified on
+    `children[]`, never at the top level (`../_reference/parent-child-devices.md`, verified on
     2.5.1.128 — 151 top-level entries, 5 children reachable only by recursing). Iterating
     `devices[]` alone silently misses every child device.
     """

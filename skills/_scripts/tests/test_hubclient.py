@@ -37,18 +37,18 @@ def make_transport(routes):
 
 
 CFG = {"schema_version": 1, "default": "main",
-       "hubs": {"main": {"ip": "192.168.30.2"},
-                "garage": {"ip": "192.168.30.16", "port": 8080}}}
+       "hubs": {"main": {"ip": "192.0.2.10"},
+                "garage": {"ip": "192.0.2.12", "port": 8080}}}
 
 
 class TestResolveHub(unittest.TestCase):
     def test_default(self):
         h = hubclient.resolve_hub(CFG)
         self.assertEqual(h["name"], "main")
-        self.assertEqual(h["base"], "http://192.168.30.2:8080")
+        self.assertEqual(h["base"], "http://192.0.2.10:8080")
 
     def test_named(self):
-        self.assertEqual(hubclient.resolve_hub(CFG, "garage")["ip"], "192.168.30.16")
+        self.assertEqual(hubclient.resolve_hub(CFG, "garage")["ip"], "192.0.2.12")
 
     def test_single_hub_needs_no_default(self):
         cfg = {"schema_version": 1, "hubs": {"only": {"ip": "10.0.0.5"}}}
@@ -160,7 +160,7 @@ class TestResolveBaseFromArgs(unittest.TestCase):
             old = os.getcwd()
             os.chdir(d)
             try:
-                self.assertEqual(hubclient.resolve_base_from_args(hub="main"), "http://192.168.30.2:8080")
+                self.assertEqual(hubclient.resolve_base_from_args(hub="main"), "http://192.0.2.10:8080")
             finally:
                 os.chdir(old)
 

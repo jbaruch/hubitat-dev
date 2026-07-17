@@ -1,7 +1,7 @@
 # Driving the Hubitat UI with Playwright MCP (grounded)
 
 Observed live against a **C-8 Pro**, local network, **Hub Security off**. The `hubitat-dev`
-toolset is HTTP/code only (`reference/endpoints.md`). A class of real tasks has **no documented
+toolset is HTTP/code only (`skills/_reference/endpoints.md`). A class of real tasks has **no documented
 HTTP/code endpoint** and is reachable only through the hub's web UI at `http://<hub-ip>:8080`.
 For those, drive the UI with the **Playwright MCP** — a headless Chromium that needs no browser
 extension and no auth on a Hub-Security-off hub. Several gotchas below cost real time; one
@@ -9,7 +9,7 @@ silently overwrote a live Room Lighting scene before it was understood.
 
 ## When the UI is the only path
 
-HTTP/code (`reference/endpoints.md`) handles source deploy/pull, log/event tail, mesh detail,
+HTTP/code (`skills/_reference/endpoints.md`) handles source deploy/pull, log/event tail, mesh detail,
 and device control via Maker API. The UI is required for:
 
 - Installing an **app instance** — Add User App → configure pages → **Done**.
@@ -150,12 +150,12 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     **Never navigate the configuring tab.** To touch another app mid-configuration, open a second tab
     (`browser_tabs(action: "new")`), do the work there, then select back and re-verify before Done.
     Config survived the tab switch intact (verified 2.5.1.128). Same family as the built-in app's
-    transient instance discarded on Cancel (`reference/endpoints.md`, `/installedapp/direct/`).
+    transient instance discarded on Cancel (`skills/_reference/endpoints.md`, `/installedapp/direct/`).
 
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
-`reference/endpoints.md`); gotchas 10–15 verified on 2.5.1.128 while installing a user app instance
+`skills/_reference/endpoints.md`); gotchas 10–15 verified on 2.5.1.128 while installing a user app instance
 end-to-end (2 device radios, 25 contact-sensor checkboxes across two multi-selects, 5 enum dropdowns,
 Done). Gotchas 1, 2, 5 and 10 are the load-bearing ones — each was reached the expensive way in real
 usage; 5 corrupted a live scene, and 10 silently discarded a setting while the page looked correct.

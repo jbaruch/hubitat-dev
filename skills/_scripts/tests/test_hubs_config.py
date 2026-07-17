@@ -16,9 +16,9 @@ spec.loader.exec_module(hc)
 
 class TestPureOps(unittest.TestCase):
     def test_add_first_hub_becomes_default(self):
-        cfg = hc.add_hub(hc.empty_config(), "main", "192.168.30.2")
+        cfg = hc.add_hub(hc.empty_config(), "main", "192.0.2.10")
         self.assertEqual(cfg["default"], "main")
-        self.assertEqual(cfg["hubs"]["main"], {"ip": "192.168.30.2", "port": 8080})
+        self.assertEqual(cfg["hubs"]["main"], {"ip": "192.0.2.10", "port": 8080})
 
     def test_second_hub_does_not_steal_default(self):
         cfg = hc.add_hub(hc.add_hub(hc.empty_config(), "main", "1"), "garage", "2")
@@ -57,10 +57,10 @@ class TestCli(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             path = Path(d) / "hubs.json"
             self.assertEqual(self._run("init", "--path", str(path)), 0)
-            self.assertEqual(self._run("add", "--path", str(path), "--name", "main", "--ip", "192.168.30.2"), 0)
+            self.assertEqual(self._run("add", "--path", str(path), "--name", "main", "--ip", "192.0.2.10"), 0)
             cfg = json.loads(path.read_text())
             self.assertEqual(cfg["default"], "main")
-            self.assertEqual(cfg["hubs"]["main"]["ip"], "192.168.30.2")
+            self.assertEqual(cfg["hubs"]["main"]["ip"], "192.0.2.10")
 
     def test_init_refuses_overwrite_without_force(self):
         with tempfile.TemporaryDirectory() as d:

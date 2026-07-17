@@ -8,8 +8,8 @@ retry. Otherwise it creates a new entry and reports the assigned id.
 
 Usage:
     hub_deploy.py --kind driver --source d.groovy --hub main --hubs hubs.json
-    hub_deploy.py --kind app --source a.groovy --id 143 --ip 192.168.30.2
-    hub_deploy.py --kind driver --source d.groovy --name "My Driver" --ip 192.168.30.2
+    hub_deploy.py --kind app --source a.groovy --id 143 --ip 192.0.2.10
+    hub_deploy.py --kind driver --source d.groovy --name "My Driver" --ip 192.0.2.10
 
 Exit: 0 on success, 2 on a version conflict (re-pull and reconcile), 1 on other errors.
 """

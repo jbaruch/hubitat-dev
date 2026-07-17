@@ -22,11 +22,11 @@ The Step 5 verification and the manual path both need this, and it must be read 
 changes:
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_device_usage.py --device <id> --ip <addr>
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_device_usage.py --name "<display name>" --ip <addr>
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --device <id> --ip <addr>
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --name "<display name>" --ip <addr>
 ```
 
-Argument and output contract: `scripts/hub_device_usage.py` module docstring. Use `--hub <name>`
+Argument and output contract: `skills/_scripts/hub_device_usage.py` module docstring. Use `--hub <name>`
 instead of `--ip` to resolve via `hubs.json` (`hub-config` skill). Keep the report — it is the
 capture, listing apps (enabled vs disabled), dashboards, `parentApp`, and child devices. Proceed to
 Step 2.
@@ -35,7 +35,7 @@ Step 2.
 
 Navigate to `http://<hub-ip>:8080/installedapp/direct/swapDevice` (the Settings → Swap Device tile,
 subtitled "Replace device across all apps at once"). It redirects to a transient app instance at
-`/installedapp/configure/<id>/mainPage`. Drive it with Playwright per `reference/playwright-ui.md`.
+`/installedapp/configure/<id>/mainPage`. Drive it with Playwright per `skills/_reference/playwright-ui.md`.
 
 The page has two pickers — **"Select device to be replaced in apps (old)"** and **"Select
 replacement device for apps (new)"**. The new picker stays **disabled until an old device is
@@ -61,7 +61,7 @@ absent, proceed to Step 3.
 Do not reach for a fallback until you know which one can work. The reason decides:
 
 - **Missing from the OLD list entirely ⇒ it is a child device.** Devices owned by a parent device or
-  a parent app are excluded by design (`reference/parent-child-devices.md`) — the page says so:
+  a parent app are excluded by design (`skills/_reference/parent-child-devices.md`) — the page says so:
   *"Most child devices are not swappable and are not listed here."* **A virtual hop cannot lift that
   exclusion.** The last swap of any chain still targets the child, still ineligible. Go to Step 6.
   (Exceptions Hubitat allows: AirPlay, Bluetooth, HomeKit Controller, Tuya, Wiz.)
@@ -110,11 +110,11 @@ The fallback when no swap path exists — the doc's own remedy for an incompatib
 only path for a child device. Work the Step 1 capture: for **each** app using the old device, open
 it, select the new device where the old was selected, de-select the old, configure the new to match
 if the app needs it (every app differs), and hit **Done** — the change does not commit until then,
-and not over observable HTTP (`reference/playwright-ui.md`).
+and not over observable HTTP (`skills/_reference/playwright-ui.md`).
 
 Verify each app individually via `/installedapp/configure/json/<appId>/<page>` (the `settings`
 object). Do **not** verify with `/installedapp/statusJson/<appId>` — it reports device inputs as
-`None` even when set (`reference/endpoints.md`). Re-run Step 1's script when done. Proceed to Step 7.
+`None` even when set (`skills/_reference/endpoints.md`). Re-run Step 1's script when done. Proceed to Step 7.
 
 ## Step 7 — Report what moved and what is left
 

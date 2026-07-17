@@ -11,7 +11,7 @@ Hubitat has no debugger — diagnosis is `log.debug` plus the live stream (`logg
 
 ## Step 1 — Frame the question
 
-Read `reference/endpoints.md` before probing for any endpoint.
+Read `skills/_reference/endpoints.md` before probing for any endpoint.
 
 Establish what is wrong and which app/driver it concerns, and pick the socket:
 - `logsocket` — the debug/info/warn/error log lines (default; use for "my code does X wrong").
@@ -26,11 +26,11 @@ Have the source in hand so the log can be read against it. Proceed to Step 2.
 ## Step 2 — Tail, filtered
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_logtail.py --ip <addr> \
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_logtail.py --ip <addr> \
     [--socket logsocket|eventsocket] [--name "<name>"] [--min-level debug] [--seconds N | --follow]
 ```
 
-Argument and output contract, filter semantics, and frame shape: `scripts/hub_logtail.py` module docstring, and `reference/endpoints.md` for the raw frame fields. Filter tightly — `--name` to the app/driver under test — so the stream is readable. Default is a bounded window; use `--follow` only when the user will actively trigger the behavior.
+Argument and output contract, filter semantics, and frame shape: `skills/_scripts/hub_logtail.py` module docstring, and `skills/_reference/endpoints.md` for the raw frame fields. Filter tightly — `--name` to the app/driver under test — so the stream is readable. Default is a bounded window; use `--follow` only when the user will actively trigger the behavior.
 
 Proceed to Step 3.
 
@@ -44,7 +44,7 @@ A missing expected line means the branch wasn't reached; a `groovy.lang.MissingM
 
 **A status is not a fact.** Read `lastPollDate`, `authTokenExpires`, or an event `date`; treat a status label as cached state, never a probe. Verify an action by re-reading what it changed (`/device/fullJson/<id>`, `/device/eventsJson/<id>`), never by the app's own "I did X" line.
 
-**A value's timestamp is not a liveness signal.** A frozen attribute's event `date` dates the last *change*, not the last report — a steady world and a dead integration look identical. Read liveness off a monotonic attribute (`thermostatTime`) or your own stamped read, never off a value's timestamp or an attribute merely *named* like one (`lastPoll`). Full split: `rules/state-vs-attributes.md`. Radios: `rules/zwave-zigbee-mesh.md`. Endpoint timezone and ordering splits: `reference/endpoints.md`.
+**A value's timestamp is not a liveness signal.** A frozen attribute's event `date` dates the last *change*, not the last report — a steady world and a dead integration look identical. Read liveness off a monotonic attribute (`thermostatTime`) or your own stamped read, never off a value's timestamp or an attribute merely *named* like one (`lastPoll`). Full split: `rules/state-vs-attributes.md`. Radios: `rules/zwave-zigbee-mesh.md`. Endpoint timezone and ordering splits: `skills/_reference/endpoints.md`.
 
 Reconcile disagreeing sources before diagnosing. Proceed to Step 5.
 

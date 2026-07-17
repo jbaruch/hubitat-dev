@@ -4,7 +4,9 @@
 .tesslignore
 .tessl/
 scratch/
-scripts/**/tests/
+# Scripts and reference data now live under skills/ so Tessl's manifest allowlist ships them
+# (only rules/ and skills/ are packaged). Their tests are dev-only — keep them out of the package.
+skills/_scripts/tests/
 # Fixture-authoring tooling. Lives beside the fixture it generates so a contract change can be
 # replayed rather than hand-patched; the eval runner needs the fixture, never the generator.
 evals/**/generate.py

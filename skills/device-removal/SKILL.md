@@ -19,12 +19,12 @@ resolve the id from `/hub2/devicesList` (exact match — it fails clearly on zer
 do not resolve the name yourself):
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_device_usage.py --device <id> --ip <addr>
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_device_usage.py --name "<display name>" --ip <addr>
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --device <id> --ip <addr>
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --name "<display name>" --ip <addr>
 ```
 
 Use `--hub <name>` instead of `--ip` to resolve via `hubs.json` (`hub-config` skill). Argument and
-output contract: `scripts/hub_device_usage.py` module docstring. The report splits `appsUsing` into
+output contract: `skills/_scripts/hub_device_usage.py` module docstring. The report splits `appsUsing` into
 enabled vs disabled and lists dashboards, `parentApp`, and child devices. Proceed to Step 2.
 
 ## Step 2 — Warn with the concrete blast radius
@@ -54,7 +54,7 @@ Step 4 once the references are off the old device.
 ## Step 4 — Guide the removal
 
 Deletion is irreversible — the **user** performs it, not the agent. Navigate to the device's remove
-control with Playwright and read the "in use by N apps" confirm dialog (`reference/playwright-ui.md`),
+control with Playwright and read the "in use by N apps" confirm dialog (`skills/_reference/playwright-ui.md`),
 then have the user confirm the final removal. A radio (Z-Wave/Zigbee) device also needs a physical
 exclusion/factory-reset only the user can do (`rules/zwave-zigbee-mesh.md`). An app with
 `removeButton:false` (e.g. HubiThings Replica) is remove-not-automatable — tell the user. Proceed to

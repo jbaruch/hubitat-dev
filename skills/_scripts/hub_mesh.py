@@ -2,7 +2,7 @@
 """Fetch a Hubitat hub's Z-Wave, Zigbee, and hub-mesh detail and flag network problems.
 
 The hub exposes three undocumented JSON endpoints (verified live on 2.5.1.128, C-8 Pro —
-see reference/endpoints.md):
+see ../_reference/endpoints.md):
     GET /hub/zwaveDetails/json   -> {enabled, healthy, zwaveJS, region, nodes[...]}
     GET /hub/zigbeeDetails/json  -> {networkState, healthy, channel, weakChannel, devices[...]}
     GET /hub2/hubMeshJson        -> {hubList:[{ipAddress, hubId, active, offline, warning, ...}]}
@@ -57,10 +57,10 @@ The deterministic pieces — parsing, ranking, flagging — are pure functions t
 already-parsed JSON and are unit-tested without a hub. Only fetch() touches the network.
 
 Usage:
-    hub_mesh.py --ip 192.168.30.2
+    hub_mesh.py --ip 192.0.2.10
     hub_mesh.py --hub main            # resolve via ./hubs.json (hub-config skill)
-    hub_mesh.py --ip 192.168.30.2 --radio zwave    # one radio only
-    hub_mesh.py --ip 192.168.30.2 --no-probe       # skip the peer reachability probe
+    hub_mesh.py --ip 192.0.2.10 --radio zwave    # one radio only
+    hub_mesh.py --ip 192.0.2.10 --no-probe       # skip the peer reachability probe
 Output: a single JSON object on stdout (see analyze()).
 Exit is non-zero only when a REQUESTED RADIO endpoint fails — that is the asked-for capability.
 The auxiliary endpoints (/hub2/hubMeshJson, /hub/details/json) are undocumented and
@@ -105,7 +105,7 @@ def parse_rssi(raw) -> Optional[float]:
     if raw is None:
         return None
     s = str(raw).strip().lower()
-    if s.endswith("db"):  # suffix strip without str.removesuffix (3.9+ floor; see scripts/README.md)
+    if s.endswith("db"):  # suffix strip without str.removesuffix (3.9+ floor; see README.md)
         s = s[:-2]
     try:
         return float(s.strip())
@@ -670,7 +670,7 @@ def main(argv=None, transport=None) -> int:
 
     def optional_fetch(path: str, consequence: str):
         """Auxiliary endpoints degrade instead of sinking the radio diagnostics the caller
-        asked for. Both are undocumented and version-sensitive (reference/endpoints.md), so a
+        asked for. Both are undocumented and version-sensitive (../_reference/endpoints.md), so a
         hub that lacks one must still get its radios analyzed — analyze() already models a
         missing hub_mesh, and naive_zone(None) already has a documented fallback.
 

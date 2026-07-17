@@ -32,4 +32,4 @@ def initialize(){ subscribe(motionSensor, "motion", "motionHandler") }
 
 - Handler method names are passed as **bare strings**: `subscribe(dev, "switch", "switchHandler")`, `runIn(300, "checkState")`. A typo'd or missing handler name fails quietly — see `rules/groovy-gotchas.md`.
 - Handlers take one `evt` param: `evt.name`, `evt.value`, `evt.device`.
-- Prefer `runIn`/`runInMillis`/`runOnce`/`schedule` (7-field Quartz cron) over any busy-wait. Parent/child app communication goes through exposed methods, never shared `state` — see `reference/endpoints.md` only for hub-side APIs, not for cross-app calls.
+- Prefer `runIn`/`runInMillis`/`runOnce`/`schedule` (7-field Quartz cron) over any busy-wait. Parent/child app communication goes through exposed methods, never shared `state` — see `skills/_reference/endpoints.md` only for hub-side APIs, not for cross-app calls.

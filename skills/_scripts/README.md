@@ -22,14 +22,14 @@ end-of-life on 2024-10-07; CI runs 3.11.
 | `hub_device_usage.py` | Report where a device is used (blast radius) before removing it | HTTP |
 | `hubs_config.py` | Owner of `hubs.json` — init/add/set-default/remove/list hubs (imported + CLI) | — |
 
-The hub endpoints these drive are undocumented and version-sensitive — see `../reference/endpoints.md`
+The hub endpoints these drive are undocumented and version-sensitive — see `../_reference/endpoints.md`
 for what was verified and against which platform. The deterministic cores are unit-tested; only the
 socket/HTTP loops touch the network.
 
 ## Tests
 
 ```
-python3 -m unittest discover -s scripts/tests -p 'test_*.py'
+python3 -m unittest discover -s tests -p 'test_*.py'
 ```
 
 Tests are stdlib `unittest`, deterministic, and network-free — HTTP and websocket layers are

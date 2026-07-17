@@ -112,7 +112,7 @@ python3 evals/mesh-health-command-path-not-radio/generate.py --check  # exit 1 o
 ```
 
 It is authoring tooling, not a plugin surface — `.tesslignore`d out of the published
-plugin, and deliberately not a `scripts/` module (that would pull a production test
+plugin, and deliberately not a `skills/_scripts/` module (that would pull a production test
 burden onto a one-fixture tool). CI runs `--check` over every `evals/*/generate.py`, so a
 fixture that stops matching its generator fails the build instead of rotting quietly. When
 an analyzer's contract changes, **regenerate — do not hand-patch the JSON.** Hand-patching

@@ -21,7 +21,7 @@ Hubitat has two distinct persistence mechanisms. Choosing the wrong one is a des
 - Derive liveness from a **monotonic** attribute — always advances, never change-filtered (`thermostatTime`, `runtimeUpdated`, `sensorsUpdated`). Strongest form: stamp your own clock on each verified read, monotonic by construction.
 - An attribute *named* like a liveness signal is not one. An app's `lastPoll` whose value is a constant string like `Succeeded` is change-filtered like any value, and goes arbitrarily stale on a healthy integration.
 - `isStateChange: true` is the writer-side counterpart: set it when a consumer must see every report, not only changes.
-- `GET /device/eventsJson/<deviceId>` (`reference/endpoints.md`) is how you measure an attribute's real gap distribution before trusting it.
+- `GET /device/eventsJson/<deviceId>` (`skills/_reference/endpoints.md`) is how you measure an attribute's real gap distribution before trusting it.
 
 ## state / atomicState (internal, private)
 

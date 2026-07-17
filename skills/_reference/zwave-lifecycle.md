@@ -1,7 +1,7 @@
 # Z-Wave Device Lifecycle — grounded wire signatures
 
 Captured live on 2026-07-15 against the "Apps" hub (C-8 Pro, zwaveJS backend, Z-Wave LR) by
-tailing `ws://<ip>/zwaveLogsocket` (`scripts/hub_radiolog.py`) through a real inclusion and a real
+tailing `ws://<ip>/zwaveLogsocket` (`skills/_scripts/hub_radiolog.py`) through a real inclusion and a real
 graceful exclusion of a Zooz LR leak sensor. These are the signatures the `mesh-health` skill uses
 to **confirm** a lifecycle event happened — the tooling observes and confirms, it does not trigger
 (there is no groundable zwaveJS action endpoint; inclusion/exclusion/remove are hub-UI + physical).

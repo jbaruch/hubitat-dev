@@ -17,7 +17,7 @@ Hubitat apps and drivers are single Groovy 2.4 files run in a locked-down sandbo
 
 ## Allowed Imports
 
-- The allow-list is `reference/allowed-imports.txt` (197 fully-qualified classes, verified against 2.5.1.125). An import outside it is a compile error, not a runtime one.
+- The allow-list is `skills/_reference/allowed-imports.txt` (197 fully-qualified classes, verified against 2.5.1.125). An import outside it is a compile error, not a runtime one.
 - Highlights present: `java.util.*` collections, `java.math.BigDecimal/BigInteger`, `java.time.*`, `groovy.json.*` (`JsonSlurper`, `JsonOutput`, `JsonBuilder`), `groovy.transform.Field`/`CompileStatic`, `java.security.MessageDigest`, `javax.crypto.*`, `org.apache.commons.codec.binary.Base64`, `com.hubitat.app.*` wrappers, `hubitat.scheduling.AsyncResponse`, Nimbus JOSE/JWT, `org.json.*`, `org.quartz.CronExpression`.
 - Absent by design: file I/O, sockets, reflection, `java.lang.Thread`, arbitrary `org.*`.
 

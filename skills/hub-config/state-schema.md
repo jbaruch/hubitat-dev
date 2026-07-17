@@ -1,8 +1,8 @@
 # hubs.json — schema
 
 The stateful artifact recording how to reach each Hubitat hub for **code** operations
-(deploy, pull, log-tail). Owner: `scripts/hubs_config.py` (sole writer; owns migration).
-Readers: `scripts/hubclient.py` (`load_hubs`, `resolve_hub`) via `hub_pull.py` / `hub_deploy.py`.
+(deploy, pull, log-tail). Owner: `skills/_scripts/hubs_config.py` (sole writer; owns migration).
+Readers: `skills/_scripts/hubclient.py` (`load_hubs`, `resolve_hub`) via `hub_pull.py` / `hub_deploy.py`.
 
 ## Shape (schema_version 1)
 
@@ -11,9 +11,9 @@ Readers: `scripts/hubclient.py` (`load_hubs`, `resolve_hub`) via `hub_pull.py` /
   "schema_version": 1,
   "default": "main",
   "hubs": {
-    "main":     { "ip": "192.168.30.2",  "port": 8080 },
-    "upstairs": { "ip": "192.168.30.17", "port": 8080 },
-    "garage":   { "ip": "192.168.30.16", "port": 8080 }
+    "main":     { "ip": "192.0.2.10", "port": 8080 },
+    "upstairs": { "ip": "192.0.2.11", "port": 8080 },
+    "garage":   { "ip": "192.0.2.12", "port": 8080 }
   }
 }
 ```

@@ -17,8 +17,8 @@ Checks:
                       calls updated() nor wires them itself (first-run does nothing)
 
 Reference data (paths resolved relative to this script by default):
-  ../reference/allowed-imports.txt   one FQ class per line, '#' comments ignored
-  ../reference/capabilities.json     capability -> required commands
+  ../_reference/allowed-imports.txt   one FQ class per line, '#' comments ignored
+  ../_reference/capabilities.json     capability -> required commands
 
 Usage:
     hub_lint.py SOURCE.groovy [--allowed-imports PATH] [--capabilities PATH]
@@ -34,7 +34,7 @@ import re
 import sys
 from pathlib import Path
 
-_REF = Path(__file__).resolve().parent.parent / "reference"
+_REF = Path(__file__).resolve().parent.parent / "_reference"
 
 # Command names that are lifecycle/util methods, never a capability-required command gap.
 _LIFECYCLE = {"installed", "updated", "uninstalled", "initialize", "configure",
