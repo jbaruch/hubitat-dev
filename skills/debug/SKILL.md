@@ -42,7 +42,9 @@ While tailing, have the behavior exercised (press the device command, fire the a
 
 A missing expected line means the branch wasn't reached; a `groovy.lang.MissingMethodException` or null error names the failing call. Cross-reference the `groovy-gotchas` and lifecycle rules — a handler that never logs is often the string-name, the first-run-`installed()`, or the 2.5.1 `e.statusCode` trap, where the NPE escapes the `catch` and kills the recovery below it.
 
-**A status is not a fact.** Read `lastPollDate`, `authTokenExpires`, or an event `date`; treat a status label as cached state, never a probe. Verify an action by re-reading what it changed (`/device/fullJson/<id>`, `/device/eventsJson/<id>`), never by the app's own "I did X" line. Compare a frozen attribute's event `date`, not its value. Radios: `rules/zwave-zigbee-mesh.md`. Endpoint timezone and ordering splits: `reference/endpoints.md`.
+**A status is not a fact.** Read `lastPollDate`, `authTokenExpires`, or an event `date`; treat a status label as cached state, never a probe. Verify an action by re-reading what it changed (`/device/fullJson/<id>`, `/device/eventsJson/<id>`), never by the app's own "I did X" line.
+
+**A value's timestamp is not a liveness signal.** A frozen attribute's event `date` dates the last *change*, not the last report — a steady world and a dead integration look identical. Read liveness off a monotonic attribute (`thermostatTime`) or your own stamped read, never off a value's timestamp or an attribute merely *named* like one (`lastPoll`). Full split: `rules/state-vs-attributes.md`. Radios: `rules/zwave-zigbee-mesh.md`. Endpoint timezone and ordering splits: `reference/endpoints.md`.
 
 Reconcile disagreeing sources before diagnosing. Proceed to Step 5.
 
