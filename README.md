@@ -27,7 +27,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [app-lifecycle](rules/app-lifecycle.md) | App callbacks and the `installed()`→`updated()`→`unsubscribe()` idiom that keeps an app from silently doing nothing. |
 | [driver-lifecycle](rules/driver-lifecycle.md) | Driver callbacks, the capability contract (declare = must implement), and the `parse()` dispatch pattern. |
 | [logging-conventions](rules/logging-conventions.md) | The `logEnable`/`txtEnable` toggles and the `runIn(1800, logsOff)` auto-disable idiom. |
-| [state-vs-attributes](rules/state-vs-attributes.md) | Attributes via `sendEvent` (subscribable) vs. `state`/`atomicState` (private, JSON-serializable). |
+| [state-vs-attributes](rules/state-vs-attributes.md) | Attributes via `sendEvent` (subscribable) vs. `state`/`atomicState` (private, JSON-serializable). Why a value's timestamp can't tell you the source is alive. |
 | [groovy-gotchas](rules/groovy-gotchas.md) | Silent-failure traps the compiler misses: string handler names, `0`-is-falsy, null device inputs, reserved names. |
 | [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
 | [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, the two-scale `lwrRssi` backend trap, and what counts as a real problem. |
