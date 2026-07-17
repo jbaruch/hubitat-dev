@@ -19,7 +19,7 @@ Hubitat has two distinct persistence mechanisms. Choosing the wrong one is a des
 - `currentState(attr).date` dates the last **change** to the value, never the last report from the source. A healthy source reporting a steady value emits nothing and is indistinguishable from a dead one.
 - Never derive liveness or freshness from a value attribute's timestamp (`temperature`, `humidity`, `thermostatOperatingState`). Its staleness measures the world's volatility, not the path's health. Raising the threshold trades detection window against false alerts; no threshold makes the wrong signal right.
 - Derive liveness from a **monotonic** attribute — always advances, never change-filtered (`thermostatTime`, `runtimeUpdated`, `sensorsUpdated`). Strongest form: stamp your own clock on each verified read, monotonic by construction.
-- An attribute *named* like a liveness signal is not one. An app's `lastPoll` whose value is the constant string `Succeeded` is change-filtered like any value — measured 21 hours stale against a healthy integration.
+- An attribute *named* like a liveness signal is not one. An app's `lastPoll` whose value is a constant string like `Succeeded` is change-filtered like any value, and goes arbitrarily stale on a healthy integration.
 - `isStateChange: true` is the writer-side counterpart: set it when a consumer must see every report, not only changes.
 - `GET /device/eventsJson/<deviceId>` (`reference/endpoints.md`) is how you measure an attribute's real gap distribution before trusting it.
 
