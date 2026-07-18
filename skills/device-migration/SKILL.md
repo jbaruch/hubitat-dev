@@ -1,6 +1,6 @@
 ---
 name: device-migration
-description: Move every app reference from an old Hubitat device onto a new one — via Settings → Swap Device where possible, a virtual-device bridge or parking slot where the swap list blocks it, and a guided manual re-select where neither works. Use when the user wants to swap, migrate, replace, or move a device's references to a different device, or asks why a device does not appear in the Swap Device list.
+description: Move every app reference from an old Hubitat device onto a new one — via Settings → Swap Device where possible, a virtual-device bridge or parking slot where the swap list blocks it, and a guided manual re-select where neither works. Use when the user wants to swap, migrate, replace, or move a device's references to a different device, re-home a device to a different hub over Hub Mesh, or asks why a device does not appear in the Swap Device list.
 argument-hint: "[old device] [new device] [--hub <name>]"
 ---
 
@@ -15,6 +15,9 @@ the swap is blocked.
 
 This skill moves **references**. It does not delete the old device — `Skill(skill: "device-removal")`
 owns that. Run this **before** that skill's delete: a deleted device cannot be swapped from.
+
+Re-homing a device to a **different hub** over Hub Mesh is the park fallback with the orphaned mesh
+link as the slot — Step 4 covers it.
 
 ## Step 1 — Capture what the old device is used by
 
@@ -87,6 +90,16 @@ useful for exactly two jobs:
 - **Park** references when the old device must die first — swap old → virtual, then remove the old
   device and pair the new one, then swap virtual → new. The references wait on the virtual instead
   of dangling.
+- **Re-home across hubs (Hub Mesh)** — the "old" device is a Hub-Mesh **linked** device
+  (`source: Linked` in `/device/fullJson/<id>`, `skills/_reference/parent-child-devices.md`), moving to
+  native on *this* hub. Removing it on its **source** hub orphans the link here: it drops to
+  **`[offline]`** but keeps its id and its app bindings — a parking slot you did not have to build.
+  Capture its `appsUsing[]` first (`/hub2/hubMeshJson` → `sharedDevices[]`, `skills/_reference/endpoints.md`,
+  or Step 1's script), remove on the source hub, pair the replacement natively here, then swap the
+  offline link → the new device (Step 2's mechanics). With the source gone, exactly **one** offline
+  linked device remains — the swap's "old" pick is unambiguous. No virtual device to build or delete;
+  the emptied link is then a normal removal (`Skill(skill: "device-removal")`). Grounded on a live
+  re-home, 2026-07-18.
 
 Create it under Devices → Add Device → Virtual, matching the capability you need (Virtual Switch,
 Virtual Dimmer, Virtual Lock, …). Each hop is a Step 2 swap and carries Step 2's hazards. After the
