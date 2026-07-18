@@ -1,6 +1,6 @@
 ---
 name: device-migration
-description: Move every app reference from an old Hubitat device onto a new one — via Settings → Swap Device where possible, a virtual-device bridge or parking slot where the swap list blocks it, and a guided manual re-select where neither works. Use when the user wants to swap, migrate, replace, or move a device's references to a different device, or asks why a device does not appear in the Swap Device list.
+description: Move every app reference from an old Hubitat device onto a new one — via Settings → Swap Device where possible, a virtual-device bridge or parking slot where the swap list blocks it, and a guided manual re-select where neither works. Use when the user wants to swap, migrate, replace, or move a device's references to a different device, re-home a device to a different hub over Hub Mesh, or asks why a device does not appear in the Swap Device list.
 argument-hint: "[old device] [new device] [--hub <name>]"
 ---
 
@@ -15,6 +15,9 @@ the swap is blocked.
 
 This skill moves **references**. It does not delete the old device — `Skill(skill: "device-removal")`
 owns that. Run this **before** that skill's delete: a deleted device cannot be swapped from.
+
+Re-homing a device to a **different hub** over Hub Mesh is the park fallback with the orphaned mesh
+link as the slot — Step 4 covers it.
 
 ## Step 1 — Capture what the old device is used by
 
@@ -76,7 +79,7 @@ Confirm child-vs-capability against the hub rather than guessing: a device absen
 `/hub2/devicesList`'s **top level** is a child (children are nested only), and a `parentApp` in
 `/device/fullJson/<id>` marks an app-owned child. Proceed to the step the diagnosis names.
 
-## Step 4 — Bridge or park through a virtual device
+## Step 4 — Bridge, park, or re-home across hubs
 
 A virtual device is swappable (verified: `[Virtual] …` devices appear in the list), which makes it
 useful for exactly two jobs:
@@ -91,7 +94,17 @@ useful for exactly two jobs:
 Create it under Devices → Add Device → Virtual, matching the capability you need (Virtual Switch,
 Virtual Dimmer, Virtual Lock, …). Each hop is a Step 2 swap and carries Step 2's hazards. After the
 final hop, delete the virtual device — a parked virtual left behind is a device that answers
-commands and silently does nothing. Proceed to Step 5.
+commands and silently does nothing.
+
+**Re-home across hubs over Hub Mesh needs no virtual device.** The "old" device is a Hub Mesh
+**linked** device — `data.source: Linked` in `/hub2/devicesList` (`skills/_reference/parent-child-devices.md`).
+Removing it on its **source** hub orphans the link here: it drops to **`[offline]`** but keeps its id
+and its app bindings — the parking slot, ready-made. Capture its `appsUsing[]` first
+(`/hub2/hubMeshJson` → `sharedDevices[]`, or Step 1's script). Then remove on the source hub, pair the
+replacement natively here, and swap the offline link → the new device as in Step 2. If the orphan is
+the only offline device, the swap's "old" pick is unambiguous. With others offline, pick it by the
+id/name captured in Step 1 — `data.source: Linked` marks it as the mesh link. The emptied link is
+then a normal removal (`Skill(skill: "device-removal")`). Proceed to Step 5.
 
 ## Step 5 — Verify the references actually moved
 

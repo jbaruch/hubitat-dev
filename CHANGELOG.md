@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **A cross-hub `device-migration` route: re-home a Hub Mesh device by swapping its orphaned link.** Moving a device to a *different* hub was undocumented here. When a device shared over Hub Mesh is removed on its source hub, the linked copy on the consuming hub drops to `[offline]` but keeps its id and every app binding — a parking slot the platform hands you for free, no hand-built virtual device required. Pair the replacement natively on the consuming hub, then Settings → Swap Device from the offline link to the new device re-points every app in one shot. The tell that makes it easy: the orphaned link is the swap's "old" device — unambiguous when it is the only device offline, otherwise matched by the id/name captured before removal. Added as a third pattern under Step 4's park fallback, with an intro signpost and a broadened skill description so "move this device to another hub" triggers it. Identification reuses existing grounding — `data.source: Linked` in `/hub2/devicesList` and `/hub2/hubMeshJson`'s `sharedDevices[].appsUsing[]`. Grounded on a live re-home, 2026-07-18.
+
 ## 0.1.18 — 2026-07-18
 
 ### Fixed
