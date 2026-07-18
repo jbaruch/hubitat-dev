@@ -96,15 +96,15 @@ Virtual Dimmer, Virtual Lock, …). Each hop is a Step 2 swap and carries Step 2
 final hop, delete the virtual device — a parked virtual left behind is a device that answers
 commands and silently does nothing.
 
-**Re-home across hubs (Hub Mesh) needs no virtual device.** The "old" device is a Hub-Mesh
-**linked** device (`source: Linked` in `/device/fullJson/<id>`, `skills/_reference/parent-child-devices.md`),
-moving to native on *this* hub. Removing it on its **source** hub orphans the link here: it drops to
-**`[offline]`** but keeps its id and its app bindings — the parking slot, ready-made. Capture its
-`appsUsing[]` first (`/hub2/hubMeshJson` → `sharedDevices[]`, `skills/_reference/endpoints.md`, or Step 1's
-script). Then remove on the source hub, pair the replacement natively here, and swap the offline link
-→ the new device as in Step 2. With the source gone, exactly **one** offline linked device
-remains — the swap's "old" pick is unambiguous. The emptied link is then a normal removal
-(`Skill(skill: "device-removal")`). Proceed to Step 5.
+**Re-home across hubs over Hub Mesh needs no virtual device.** The "old" device is a Hub-Mesh
+**linked** device — `data.source: Linked` in `/hub2/devicesList` (`skills/_reference/parent-child-devices.md`).
+Removing it on its **source** hub orphans the link here: it drops to **`[offline]`** but keeps its id
+and its app bindings — the parking slot, ready-made. Capture its `appsUsing[]` first
+(`/hub2/hubMeshJson` → `sharedDevices[]`, or Step 1's script). Then remove on the source hub, pair the
+replacement natively here, and swap the offline link → the new device as in Step 2. If the orphan is
+the only offline device, the swap's "old" pick is unambiguous. With others offline, pick it by the
+id/name captured in Step 1 — `data.source: Linked` marks it as the mesh link. The emptied link is
+then a normal removal (`Skill(skill: "device-removal")`). Proceed to Step 5.
 
 ## Step 5 — Verify the references actually moved
 
