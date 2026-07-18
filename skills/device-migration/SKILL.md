@@ -101,8 +101,8 @@ commands and silently does nothing.
 moving to native on *this* hub. Removing it on its **source** hub orphans the link here: it drops to
 **`[offline]`** but keeps its id and its app bindings — the parking slot, ready-made. Capture its
 `appsUsing[]` first (`/hub2/hubMeshJson` → `sharedDevices[]`, `skills/_reference/endpoints.md`, or Step 1's
-script), remove on the source hub, pair the replacement natively here, then swap the offline link →
-the new device (Step 2's mechanics). With the source gone, exactly **one** offline linked device
+script). Then remove on the source hub, pair the replacement natively here, and swap the offline link
+→ the new device as in Step 2. With the source gone, exactly **one** offline linked device
 remains — the swap's "old" pick is unambiguous. The emptied link is then a normal removal
 (`Skill(skill: "device-removal")`). Proceed to Step 5.
 
