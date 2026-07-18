@@ -90,21 +90,21 @@ useful for exactly two jobs:
 - **Park** references when the old device must die first — swap old → virtual, then remove the old
   device and pair the new one, then swap virtual → new. The references wait on the virtual instead
   of dangling.
-- **Re-home across hubs (Hub Mesh)** — the "old" device is a Hub-Mesh **linked** device
-  (`source: Linked` in `/device/fullJson/<id>`, `skills/_reference/parent-child-devices.md`), moving to
-  native on *this* hub. Removing it on its **source** hub orphans the link here: it drops to
-  **`[offline]`** but keeps its id and its app bindings — a parking slot you did not have to build.
-  Capture its `appsUsing[]` first (`/hub2/hubMeshJson` → `sharedDevices[]`, `skills/_reference/endpoints.md`,
-  or Step 1's script), remove on the source hub, pair the replacement natively here, then swap the
-  offline link → the new device (Step 2's mechanics). With the source gone, exactly **one** offline
-  linked device remains — the swap's "old" pick is unambiguous. No virtual device to build or delete;
-  the emptied link is then a normal removal (`Skill(skill: "device-removal")`). Grounded on a live
-  re-home, 2026-07-18.
 
 Create it under Devices → Add Device → Virtual, matching the capability you need (Virtual Switch,
 Virtual Dimmer, Virtual Lock, …). Each hop is a Step 2 swap and carries Step 2's hazards. After the
 final hop, delete the virtual device — a parked virtual left behind is a device that answers
-commands and silently does nothing. Proceed to Step 5.
+commands and silently does nothing.
+
+**Re-home across hubs (Hub Mesh) needs no virtual device.** The "old" device is a Hub-Mesh
+**linked** device (`source: Linked` in `/device/fullJson/<id>`, `skills/_reference/parent-child-devices.md`),
+moving to native on *this* hub. Removing it on its **source** hub orphans the link here: it drops to
+**`[offline]`** but keeps its id and its app bindings — the parking slot, ready-made. Capture its
+`appsUsing[]` first (`/hub2/hubMeshJson` → `sharedDevices[]`, `skills/_reference/endpoints.md`, or Step 1's
+script), remove on the source hub, pair the replacement natively here, then swap the offline link →
+the new device (Step 2's mechanics). With the source gone, exactly **one** offline linked device
+remains — the swap's "old" pick is unambiguous. The emptied link is then a normal removal
+(`Skill(skill: "device-removal")`). Proceed to Step 5.
 
 ## Step 5 — Verify the references actually moved
 
