@@ -79,7 +79,7 @@ Confirm child-vs-capability against the hub rather than guessing: a device absen
 `/hub2/devicesList`'s **top level** is a child (children are nested only), and a `parentApp` in
 `/device/fullJson/<id>` marks an app-owned child. Proceed to the step the diagnosis names.
 
-## Step 4 — Bridge or park through a virtual device
+## Step 4 — Bridge, park, or re-home across hubs
 
 A virtual device is swappable (verified: `[Virtual] …` devices appear in the list), which makes it
 useful for exactly two jobs:
