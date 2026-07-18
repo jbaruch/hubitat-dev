@@ -96,7 +96,7 @@ Virtual Dimmer, Virtual Lock, …). Each hop is a Step 2 swap and carries Step 2
 final hop, delete the virtual device — a parked virtual left behind is a device that answers
 commands and silently does nothing.
 
-**Re-home across hubs over Hub Mesh needs no virtual device.** The "old" device is a Hub-Mesh
+**Re-home across hubs over Hub Mesh needs no virtual device.** The "old" device is a Hub Mesh
 **linked** device — `data.source: Linked` in `/hub2/devicesList` (`skills/_reference/parent-child-devices.md`).
 Removing it on its **source** hub orphans the link here: it drops to **`[offline]`** but keeps its id
 and its app bindings — the parking slot, ready-made. Capture its `appsUsing[]` first
