@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hub_mesh.py — pure parse/rank/flag logic over fixture mesh JSON.
+"""Tests for skills/_scripts/hub_mesh.py — pure parse/rank/flag logic over fixture mesh JSON.
 
 Fixtures mirror the real /hub/zwaveDetails/json and /hub/zigbeeDetails/json shapes verified
 on 2.5.1.125 (both Z-Wave backends). `now` is injected so activity-age assertions are

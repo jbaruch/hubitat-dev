@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hub_logtail.py — websocket frame parsing, filtering, formatting."""
+"""Tests for skills/_scripts/hub_logtail.py — websocket frame parsing, filtering, formatting."""
 
 import importlib.util
 import io

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hubs_config.py — the hubs.json owner script."""
+"""Tests for skills/_scripts/hubs_config.py — the hubs.json owner script."""
 
 import importlib.util
 import json

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hub_radiolog.py — pure frame parsing, filtering, cluster naming, sequence
+"""Tests for skills/_scripts/hub_radiolog.py — pure frame parsing, filtering, cluster naming, sequence
 gap tracking, and window summarization over fixture frames (no network)."""
 
 import importlib.util

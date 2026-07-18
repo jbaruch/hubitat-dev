@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hubclient.py — config resolution and deploy logic, no live hub."""
+"""Tests for skills/_scripts/hubclient.py — config resolution and deploy logic, no live hub."""
 
 import importlib.util
 import json

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hub_lint.py — the sandbox/silent-failure linter."""
+"""Tests for skills/_scripts/hub_lint.py — the sandbox/silent-failure linter."""
 
 import importlib.util
 import unittest

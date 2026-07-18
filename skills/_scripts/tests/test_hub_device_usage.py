@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hub_device_usage.py — pure projection of /device/fullJson into a device's
+"""Tests for skills/_scripts/hub_device_usage.py — pure projection of /device/fullJson into a device's
 blast radius, plus the fetch error paths. No live hub.
 
 The fixtures mirror the real /device/fullJson/<id> shape verified live on 2.5.1.128 (C-8 Pro):
