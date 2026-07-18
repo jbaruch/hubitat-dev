@@ -3,14 +3,14 @@
 
 The hub exposes ws://<ip>/logsocket (logs) and ws://<ip>/eventsocket (device events) —
 undocumented, no auth on a local hub with Hub Security off, server frames are unmasked
-text (see reference/endpoints.md, grounded on 2.5.1.125). No external library: a minimal
+text (see ../_reference/endpoints.md, grounded on 2.5.1.125). No external library: a minimal
 stdlib websocket client does the handshake and frame parsing.
 
 The deterministic pieces — handshake bytes, frame parsing, the filter predicate, line
 formatting — are pure functions and unit-tested; only the socket loop touches the network.
 
 Usage:
-    hub_logtail.py --ip 192.168.30.2 [--socket logsocket|eventsocket]
+    hub_logtail.py --ip 192.0.2.10 [--socket logsocket|eventsocket]
                    [--levels error,warn,info] [--type dev|app] [--name SUBSTR] [--id N]
                    [--seconds 30] [--max-frames N] [--follow] [--json]
 Default: 30 seconds of the log socket, formatted lines. --follow runs until interrupted.

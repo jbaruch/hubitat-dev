@@ -2,7 +2,7 @@
 """Regenerate this scenario's mesh-snapshot fixture.
 
 Run me when `hub_mesh.analyze()`'s output shape changes (`plugin-evals` Fixture Hygiene).
-Not part of the published plugin (`.tesslignore`) and not a `scripts/` module: this is
+Not part of the published plugin (`.tesslignore`) and not a `skills/_scripts/` module: this is
 authoring tooling for one fixture, co-located with what it generates.
 
     python3 evals/mesh-health-command-path-not-radio/generate.py          # rewrite the fixture
@@ -55,8 +55,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "scripts"))
-# E402: this import must follow the sys.path insert above so hub_mesh resolves from scripts/.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "skills" / "_scripts"))
+# E402: this import must follow the sys.path insert above so hub_mesh resolves from skills/_scripts/.
 from hub_mesh import analyze, analyze_hub_mesh  # noqa: E402
 
 FIXTURE = Path(__file__).resolve().parent / "inputs" / "mesh-snapshot-2026-07-16.json"
@@ -140,7 +140,7 @@ HUB_MESH_PEERS = [
 
 def zwave_raw() -> dict:
     """Synthetic /hub/zwaveDetails/json. Field names and shapes mirror the live 2.5.1.128
-    C-8 Pro capture in reference/endpoints.md."""
+    C-8 Pro capture in skills/_reference/endpoints.md."""
     nodes = []
     for node_id, name, last, rtt, rssi, msgs, neighbors, route in ZWAVE_NODES:
         nodes.append({

@@ -22,13 +22,13 @@ Run `Skill(skill: "lint-review")` on the source first. A deploy of code with a `
 ## Step 3 — Deploy
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_deploy.py \
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_deploy.py \
     --kind <kind> --source <file.groovy> [--name "<name>" | --id <id>] [--hub <name> | --ip <addr>]
 ```
 
-Argument and output contract, and the create-vs-update decision: `scripts/hub_deploy.py` module docstring; the shared logic is in `scripts/hubclient.py`. The script prints `{action, id, ...}` on success.
+Argument and output contract, and the create-vs-update decision: `skills/_scripts/hub_deploy.py` module docstring; the shared logic is in `skills/_scripts/hubclient.py`. The script prints `{action, id, ...}` on success.
 
-- **Exit 2 is a version conflict**, not a failure to retry blindly: the hub has a newer version than the local copy. Pull the hub's current source (`scripts/hub_pull.py`), reconcile the difference with the user, then deploy again. Do not loop the deploy.
+- **Exit 2 is a version conflict**, not a failure to retry blindly: the hub has a newer version than the local copy. Pull the hub's current source (`skills/_scripts/hub_pull.py`), reconcile the difference with the user, then deploy again. Do not loop the deploy.
 - Exit 1 is another error — report the stderr message.
 
 Proceed to Step 4.

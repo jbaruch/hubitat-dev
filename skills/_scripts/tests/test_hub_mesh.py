@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for scripts/hub_mesh.py — pure parse/rank/flag logic over fixture mesh JSON.
+"""Tests for skills/_scripts/hub_mesh.py — pure parse/rank/flag logic over fixture mesh JSON.
 
 Fixtures mirror the real /hub/zwaveDetails/json and /hub/zigbeeDetails/json shapes verified
 on 2.5.1.125 (both Z-Wave backends). `now` is injected so activity-age assertions are
@@ -308,7 +308,7 @@ class TestAnalyzeRollup(unittest.TestCase):
         self.assertEqual(r["summary"], {"critical": 0, "warnings": 0})
 
     def test_hub_mesh_problems_count_as_critical(self):
-        mesh = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.168.30.2": UNREACHABLE})
+        mesh = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.0.2.10": UNREACHABLE})
         r = m.analyze(zwave_details([zw_node()]), None, NOW, hub_mesh=mesh)
         # A radio-clean hub is NOT all-clear when a mesh peer cannot carry commands.
         self.assertEqual(r["summary"]["critical"], 1)
@@ -326,7 +326,7 @@ def peer(**kw):
     """A peer the hub reports as perfectly healthy — which is exactly what the hub said about
     the dead peer in the grounded outage."""
     base = {"name": "Apps", "hubId": "1ec9f270-bda8-465a-b240-f4ea79d85e4a",
-            "ipAddress": "192.168.30.2", "active": True, "offline": False, "warning": None,
+            "ipAddress": "192.0.2.10", "active": True, "offline": False, "warning": None,
             "deviceIds": [6, 57, 471], "lastActive": 1784212155639}
     base.update(kw)
     return base
@@ -355,12 +355,12 @@ class TestAnalyzeHubMesh(unittest.TestCase):
 
     def test_identity_mismatch_flagged_when_address_reassigned(self):
         r = m.analyze_hub_mesh(hub_mesh_json([peer()]),
-                               {"192.168.30.2": {"reachable": True, "hubId": "other-hub-uid",
+                               {"192.0.2.10": {"reachable": True, "hubId": "other-hub-uid",
                                                  "error": None}})
         self.assertEqual([p["signal"] for p in r["problems"]], ["peer_identity_mismatch"])
 
     def test_healthy_probed_peer_has_no_problems(self):
-        r = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.168.30.2": REACHABLE})
+        r = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.0.2.10": REACHABLE})
         self.assertEqual(r["problems"], [])
         self.assertTrue(r["probed"])
 
@@ -484,14 +484,14 @@ class TestProbePeer(unittest.TestCase):
     def test_reachable_peer_returns_its_hubUID(self):
         def ok(_method, _url, _body):
             return 200, {}, '{"hubUID": "e6574b36-23fc-4164-acf4-24aed2cc6f72"}'
-        r = m.probe_peer("192.168.30.17", 8080, transport=ok)
+        r = m.probe_peer("192.0.2.11", 8080, transport=ok)
         self.assertEqual(r, {"reachable": True,
                              "hubId": "e6574b36-23fc-4164-acf4-24aed2cc6f72", "error": None})
 
     def test_http_response_without_the_endpoint_is_reachable_identity_unknown(self):
         def missing(_method, _url, _body):
             return 404, {}, "Not Found"
-        r = m.probe_peer("192.168.30.17", 8080, transport=missing)
+        r = m.probe_peer("192.0.2.11", 8080, transport=missing)
         self.assertTrue(r["reachable"])              # something IS there ...
         self.assertIsNone(r["hubId"])                # ... it just did not identify itself
         self.assertIn("identity unverified", r["error"])
@@ -499,7 +499,7 @@ class TestProbePeer(unittest.TestCase):
     def test_non_json_response_is_reachable_identity_unknown(self):
         def html(_method, _url, _body):
             return 200, {}, "<html>login</html>"     # e.g. Hub Security on
-        r = m.probe_peer("192.168.30.17", 8080, transport=html)
+        r = m.probe_peer("192.0.2.11", 8080, transport=html)
         self.assertTrue(r["reachable"])
         self.assertIsNone(r["hubId"])
         self.assertIn("identity unverified", r["error"])
@@ -509,7 +509,7 @@ class TestProbePeer(unittest.TestCase):
         # and fine" — the one shape that must never look verified.
         def no_uid(_method, _url, _body):
             return 200, {}, '{"hubName": "Some Hub"}'
-        r = m.probe_peer("192.168.30.17", 8080, transport=no_uid)
+        r = m.probe_peer("192.0.2.11", 8080, transport=no_uid)
         self.assertTrue(r["reachable"])
         self.assertIsNone(r["hubId"])
         self.assertIn("identity unverified", r["error"])
@@ -518,7 +518,7 @@ class TestProbePeer(unittest.TestCase):
         # The regression the split exists for: a healthy peer on a firmware without
         # /hub/details/json must not be reported unreachable, nor as an identity mismatch.
         probe = {"reachable": True, "hubId": None, "error": "identity unverified"}
-        r = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.168.30.2": probe})
+        r = m.analyze_hub_mesh(hub_mesh_json([peer()]), {"192.0.2.10": probe})
         self.assertEqual(r["problems"], [])
         self.assertEqual(r["peers"][0]["probe_error"], "identity unverified")
 

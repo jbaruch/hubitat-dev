@@ -7,18 +7,18 @@ description: Driving the Hubitat web UI with Playwright for UI-only operations �
 
 The `hubitat-dev` toolset is HTTP/code only. A class of operations has no documented endpoint and
 is reachable only through the hub web UI at `http://<hub-ip>:8080`, driven with the Playwright MCP.
-The setup, full workflow, selectors, and per-gotcha detail all live in `reference/playwright-ui.md`.
+The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_reference/playwright-ui.md`.
 
 ## Reach for HTTP first
 
-- Source deploy/pull, log/event tail, mesh detail, and device control (Maker API) have grounded HTTP endpoints — use them (`reference/endpoints.md`).
+- Source deploy/pull, log/event tail, mesh detail, and device control (Maker API) have grounded HTTP endpoints — use them (`skills/_reference/endpoints.md`).
 - Drive the UI only for the operations with no endpoint: installing an app instance, configuring built-in/community apps (Room Lighting, Notifications, CoCoHue, HubiThings Replica), deleting a device or app, importing devices, reading/downloading a backup, swapping a device's app references (`skills/device-migration/SKILL.md`).
 
 ## Read state the way the framework stores it
 
 - MDL/Vue checkbox and radio pickers keep selection in a `label.is-checked` CSS class. Read the class, never `input.checked` — the property is unreliable and may or may not track, depending on element and platform version.
 - Act with real `browser_click` / `browser_type`. `element.click()` inside `browser_evaluate` does not fire jQuery/Vue/MDL handlers.
-- Snapshot `ref`s are unreliable on Hubitat's MDL `<div>` controls — a `ref` resolves to a wrapper and the click hits a container, silently. Tag the real control by walking up from its hidden `settings[...]` input, then click the tag: `reference/playwright-ui.md` gotchas 10–12. Tagging in `browser_evaluate` is not the banned synthetic click.
+- Snapshot `ref`s are unreliable on Hubitat's MDL `<div>` controls — a `ref` resolves to a wrapper and the click hits a container, silently. Tag the real control by walking up from its hidden `settings[...]` input, then click the tag: `skills/_reference/playwright-ui.md` gotchas 10–12. Tagging in `browser_evaluate` is not the banned synthetic click.
 - A device input persists to the hub on the page's **Done** over a WebSocket, not over observable HTTP. Forcing `.checked` or dispatching synthetic events does not persist.
 - Commit device inputs **before** filling the sections a `submitOnChange` gates — the dependent controls do not exist until the picker's Update commits.
 

@@ -2,7 +2,7 @@
 """Tail a Hubitat hub's live Z-Wave or Zigbee RADIO log socket and read the per-frame traffic.
 
 Distinct from hub_logtail.py: that tails the driver/app log (`/logsocket`). These are the
-dedicated radio-protocol log streams (verified live on 2.5.1.128 — see reference/endpoints.md):
+dedicated radio-protocol log streams (verified live on 2.5.1.128 — see ../_reference/endpoints.md):
     ws://<ip>/zwaveLogsocket    (case-sensitive) — decoded Z-Wave controller/driver frames
     ws://<ip>/zigbeeLogsocket   (case-sensitive) — structured Zigbee frame JSON
 No auth on a local hub with Hub Security off. The handshake and frame de-chunking are reused
@@ -332,7 +332,7 @@ def _run(ip: str, radio: str, filters: dict, seconds, follow, summary, as_json, 
         if "101" not in header.split("\r\n", 1)[0]:
             print(f"radio-log handshake failed: {header.splitlines()[0] if header else '(no response)'}. "
                   f"The {RADIO_SOCKETS[radio]} endpoint may not exist on this firmware or Hub Security "
-                  f"may be on — verify the path against reference/endpoints.md and that the hub is on a "
+                  f"may be on — verify the path against ../_reference/endpoints.md and that the hub is on a "
                   f"supported platform.", file=sys.stderr)
             return 1
         buf = bytearray(raw[sep + 4:]) if sep >= 0 else bytearray()

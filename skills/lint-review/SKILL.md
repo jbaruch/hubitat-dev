@@ -12,10 +12,10 @@ The linter is deterministic and offline; it emits **candidates**, not verdicts (
 ## Step 1 — Run the linter
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_lint.py <file.groovy>
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_lint.py <file.groovy>
 ```
 
-Check list, severity meanings, and output shape: `scripts/hub_lint.py` module docstring. Output is JSON `{kind, finding_count, findings:[...]}`. If `finding_count` is 0, report the code lints clean and finish.
+Check list, severity meanings, and output shape: `skills/_scripts/hub_lint.py` module docstring. Output is JSON `{kind, finding_count, findings:[...]}`. If `finding_count` is 0, report the code lints clean and finish.
 
 ## Step 2 — Judge each finding
 

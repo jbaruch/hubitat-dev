@@ -7,7 +7,7 @@ description: Generate a correct Hubitat app or driver skeleton from declared cap
 
 Process steps in order. Do not skip ahead.
 
-The always-on Hubitat rules (`sandbox-constraints`, `app-lifecycle`, `driver-lifecycle`, `logging-conventions`, `state-vs-attributes`, `groovy-gotchas`) are already in context — apply them while generating. The capability contract lives in `reference/capabilities.json`; the import allow-list in `reference/allowed-imports.txt`.
+The always-on Hubitat rules (`sandbox-constraints`, `app-lifecycle`, `driver-lifecycle`, `logging-conventions`, `state-vs-attributes`, `groovy-gotchas`) are already in context — apply them while generating. The capability contract lives in `skills/_reference/capabilities.json`; the import allow-list in `skills/_reference/allowed-imports.txt`.
 
 ## Step 1 — Determine what to build
 
@@ -21,9 +21,9 @@ Proceed to Step 2.
 
 ## Step 2 — Resolve the capability contract (driver) or UI shape (app)
 
-For a **driver**, for each declared capability read its required commands and attributes from `reference/capabilities.json` (`capabilities.<Name>.commands[].name`, `.attributes[].name`). Every required command becomes a Groovy method. Marker capabilities (`Actuator`, `Sensor`) add no methods.
+For a **driver**, for each declared capability read its required commands and attributes from `skills/_reference/capabilities.json` (`capabilities.<Name>.commands[].name`, `.attributes[].name`). Every required command becomes a Groovy method. Marker capabilities (`Actuator`, `Sensor`) add no methods.
 
-For an **app**, decide the preference inputs (see `reference/input-types.md`) and the events to subscribe to.
+For an **app**, decide the preference inputs (see `skills/_reference/input-types.md`) and the events to subscribe to.
 
 Proceed to Step 3.
 
@@ -40,10 +40,10 @@ Write the file to the path the user wants (default `<name>.groovy`). Proceed to 
 Run the sandbox linter on the generated file and resolve anything it flags:
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_lint.py <file.groovy>
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_lint.py <file.groovy>
 ```
 
-Contract and finding shape: `scripts/hub_lint.py` module docstring. A correct skeleton should lint clean; if a `missing-command` or `unresolved-handler` appears, a required method or handler is absent — add it. If no findings, say so and proceed.
+Contract and finding shape: `skills/_scripts/hub_lint.py` module docstring. A correct skeleton should lint clean; if a `missing-command` or `unresolved-handler` appears, a required method or handler is absent — add it. If no findings, say so and proceed.
 
 ## Step 5 — Offer to deploy
 

@@ -18,7 +18,7 @@ devices and one parent owning 5 children.
   this way (each Hue bulb is a child of the integration app), as do CoCoHue and HubiThings Replica
   (`rules/device-lifecycle.md`). These are **harder to see**: the device is not indented anywhere,
   and its only tell is a **"Parent app"** row in the Device Details table on the device page's
-  Device Info tab (`/device/fullJson/<id>` exposes it as `parentApp` — `reference/endpoints.md`).
+  Device Info tab (`/device/fullJson/<id>` exposes it as `parentApp` — `skills/_reference/endpoints.md`).
 
 Both make the device a child. Only the reporting differs.
 

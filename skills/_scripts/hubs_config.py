@@ -8,7 +8,7 @@ Maker API credentials come from the environment, not this file.
 Schema (schema_version 1):
     {"schema_version": 1,
      "default": "main" | null,
-     "hubs": {"<name>": {"ip": "192.168.30.2", "port": 8080}, ...}}
+     "hubs": {"<name>": {"ip": "192.0.2.10", "port": 8080}, ...}}
 
 Actions (deterministic JSON mutation): init, add, set-default, remove, list, validate.
 On read, an older/absent schema_version is migrated up and rewritten (this script owns
@@ -16,7 +16,7 @@ migration; readers treat an unrecognized version as no-usable-state).
 
 Usage:
     hubs_config.py init [--path hubs.json] [--force]
-    hubs_config.py add --name main --ip 192.168.30.2 [--port 8080] [--default] [--path ...]
+    hubs_config.py add --name main --ip 192.0.2.10 [--port 8080] [--default] [--path ...]
     hubs_config.py set-default --name main [--path ...]
     hubs_config.py remove --name main [--path ...]
     hubs_config.py list [--path ...]

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Shared Hubitat hub client: config resolution + code enumerate/pull/deploy over the
-undocumented editor endpoints (see reference/endpoints.md, grounded on 2.5.1.125).
+undocumented editor endpoints (see ../_reference/endpoints.md, grounded on 2.5.1.125).
 
 Not a CLI — imported by hub_pull.py and hub_deploy.py. The HTTP layer is a single
 injectable `transport` callable so the deterministic logic (URL building, deploy
@@ -10,7 +10,7 @@ Hub Security every call needs a session cookie first; this client does not do th
 
 Config (hubs.json, owned by the hub-config skill) holds only IPs — never secrets:
     {"schema_version": 1, "default": "main",
-     "hubs": {"main": {"ip": "192.168.30.2", "port": 8080}, ...}}
+     "hubs": {"main": {"ip": "192.0.2.10", "port": 8080}, ...}}
 Maker API credentials, if used elsewhere, come from the environment, not this file.
 """
 import json
@@ -24,7 +24,7 @@ SCHEMA_VERSION = 1
 # kind -> endpoint paths. `enumerate` lists code entries; `code` reads source+version;
 # `create` makes a new entry; `update` saves an existing one (needs current version).
 # Only app and driver are exposed: their code endpoints were verified live (see
-# reference/endpoints.md). Library create/update endpoints are not grounded on real
+# ../_reference/endpoints.md). Library create/update endpoints are not grounded on real
 # hardware, so `library` deploy/pull is deliberately out of the contract until it is.
 _PATHS = {
     "app": {"enumerate": "/hub2/userAppTypes", "code": "/app/ajax/code",

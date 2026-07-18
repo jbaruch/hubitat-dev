@@ -1,6 +1,6 @@
 # Hubitat Hub Endpoints (grounded)
 
-Verified 2026-07-14 against three **C-8 Pro** hubs on platform **2.5.1.125**, local network, **Hub Security off**. These endpoints are **undocumented and version-sensitive** — Hubitat does not support them and they can shift between firmware releases. Only the Maker API and the `/management/*` token API are officially supported. Re-verify after a platform update; the `_meta.verified_platform` in `reference/capabilities.json` tracks the baseline.
+Verified 2026-07-14 against three **C-8 Pro** hubs on platform **2.5.1.125**, local network, **Hub Security off**. These endpoints are **undocumented and version-sensitive** — Hubitat does not support them and they can shift between firmware releases. Only the Maker API and the `/management/*` token API are officially supported. Re-verify after a platform update; the `_meta.verified_platform` in `skills/_reference/capabilities.json` tracks the baseline.
 
 Base is `http://<hub-ip>:8080` unless noted. Websockets are on port `80` (`ws://<hub-ip>/...`). With Hub Security off, **no authentication** is needed — no login, no cookie. If a hub ever enables Hub Security, every call below needs a session cookie from `POST /login`.
 
@@ -72,7 +72,7 @@ Both verified on **2.5.1.128**. These answer "when did this *actually* change?",
 
 `/hub/eventsJson` is how you correlate "it broke around Tuesday" with a platform update, and it pairs with the version-sensitivity warning at the top of this file: it is how you find out *when* the platform moved.
 
-**HTML rides inside JSON string fields.** `producedBy` above is an anchor, not a name. So is `ipAddress` in `/hub/details/json` (`<a href="http://192.168.30.16">192.168.30.16</a> (Ethernet)`), and app names in the log endpoints carry status markup (`Ecobee Suite Manager<span style="color:green"> Online</span>` — **3570 of 8205** past-log lines held markup on the measured hub). Strip tags before matching on any of these; a name compared raw will not match.
+**HTML rides inside JSON string fields.** `producedBy` above is an anchor, not a name. So is `ipAddress` in `/hub/details/json` (`<a href="http://192.0.2.12">192.0.2.12</a> (Ethernet)`), and app names in the log endpoints carry status markup (`Ecobee Suite Manager<span style="color:green"> Online</span>` — **3570 of 8205** past-log lines held markup on the measured hub). Strip tags before matching on any of these; a name compared raw will not match.
 
 ## The two log endpoints disagree about time and order
 
@@ -98,14 +98,14 @@ Correlating an app's log line against an event across these two silently mis-ord
 |----------|---------|
 | `GET /hub/details/json` | Hub identity: `platformVersion`, `hardwareVersion`, `hubName`, `hubUID`, `ipAddress`, `macAddress`, `timeZone`, ... (confirmed ~49 KB on 2.5.1.125) |
 | `GET /hub2/hubData` | Newer JSON hub backend |
-| `GET /hub2/devicesList` | Devices: `{suggestBackup, devices:[{key, data:{id, name, ...}, children[], parent, child}]}` — a **tree**: `parent`/`child` are bools ("is a parent" / "is a child"), and children appear **only nested** in `children[]`, never at the top level. Iterating `devices[]` flat misses every child device (`reference/parent-child-devices.md`) |
+| `GET /hub2/devicesList` | Devices: `{suggestBackup, devices:[{key, data:{id, name, ...}, children[], parent, child}]}` — a **tree**: `parent`/`child` are bools ("is a parent" / "is a child"), and children appear **only nested** in `children[]`, never at the top level. Iterating `devices[]` flat misses every child device (`skills/_reference/parent-child-devices.md`) |
 | `GET /hub2/appsList` | Installed apps + `systemAppTypes` |
 | `GET /hub/edit` | The **Settings** page (UI). Not `/hub/settings`, which 404s — the nav link is the authority |
 | `GET /installedapp/direct/<builtInAppType>` | Opens a built-in app, redirecting to a transient instance at `/installedapp/configure/<newId>/mainPage` (e.g. `swapDevice` → Settings → Swap Device). The instance takes the next app id and is **not** a persistent install: its **Cancel** discards it, after which `/installedapp/statusJson/<id>` returns `{}` and it is absent from `/hub2/appsList`. Verified 2.5.1.128 |
 
 ## Device usage / blast radius (undocumented — grounded 2026-07-16)
 
-`GET /device/fullJson/<deviceId>` returns the hub's own **computed** "in use by" list for a device — verified live on 2.5.1.128 (C-8 Pro, Hub Security off). This is the removal blast radius, straight from the hub; `scripts/hub_device_usage.py` projects it and the `device-removal` skill reads it.
+`GET /device/fullJson/<deviceId>` returns the hub's own **computed** "in use by" list for a device — verified live on 2.5.1.128 (C-8 Pro, Hub Security off). This is the removal blast radius, straight from the hub; `skills/_scripts/hub_device_usage.py` projects it and the `device-removal` skill reads it.
 
 | Field | Shape |
 |-------|-------|
@@ -125,7 +125,7 @@ Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/
 ## Z-Wave & Zigbee mesh detail (undocumented — grounded 2026-07-15)
 
 Both return clean JSON on 2.5.1.128, no auth with Hub Security off. Drive them for mesh
-diagnostics; the `mesh-health` skill reads them via `scripts/hub_mesh.py`.
+diagnostics; the `mesh-health` skill reads them via `skills/_scripts/hub_mesh.py`.
 
 | Endpoint | Returns |
 |----------|---------|
@@ -151,7 +151,7 @@ node read as 5.02 h on `America/Chicago`). The zone is `timeZone` in `GET /hub/d
 ## Hub mesh (undocumented — grounded 2026-07-16)
 
 `GET /hub2/hubMeshJson` — the hub's own peer table. Hub mesh carries **commands** between hubs, so a
-peer with a stale record drops them while every radio metric stays green; `scripts/hub_mesh.py`
+peer with a stale record drops them while every radio metric stays green; `skills/_scripts/hub_mesh.py`
 analyzes it and the `mesh-health` skill reads it.
 
 | Field | Shape |
@@ -178,7 +178,7 @@ side can be correct while the other is stale.
 above; per-frame LQI+RSSI in the radio log sockets below; this snapshot is liveness + network-level only.
 
 **Live radio log websockets** (verified 2026-07-15 on 2.5.1.128, `HTTP 101`, unmasked text frames,
-case-sensitive paths) — the per-frame decoded traffic, distinct from the driver `/logsocket`. Tail via `scripts/hub_radiolog.py`:
+case-sensitive paths) — the per-frame decoded traffic, distinct from the driver `/logsocket`. Tail via `skills/_scripts/hub_radiolog.py`:
 
 | Socket | Frame shape (JSON per message) |
 |--------|-------------------------------|

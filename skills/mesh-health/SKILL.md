@@ -26,10 +26,10 @@ Proceed to Step 2.
 ## Step 2 — Run the analyzer
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_mesh.py --ip <addr> [--radio zwave|zigbee|both] [--no-probe]
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mesh.py --ip <addr> [--radio zwave|zigbee|both] [--no-probe]
 ```
 
-Argument contract, output shape, and every flag/rank rule: `scripts/hub_mesh.py` module docstring.
+Argument contract, output shape, and every flag/rank rule: `skills/_scripts/hub_mesh.py` module docstring.
 Output is one JSON object: `{zwave, zigbee, hub_mesh, summary:{critical, warnings}, hub_timezone,
 fetch_warnings}`. `--no-probe` skips the hub-mesh peer probe — the probe is the only thing that
 detects a stale peer record, so drop it only when the peers are unreachable by design.
@@ -85,18 +85,18 @@ signal (LQI/RSSI) and sequence continuity (soft missed-frame hints). When a susp
 confirming, tail its live traffic:
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/scripts/hub_radiolog.py --ip <addr> --radio zigbee|zwave \
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_radiolog.py --ip <addr> --radio zigbee|zwave \
     [--name "<device>" | --node <n>] --summary [--seconds N]
 ```
 
 The script emits structured JSON by default; `--summary` gives the per-device rollup you want for
-diagnosis (raw per-frame JSON otherwise). Argument and frame contract: `scripts/hub_radiolog.py` module docstring.
+diagnosis (raw per-frame JSON otherwise). Argument and frame contract: `skills/_scripts/hub_radiolog.py` module docstring.
 For a Z-Wave device that is slow or **flapping**, operate it while capturing and read the `--summary`
 `transmit_report` rollup. If `hub_snr_med` is well below `dest_snr_med` and the hub noise floor is
 worse or spikier than the device's, the hub's receiver is the bottleneck, from its RF environment
 rather than the device or distance. Get the hub's receiver out of that noise by relocating the hub,
 fitting an external antenna, or separating co-located 900 MHz hubs. Do not touch the device. See
-`reference/zwave-lifecycle.md` (TransmitReport).
+`skills/_reference/zwave-lifecycle.md` (TransmitReport).
 `--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
 worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
 `lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read

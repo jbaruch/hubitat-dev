@@ -1,15 +1,15 @@
 {
-  "include": ["scripts", "evals"],
+  "include": ["skills/_scripts", "evals"],
   "exclude": ["**/__pycache__", "scratch"],
   "typeCheckingMode": "standard",
   "executionEnvironments": [
     {
-      "root": "scripts",
-      "extraPaths": ["scripts"]
+      "root": "skills/_scripts",
+      "extraPaths": ["skills/_scripts"]
     },
     {
       "root": "evals",
-      "extraPaths": ["scripts"]
+      "extraPaths": ["skills/_scripts"]
     }
   ]
 }

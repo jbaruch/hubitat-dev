@@ -4,7 +4,7 @@
 
 Context for developing and debugging **Hubitat Elevation** apps, drivers, and the hub environment. This plugin does not write your Groovy for you — it makes an agent write it *correctly*: the sandbox constraints, lifecycle idioms, and capability contracts that the platform enforces but the docs bury, plus thin mechanisms for the deploy / log-tail / lint loop the hub gives you no official API for.
 
-Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local network, Hub Security off. The code-editor and logging endpoints it drives are undocumented and version-sensitive — see `reference/endpoints.md` for what was verified and when.
+Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local network, Hub Security off. The code-editor and logging endpoints it drives are undocumented and version-sensitive — see `skills/_reference/endpoints.md` for what was verified and when.
 
 ## What it covers
 
@@ -14,7 +14,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local netwo
 - **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and dead devices, then tail the live radio log sockets (`zwaveLogsocket`/`zigbeeLogsocket`) for per-frame signal (Zigbee LQI/RSSI, Z-Wave per-frame RSSI) — grounded in Hubitat's metrics and the Z-Wave Alliance/Silabs/IEEE 802.15.4 protocol specs.
 - **Lint** — catch the sandbox violations and silent-failure traps (bad imports, handler-name typos, capability→command gaps, the `installed()`/`updated()` first-run trap) before you paste.
 - **Test** — take apps and drivers off-hub for real unit tests.
-- **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`reference/playwright-ui.md`).
+- **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`skills/_reference/playwright-ui.md`).
 - **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`), warn with the concrete blast radius (enabled automations vs inert references, dashboards, parent/child), and verify the references cleared after. A replacement device gets a new id, so capture the old memberships and re-wire them onto the new one.
 
 ## Rules

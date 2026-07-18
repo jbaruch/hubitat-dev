@@ -7,7 +7,7 @@ metadata JSON to stdout; without it, prints metadata JSON with the source includ
 
 Usage:
     hub_pull.py --kind driver --name "My Driver" --hub main --hubs hubs.json [--out d.groovy]
-    hub_pull.py --kind app --id 143 --ip 192.168.30.2
+    hub_pull.py --kind app --id 143 --ip 192.0.2.10
 """
 import argparse
 import json

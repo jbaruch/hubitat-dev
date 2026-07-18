@@ -15,11 +15,11 @@ Hubitat's two planes behave differently across a multi-hub setup. Conflating the
 
 ## Local network, no Hub Security (assumed default)
 
-- These rules and the deploy/log-tail mechanisms assume hubs on the local network with Hub Security off — no login, no cookie, direct IP access (verified baseline in `reference/endpoints.md`).
+- These rules and the deploy/log-tail mechanisms assume hubs on the local network with Hub Security off — no login, no cookie, direct IP access (verified baseline in `skills/_reference/endpoints.md`).
 - If a hub enables Hub Security, every hub HTTP/WS call needs a session cookie from `POST /login` first; the mechanisms must switch to the authenticated path.
 
 ## Deploy is optimistically concurrent
 
 - The `version` integer returned by `/app/ajax/code` and `/driver/ajax/code` is bumped on every save and is the concurrency token. An update must send the **current** version.
 - If the hub rejects the version, a newer edit exists on the hub — re-pull and reconcile. Never blindly retry with an incremented number; that is how you clobber a change made in the web editor.
-- The endpoints are undocumented and version-sensitive — re-verify after a platform update (`reference/endpoints.md`).
+- The endpoints are undocumented and version-sensitive — re-verify after a platform update (`skills/_reference/endpoints.md`).
