@@ -163,7 +163,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     cleanly (verified: removed and re-added a member, Done, confirmed via `configure/json`). **For a
     swap, add the new device before removing the old** — the input never goes empty, stays
     `device-btn-filled`, and the trap never fires. This is the biggest limiter here: automated app
-    *install* (empty required input) is unreliable while *edits* are fine (verified 2.5.1.131).
+    *install* (empty required input) is unreliable while *edits* are fine (verified 2.5.1.131). If you
+    author the app, declaring the input `required: false` sidesteps this entirely (gotcha 23).
 
 17. **`is-invalid` on a text input is a red herring.** An MDL text input keeps `class="… is-invalid"`
     on an app that saved fine, and it does not block Done. Do not chase it — in a failed Done the real
@@ -195,16 +196,55 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     full baseline from `configure/json` first and diff after: the 457-device edit was verified to change
     exactly `{old}→{new}`, 455 others untouched.
 
+21. **Rule Machine trigger devices hide behind Select Trigger Events, and RM keeps two settings —
+    verify via `state.trigDevs`.** The trigger device is not on the rule's main page: **Select Trigger
+    Events** (`button[name="_action_href_name|selectTriggers|N"]`) → click the existing trigger row (a
+    `<div>` reading e.g. "mZone-X motion reports active") → a `Motion sensors` picker bound to
+    `settings[tDev1]`; swap it like any picker (add-new-before-remove-old, gotcha 16). **RM stores two
+    device settings, `tDev1` and `tDev-1`** — the trigger editor updates only `tDev1`, while `tDev-1` is
+    a staging leftover that keeps pointing at the old device. The authoritative live subscription is
+    **`state.trigDevs`** (e.g. `{"1580:Motion":["1"]}`), with `state.trigDevsW` listing withdrawn
+    devices. Verify a re-point via `state.trigDevs` from the rule's `statusJson`, never the raw `tDev*`
+    setting. Consequence: the stale `tDev-1` makes the old device still show in `hub_device_usage.py`,
+    but that reference is **inert** (no live subscription) — deleting the old device is safe and RM keeps
+    firing on the new one (verified 2.5.1.131).
+
+22. **`browser_run_code_unsafe` runs *real* interactions — batch bulk re-points with it.**
+    `mcp__playwright__browser_run_code_unsafe` runs genuine Playwright calls (`page.locator(sel).click()`,
+    `page.goto`, `page.waitForTimeout`) in a loop inside one tool call. These are **trusted events that
+    persist exactly like `browser_click`** — not the synthetic `element.click()` gotcha 4 forbids. It
+    collapses each ~18-call Room Lights re-point into one call and a 26-toggle Device Activity Check swap
+    into one, which is what made a 19-zone migration practical. Four caveats, each hit for real:
+    - `page.evaluate` takes **one** argument — wrap multiples in an object (`{o,n,t}`), or it errors
+      "Too many arguments".
+    - Picker-open **timeouts** happen (~1 per batch of 5–6 apps) — wrap each item in try/catch, collect
+      results, retry the failure individually.
+    - Batched `page.goto` can **race** a prior page's in-flight navigation → `net::ERR_ABORTED` — retry
+      those with `{waitUntil:'load'}` and longer waits.
+    - `page.url()` reads **stale** right after a confirm-Yes navigation — verify via HTTP
+      (`statusJson`/`fullJson`), not the returned url.
+
+23. **To make an app scriptably installable, author its device inputs `required: false` — it sidesteps
+    gotcha 16.** Gotcha 16's empty→filled trap blocks a scripted install of any app with a *required*
+    device input. An **optional** device input clears Done validation under automation, and the picker's
+    populated hidden-input value still persists on Done even while the button stays `device-btn-empty`
+    (verified: the instance saved all members and created its child device). A member-less instance is
+    then harmless and inert. This does not rescue a third-party app whose input is already required —
+    there it stays gotcha 16 (verified 2.5.1.131).
+
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
 `skills/_reference/endpoints.md`); gotchas 10–15 verified on 2.5.1.128 while installing a user app instance
 end-to-end (2 device radios, 25 contact-sensor checkboxes across two multi-selects, 5 enum dropdowns,
 Done). Gotchas 16–20 verified on 2.5.1.131 while re-pointing two live apps' device inputs (Room
-Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 1, 2, 5, 10, 16 and 19
-are the load-bearing ones — each was reached the expensive way in real usage; 5 corrupted a live scene,
-10 silently discarded a setting while the page looked correct, 16 blocks automated install of any app
-with a required device input, and 19 switched real lights on.
+Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 21–23 verified on
+2.5.1.131 across a 19-zone Zone Motion Controllers → custom-app migration (Rule Machine trigger
+re-pointing, `browser_run_code_unsafe` batching, `required: false` scriptable install). Gotchas 1, 2, 5,
+10, 16, 19 and 22 are the load-bearing ones — each was reached the expensive way in real usage; 5
+corrupted a live scene, 10 silently discarded a setting while the page looked correct, 16 blocks
+automated install of any app with a required device input, 19 switched real lights on, and 22 is the
+only reason the 19-zone migration was practical.
 
 **Everything here fails silently, which is why 13 is the habit that pays**: a `ref` that clicks a
 container, an Update that never commits, and a working page are indistinguishable on screen. Read the

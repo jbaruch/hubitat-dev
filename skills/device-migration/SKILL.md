@@ -125,7 +125,7 @@ it, select the new device where the old was selected, de-select the old, configu
 if the app needs it (every app differs), and hit **Done** — the change does not commit until then,
 and not over observable HTTP (`skills/_reference/playwright-ui.md`).
 
-Four re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
+Re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
 
 - The device input is frequently on a **sub-page**, not the app's main page. Scan for
   `button[name^="_action_href"]` to reach it (gotcha 18) rather than calling a setting unreachable.
@@ -136,18 +136,34 @@ Four re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
   drops the off-screen picks on Update (gotcha 20).
 - In Room Lighting, a `submitOnChange` button on a `settings[...]` id is a **live action**, not
   navigation — "Activate" switches the real lights (gotcha 19).
+- Room Lighting stores the turn-off sensor in **`motionsInactive`** on some instances, not `motionsOff`
+  — a swap of `motions` and `motionsOff` alone misses it silently.
+- Rule Machine hides the trigger device behind **Select Trigger Events** (gotcha 21) and keeps a stale
+  `tDev-1` beside `tDev1`. Verify its re-point via `state.trigDevs` in the rule's `statusJson`, never the
+  raw `tDev*` setting.
 
 Verify each app individually via `/installedapp/configure/json/<appId>/<page>` (the `settings`
 object). Do **not** verify device *inputs* with `/installedapp/statusJson/<appId>` — it reports them as
 `None` even when set (`skills/_reference/endpoints.md`). Its `childDevices` list is a separate, reliable
 field: a managed child device such as `mZone*` is absent from `/hub2/devicesList` top level, and its id
 is read from the parent app's `statusJson.childDevices` (`skills/_reference/parent-child-devices.md`).
-Re-run Step 1's script when done. Proceed to Step 7.
+Trust this device-level re-read over the picker values — it is what catches a turn-off sensor left
+behind in `motionsInactive`. A stale Rule Machine `tDev-1` keeps a re-pointed old device listing the
+rule in Step 1's script, but that reference is **inert** — no live subscription. Once `state.trigDevs`
+shows the new device, the old one is safe to delete. Re-run Step 1's script when done. Proceed to Step 7.
 
 ## Step 7 — Report what moved and what is left
 
 State which apps moved, by what path (swap / bridge / park / manual), and name anything left for the
 user — dashboards, scenes, an app that would not commit, a virtual device still to delete. Never
 report a migration complete on a UI success message alone; report it on the Step 5 re-read.
+
+Removing the **old app** (a superseded zone controller, say) is a two-step PrimeVue confirm — a
+"Remove … now?" prompt, then a "This will remove N child device(s)…" prompt, both `button.p-confirm`
+labelled "Yes" — and it **deletes the app's owned child devices**. A dangling reference from another app does not block
+it: a stale Rule Machine `tDev-1` pointing at a deleted device is inert (`skills/_reference/playwright-ui.md`
+gotcha 21). Agent-initiated Remove/Delete clicks are refused by the auto-mode classifier regardless of
+in-chat approval — the **user performs the destructive delete** (`rules/device-lifecycle.md`), after
+which a fresh retry proceeds.
 
 If the old device is now to be removed, hand off: `Skill(skill: "device-removal")`. Finish here.
