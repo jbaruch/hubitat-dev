@@ -26,3 +26,11 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 - Z-Wave uses multiple-dispatch `zwaveEvent(...)` overloads with a `hubitat.zwave.Command` catch-all placed **last**.
 - Returning a formatted command string/List from a command method **auto-sends it** to the device — easy to trigger unintentionally. S2 devices wrap with `zwaveSecureEncap(...)`.
 - First line of any protocol `parse()` while developing: `if (logEnable) log.debug "parse: ${description}"` — see `rules/logging-conventions.md`.
+
+## App-driven virtual devices
+
+- The built-in `hubitat` **`Virtual Motion Sensor`** is unsafe for app-driven latched state: its `active()` **auto-reverts to `inactive` on a hardcoded ~15s timer**. An app that drives a virtual motion device to hold an aggregate state, such as a zone controller, cannot keep it `active` with the built-in.
+- Verified 2.5.1.131: a direct `active()` from the device page emitted `inactive` exactly 15s later, and an app-created child device renders no `autoInactive` preference on its edit page to disable it. A dead-consistent ~15s active duration in the event history is the signature.
+- For an app-owned "hold until commanded" device, write a trivial custom driver — `capability "MotionSensor"` plus `active`/`inactive` commands that only `sendEvent`, no timer.
+- Harden the owning app to self-heal: re-assert the device to the intended state whenever it diverges, not only on a transition. An out-of-band command or a hub restart then re-syncs rather than latching.
+- Swap an already-created device onto the custom driver in place — the swap keeps the device id and every app reference (`skills/_reference/playwright-ui.md` gotcha 24).

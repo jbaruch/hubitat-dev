@@ -232,15 +232,28 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     then harmless and inert. This does not rescue a third-party app whose input is already required —
     there it stays gotcha 16 (verified 2.5.1.131).
 
+24. **Swap a device's driver in place — it keeps the id, DNI, and every app reference.** Changing an
+    existing device's Type re-points nothing: consumers (Room Lighting, Device Activity Check, Rule
+    Machine) keep working transparently, which makes it the clean fix for a device on the wrong driver
+    (e.g. off the auto-inactivating built-in Virtual Motion Sensor, `rules/driver-lifecycle.md`). On the
+    2.5.1.x PrimeVue device page: `/device/edit/<id>` → **Device Info** tab → the **Type** control is a
+    PrimeVue dropdown (`.p-dropdown-label`, **not** a native `<select>`, so a
+    `querySelectorAll('select')` sweep finds nothing). Click the label to open, type into
+    `.p-dropdown-filter`, click the `.p-dropdown-item` matching the driver name exactly, then page
+    **Save**. The swap re-runs the new driver's `installed()`, so the device's states reset — reconcile
+    the owning app after (its `updated()` re-derives and re-drives). Batches cleanly via
+    `browser_run_code_unsafe` (gotcha 22) — 19 devices swapped this way (verified 2.5.1.131).
+
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
 `skills/_reference/endpoints.md`); gotchas 10–15 verified on 2.5.1.128 while installing a user app instance
 end-to-end (2 device radios, 25 contact-sensor checkboxes across two multi-selects, 5 enum dropdowns,
 Done). Gotchas 16–20 verified on 2.5.1.131 while re-pointing two live apps' device inputs (Room
-Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 21–23 verified on
+Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 21–24 verified on
 2.5.1.131 across a 19-zone Zone Motion Controllers → custom-app migration (Rule Machine trigger
-re-pointing, `browser_run_code_unsafe` batching, `required: false` scriptable install). Gotchas 1, 2, 5,
+re-pointing, `browser_run_code_unsafe` batching, `required: false` scriptable install, in-place driver
+swap). Gotchas 1, 2, 5,
 10, 16, 19 and 22 are the load-bearing ones — each was reached the expensive way in real usage; 5
 corrupted a live scene, 10 silently discarded a setting while the page looked correct, 16 blocks
 automated install of any app with a required device input, 19 switched real lights on, and 22 is the
