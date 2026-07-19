@@ -125,9 +125,24 @@ it, select the new device where the old was selected, de-select the old, configu
 if the app needs it (every app differs), and hit **Done** — the change does not commit until then,
 and not over observable HTTP (`skills/_reference/playwright-ui.md`).
 
+Four re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
+
+- The device input is frequently on a **sub-page**, not the app's main page. Scan for
+  `button[name^="_action_href"]` to reach it (gotcha 18) rather than calling a setting unreachable.
+- **Add the new device before removing the old.** A required input taken empty will not re-commit via
+  automation, and Done then rejects the page as incomplete (gotcha 16). Keeping it populated dodges the
+  trap.
+- Before toggling a **large** multi-select, confirm the full selection renders — a virtualized list
+  drops the off-screen picks on Update (gotcha 20).
+- In Room Lighting, a `submitOnChange` button on a `settings[...]` id is a **live action**, not
+  navigation — "Activate" switches the real lights (gotcha 19).
+
 Verify each app individually via `/installedapp/configure/json/<appId>/<page>` (the `settings`
-object). Do **not** verify with `/installedapp/statusJson/<appId>` — it reports device inputs as
-`None` even when set (`skills/_reference/endpoints.md`). Re-run Step 1's script when done. Proceed to Step 7.
+object). Do **not** verify device *inputs* with `/installedapp/statusJson/<appId>` — it reports them as
+`None` even when set (`skills/_reference/endpoints.md`). Its `childDevices` list is a separate, reliable
+field: a managed child device such as `mZone*` is absent from `/hub2/devicesList` top level, and its id
+is read from the parent app's `statusJson.childDevices` (`skills/_reference/parent-child-devices.md`).
+Re-run Step 1's script when done. Proceed to Step 7.
 
 ## Step 7 — Report what moved and what is left
 

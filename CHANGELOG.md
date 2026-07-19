@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **Five Playwright-UI device-input gotchas from a live app migration** (`skills/_reference/playwright-ui.md` 16–20, `skills/device-migration`, closes #41). From re-pointing two real apps' device inputs (Room Lighting + Device Activity Check) off an old zone device onto a new one on 2.5.1.131 — several cost real trial-and-error and two caused side effects (accidentally switched physical lights on). The load-bearing one (16): a *fresh required* device input never flips `device-btn-empty` → `device-btn-filled` under automation even though the hidden input takes the id list, so Done rejects the page as incomplete — which makes automated app *install* unreliable while *edits* are fine; the workaround is to **add the new device before removing the old** so the input never goes empty. Also: `is-invalid` on a text input is a red herring that doesn't block Done (17); device inputs are frequently on sub-pages reached by `button[name^="_action_href"]`, not `<a>` links (18); Room Lighting's `submitOnChange` `settings[activate]`/`settings[turnOff]` buttons are live actions that switch the real lights, not navigation (19); and large multi-selects must be checked for virtualization before toggling or Update drops the off-screen selections (20). Gotcha 1 gains the note that the picker's Update reads `is-checked`, not `input.checked`. `device-migration` Step 6 now carries the sub-page discovery, add-before-remove ordering, virtualization gate, and the live-trigger caution, plus the reminder that a managed child device (`mZone*`) is absent from `/hub2/devicesList` top level and read from the parent app's `statusJson.childDevices`.
+
 ## 0.1.20 — 2026-07-18
 
 ### Added
