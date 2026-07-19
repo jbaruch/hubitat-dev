@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **Playwright-UI + device-migration findings from a 19-zone migration** (`skills/_reference/playwright-ui.md` 21–23, `skills/device-migration`, closes #43). Follow-up to #41 — a full Zone Motion Controllers → custom-app migration across 19 zones on 2.5.1.131 surfaced findings beyond the picker mechanics. The load-bearing one (22): `mcp__playwright__browser_run_code_unsafe` runs **real** Playwright interactions (`page.locator().click()`, `page.goto`) in a loop inside one tool call — genuine trusted events that persist like `browser_click`, not the synthetic clicks gotcha 4 forbids — collapsing each ~18-call re-point into one, which is the only reason 19 zones were practical; its four caveats (single-arg `page.evaluate`, per-batch picker timeouts, `page.goto` navigation races, stale `page.url()` after a confirm) are captured. Also: Rule Machine trigger devices hide behind Select Trigger Events and RM keeps a stale `tDev-1` beside `tDev1`, so a re-point is verified via `state.trigDevs`, never the raw setting (21); and authoring a device input `required: false` sidesteps #41's empty→filled install trap while the hidden value still persists on Done (23, cross-referenced from 16). `device-migration` gains the `motionsInactive`-vs-`motionsOff` turn-off variant, the "trust the device-level re-read over picker values" rule, the RM `trigDevs` verification (stale `tDev-1` is inert), the two-step PrimeVue app-removal confirm that deletes owned child devices, and the note that agent-initiated deletes are refused by the auto-mode classifier so the user performs them.
+
 ## 0.1.21 — 2026-07-19
 
 ### Added
