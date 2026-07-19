@@ -55,6 +55,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
    property once made 15 selected members look unselected and nearly wiped them; on 2.5.1.128 the
    property agreed with the class on a device radio and on 14 multi-select checkboxes. Both
    observations are real, which is the point: the class is the safe superset in every case measured.
+   The picker's own Update reads `is-checked` too, so assert on the class, not `input.checked`, when
+   confirming what an Update will commit (reinforced 2.5.1.131).
 
 2. **Selections persist over a WebSocket, not observable HTTP.** The picker's "Update" button fires
    no HTTP request; the value persists to the hub on the page's **Done**. To make a device input
@@ -152,13 +154,57 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     Config survived the tab switch intact (verified 2.5.1.128). Same family as the built-in app's
     transient instance discarded on Cancel (`skills/_reference/endpoints.md`, `/installedapp/direct/`).
 
+16. **A fresh *required* device input will not commit via automation — the empty→filled transition
+    fails silently.** The picker mechanism (gotchas 10–13) works for **edits** but not for a first
+    fill. An empty required picker starts `device-btn-empty`; after checking devices and clicking
+    Update, the hidden `input[name="settings[<name>]"]` **does** take the id list (gotcha 13's commit
+    signal), yet the button **never flips** to `device-btn-filled`, so Done rejects the page with
+    "Please complete the required fields", repeatedly. Editing an **already-populated** picker persists
+    cleanly (verified: removed and re-added a member, Done, confirmed via `configure/json`). **For a
+    swap, add the new device before removing the old** — the input never goes empty, stays
+    `device-btn-filled`, and the trap never fires. This is the biggest limiter here: automated app
+    *install* (empty required input) is unreliable while *edits* are fine (verified 2.5.1.131).
+
+17. **`is-invalid` on a text input is a red herring.** An MDL text input keeps `class="… is-invalid"`
+    on an app that saved fine, and it does not block Done. Do not chase it — in a failed Done the real
+    blocker is gotcha 16's `device-btn-empty`, not a text field's `is-invalid` (cost real time treating
+    it as the blocker).
+
+18. **Device inputs are often on sub-pages reached by `hrefElem` buttons, not `<a>` links.** The target
+    input is frequently not on the app's main page. Scan for `button[name^="_action_href"]` to discover
+    sub-pages instead of concluding a setting is unreachable. Room Lighting:
+    `button[name="_action_href_name|onMeansPage|N"]` → `motions`; `…|offMeansPage|N` → `motionsOff`.
+    Device Activity Check: `button[name="_action_href_pageDeviceGroup1Href|pageDeviceGroup|1"]` →
+    `group1.devices`. Return via `_action_previous` ("Done with …") or `_action_next` (`id=btnNext`);
+    final commit is the main-page `_action_update` (`id=btnDone`).
+
+19. **Room Lighting has live-trigger buttons that look like navigation — they have side effects.**
+    The buttons with id `settings[activate]` ("Activate") and `settings[turnOff]` ("Turn Off") are
+    `submitOnChange` buttons that **physically switch the room's lights** and flip the page title to
+    "(Active)". Target them as `button[id="settings[activate]"]` — the bracketed id is not a CSS
+    id-selector, so `#settings[activate]` misparses as id `settings` with an `activate` attribute.
+    Clicking "Activate" blind turned real bathroom lights on. The tell: an `hrefElem`-class button is
+    navigation (safe); a `submitOnChange` on a `settings[...]`-id button is a **live action**. Read the
+    class and name before clicking any unfamiliar Room Lighting button.
+
+20. **Large pickers: gate on virtualization before toggling.** One monitored-device input held 457
+    devices. Before editing, open the picker and compare the rendered `label.is-checked` count to the
+    known selection count. 481 checkboxes rendered with exactly 457 checked ⇒ the full set is in the
+    DOM, not virtualized ⇒ Update reads all of it and toggling two is safe. If fewer render than are
+    selected, the list virtualizes and Update **drops the off-screen selections** — abort. Capture the
+    full baseline from `configure/json` first and diff after: the 457-device edit was verified to change
+    exactly `{old}→{new}`, 455 others untouched.
+
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
 `skills/_reference/endpoints.md`); gotchas 10–15 verified on 2.5.1.128 while installing a user app instance
 end-to-end (2 device radios, 25 contact-sensor checkboxes across two multi-selects, 5 enum dropdowns,
-Done). Gotchas 1, 2, 5 and 10 are the load-bearing ones — each was reached the expensive way in real
-usage; 5 corrupted a live scene, and 10 silently discarded a setting while the page looked correct.
+Done). Gotchas 16–20 verified on 2.5.1.131 while re-pointing two live apps' device inputs (Room
+Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 1, 2, 5, 10, 16 and 19
+are the load-bearing ones — each was reached the expensive way in real usage; 5 corrupted a live scene,
+10 silently discarded a setting while the page looked correct, 16 blocks automated install of any app
+with a required device input, and 19 switched real lights on.
 
 **Everything here fails silently, which is why 13 is the habit that pays**: a `ref` that clicks a
 container, an Update that never commits, and a working page are indistinguishable on screen. Read the
