@@ -33,4 +33,4 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 - Verified 2.5.1.131: a direct `active()` from the device page emitted `inactive` exactly 15s later, and an app-created child device renders no `autoInactive` preference on its edit page to disable it. A dead-consistent ~15s active duration in the event history is the signature.
 - For an app-owned "hold until commanded" device, write a trivial custom driver — `capability "MotionSensor"` plus `active`/`inactive` commands that only `sendEvent`, no timer.
 - Harden the owning app to self-heal: re-assert the device to the intended state whenever it diverges, not only on a transition. An out-of-band command or a hub restart then re-syncs rather than latching.
-- Swap an already-created device onto the custom driver in place — the swap keeps the device id and every app reference (`skills/_reference/playwright-ui.md` gotcha 24).
+- Swap an already-created device onto the custom driver in place — the swap keeps the device id and every app reference (`skills/_reference/playwright-ui.md` gotcha 25).

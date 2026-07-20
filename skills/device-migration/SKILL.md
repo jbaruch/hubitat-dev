@@ -128,17 +128,17 @@ and not over observable HTTP (`skills/_reference/playwright-ui.md`).
 Re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
 
 - The device input is frequently on a **sub-page**, not the app's main page. Scan for
-  `button[name^="_action_href"]` to reach it (gotcha 18) rather than calling a setting unreachable.
+  `button[name^="_action_href"]` to reach it (gotcha 19) rather than calling a setting unreachable.
 - **Add the new device before removing the old.** A required input taken empty will not re-commit via
-  automation, and Done then rejects the page as incomplete (gotcha 16). Keeping it populated dodges the
+  automation, and Done then rejects the page as incomplete (gotcha 17). Keeping it populated dodges the
   trap.
 - Before toggling a **large** multi-select, confirm the full selection renders — a virtualized list
-  drops the off-screen picks on Update (gotcha 20).
+  drops the off-screen picks on Update (gotcha 21).
 - In Room Lighting, a `submitOnChange` button on a `settings[...]` id is a **live action**, not
-  navigation — "Activate" switches the real lights (gotcha 19).
+  navigation — "Activate" switches the real lights (gotcha 20).
 - Room Lighting stores the turn-off sensor in **`motionsInactive`** on some instances, not `motionsOff`
   — a swap of `motions` and `motionsOff` alone misses it silently.
-- Rule Machine hides the trigger device behind **Select Trigger Events** (gotcha 21) and keeps a stale
+- Rule Machine hides the trigger device behind **Select Trigger Events** (gotcha 22) and keeps a stale
   `tDev-1` beside `tDev1`. Verify its re-point via `state.trigDevs` in the rule's `statusJson`, never the
   raw `tDev*` setting.
 
@@ -162,7 +162,7 @@ Removing the **old app** (a superseded zone controller, say) is a two-step Prime
 "Remove … now?" prompt, then a "This will remove N child device(s)…" prompt, both `button.p-confirm`
 labelled "Yes" — and it **deletes the app's owned child devices**. A dangling reference from another app does not block
 it: a stale Rule Machine `tDev-1` pointing at a deleted device is inert (`skills/_reference/playwright-ui.md`
-gotcha 21). Agent-initiated Remove/Delete clicks are refused by the auto-mode classifier regardless of
+gotcha 22). Agent-initiated Remove/Delete clicks are refused by the auto-mode classifier regardless of
 in-chat approval — the **user performs the destructive delete** (`rules/device-lifecycle.md`), after
 which a fresh retry proceeds.
 

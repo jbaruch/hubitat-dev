@@ -147,10 +147,9 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     Update writes and Done reads — not a faked event on an option.
 
     ```js
-    // browser_evaluate — set the commit signal directly, then tag Done for a real click
+    // browser_evaluate — set the commit signal directly; Done already has a stable selector
     document.querySelector('input[name="settings[plug_565]"]').value = "1246"; // id list
-    document.querySelector('button[name="_action_update"]').id = 'claude-done';
-    // then: browser_click(target: '#claude-done')
+    // then: browser_click(target: 'button[name="_action_update"]')   <- real click on Done (id=btnDone)
     ```
     Collapses each optional-input wiring from ~9 tool calls to ~3 (navigate → one evaluate → one Done
     click). **Optional only**: a `required: true` input still validates on Done via `device-btn-empty`
