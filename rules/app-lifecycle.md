@@ -30,9 +30,9 @@ def initialize(){ subscribe(motionSensor, "motion", "motionHandler") }
 
 ## Handlers that skip initialize()
 
-- `hubStartupHandler()` runs on hub startup **without** routing through `installed()`/`updated()`/`initialize()`. Any `state.*` map that `initialize()` sets up may be null when it fires, and reading it NPEs on boot (`cannot invoke method keySet() on null object`).
+- `hubStartupHandler()` runs on hub startup **without** routing through `installed()`/`updated()`/`initialize()`. Any `state.*` value that `initialize()` sets up may be null when it fires, and reading it NPEs on boot (`cannot invoke method keySet() on null object`).
 - The same trap catches any entry point the platform invokes before the first **Done** or after a state reset — `hubStartupHandler`, a subscribed event, a scheduled job.
-- Do not initialize state maps in `initialize()` alone. Put the setup in a small helper, call it from **every** entry point that reads that state, or null-guard at the read site (`rules/groovy-gotchas.md`).
+- Do not initialize `state.*` collections in `initialize()` alone — a Map and a List both start null (the example seeds each). Put the setup in a small helper, call it from **every** entry point that reads them, or null-guard at the read site (`rules/groovy-gotchas.md`).
 
 ```groovy
 private ensureState() {
@@ -44,7 +44,7 @@ private reconcile()     { ensureState(); /* reached from hubStartupHandler(), wh
 def hubStartupHandler() { reconcile() }
 ```
 
-- Test it: a spec that drives the startup/handler path on a freshly-loaded, **never-initialized** instance and asserts no NPE catches this deterministically — it fails before the guard, passes after (`rules/testing-standards.md`).
+- Test it: a spec that drives the startup/handler path on a freshly-loaded, **never-initialized** instance and asserts no NPE catches this deterministically — it fails before the guard, passes after (`skills/test`).
 
 ## Subscriptions & scheduling
 
