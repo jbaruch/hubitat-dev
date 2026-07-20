@@ -20,6 +20,7 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Act with real `browser_click` / `browser_type`. `element.click()` inside `browser_evaluate` does not fire jQuery/Vue/MDL handlers.
 - Snapshot `ref`s are unreliable on Hubitat's MDL `<div>` controls — a `ref` resolves to a wrapper and the click hits a container, silently. Tag the real control by walking up from its hidden `settings[...]` input, then click the tag: `skills/_reference/playwright-ui.md` gotchas 10–12. Tagging in `browser_evaluate` is not the banned synthetic click.
 - A device input persists to the hub on the page's **Done** over a WebSocket, not over observable HTTP. Forcing `.checked` or dispatching synthetic events does not persist.
+- An **optional** device input needs no picker — set its hidden `settings[<name>]` value directly and Done serializes it; the empty→filled validation only gates **required** inputs (`skills/_reference/playwright-ui.md` gotcha 14; the required-input validation trap is gotcha 17).
 - Commit device inputs **before** filling the sections a `submitOnChange` gates — the dependent controls do not exist until the picker's Update commits.
 
 ## Verify every mutation

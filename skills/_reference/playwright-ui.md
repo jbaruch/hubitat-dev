@@ -138,7 +138,27 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     comma-separated id list after (`"35,33,26,21,…"`). Cheapest possible check, and it catches
     gotcha 10 immediately. `.value` order is **selection order, not sorted** — compare as a set.
 
-14. **`submitOnChange` device inputs gate the sections below them.** A device input with
+14. **For an *optional* device input, skip the picker — write the hidden `settings[<name>]` value and let Done serialize it.**
+    Done (`button[name="_action_update"]`) serializes the form's hidden `input[name="settings[<name>]"]`
+    values over the websocket, so an optional device input needs no picker: set the hidden input's
+    `.value` to the device id (comma-separated for multi-select — the same string the picker writes) in
+    `browser_evaluate`, then a real `browser_click` on Done. This is **not** the synthetic-event trap
+    (gotchas 2, 4): you write the real commit-signal field (gotcha 13), the exact value the picker's own
+    Update writes and Done reads — not a faked event on an option.
+
+    ```js
+    // browser_evaluate — set the commit signal directly; Done already has a stable selector
+    document.querySelector('input[name="settings[plug_565]"]').value = "1246"; // id list
+    // then: browser_click(target: 'button[name="_action_update"]')   <- real click on Done (id=btnDone)
+    ```
+    Collapses each optional-input wiring from ~9 tool calls to ~3 (navigate → one evaluate → one Done
+    click). **Optional only**: a `required: true` input still validates on Done via `device-btn-empty`
+    (gotcha 17), which this does not flip — a required-empty input stays rejected, so use the real picker
+    to reach `device-btn-filled` (or edit an already-filled one). Verify at the source, never the UI:
+    after Done, `configure/json/<appId>/<page>` shows `settings[plug_565] = {"1246":"<label>"}` and every
+    other hidden `settings[*]` untouched (verified 2.5.1.131, 14 single-plug zones).
+
+15. **`submitOnChange` device inputs gate the sections below them.** A device input with
     `submitOnChange: true` re-renders its dependent sections only **after its picker's Update
     commits** — not when the option is clicked. Dropdowns built from the selected device's data do
     not exist before then, so there is nothing to `selectOption`. **Order matters: commit the device
@@ -146,7 +166,7 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     later `submitOnChange` re-render (verified: five dropdown values intact after a second device
     picker committed).
 
-15. **Opening an app config page creates a transient instance — protect it with a second tab.**
+16. **Opening an app config page creates a transient instance — protect it with a second tab.**
     Opening a user app from **Add user app** lands on `/installedapp/configure/<newId>/mainPage` with
     a real id, but nothing persists until **Done**, and the form carries `_cancellable: false`.
     **Never navigate the configuring tab.** To touch another app mid-configuration, open a second tab
@@ -154,7 +174,7 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     Config survived the tab switch intact (verified 2.5.1.128). Same family as the built-in app's
     transient instance discarded on Cancel (`skills/_reference/endpoints.md`, `/installedapp/direct/`).
 
-16. **A fresh *required* device input will not commit via automation — the empty→filled transition
+17. **A fresh *required* device input will not commit via automation — the empty→filled transition
     fails silently.** The picker mechanism (gotchas 10–13) works for **edits** but not for a first
     fill. An empty required picker starts `device-btn-empty`; after checking devices and clicking
     Update, the hidden `input[name="settings[<name>]"]` **does** take the id list (gotcha 13's commit
@@ -164,14 +184,14 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     swap, add the new device before removing the old** — the input never goes empty, stays
     `device-btn-filled`, and the trap never fires. This is the biggest limiter here: automated app
     *install* (empty required input) is unreliable while *edits* are fine (verified 2.5.1.131). If you
-    author the app, declaring the input `required: false` sidesteps this entirely (gotcha 23).
+    author the app, declaring the input `required: false` sidesteps this entirely (gotcha 24).
 
-17. **`is-invalid` on a text input is a red herring.** An MDL text input keeps `class="… is-invalid"`
+18. **`is-invalid` on a text input is a red herring.** An MDL text input keeps `class="… is-invalid"`
     on an app that saved fine, and it does not block Done. Do not chase it — in a failed Done the real
-    blocker is gotcha 16's `device-btn-empty`, not a text field's `is-invalid` (cost real time treating
+    blocker is gotcha 17's `device-btn-empty`, not a text field's `is-invalid` (cost real time treating
     it as the blocker).
 
-18. **Device inputs are often on sub-pages reached by `hrefElem` buttons, not `<a>` links.** The target
+19. **Device inputs are often on sub-pages reached by `hrefElem` buttons, not `<a>` links.** The target
     input is frequently not on the app's main page. Scan for `button[name^="_action_href"]` to discover
     sub-pages instead of concluding a setting is unreachable. Room Lighting:
     `button[name="_action_href_name|onMeansPage|N"]` → `motions`; `…|offMeansPage|N` → `motionsOff`.
@@ -179,7 +199,7 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     `group1.devices`. Return via `_action_previous` ("Done with …") or `_action_next` (`id=btnNext`);
     final commit is the main-page `_action_update` (`id=btnDone`).
 
-19. **Room Lighting has live-trigger buttons that look like navigation — they have side effects.**
+20. **Room Lighting has live-trigger buttons that look like navigation — they have side effects.**
     The buttons with id `settings[activate]` ("Activate") and `settings[turnOff]` ("Turn Off") are
     `submitOnChange` buttons that **physically switch the room's lights** and flip the page title to
     "(Active)". Target them as `button[id="settings[activate]"]` — the bracketed id is not a CSS
@@ -188,7 +208,7 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     navigation (safe); a `submitOnChange` on a `settings[...]`-id button is a **live action**. Read the
     class and name before clicking any unfamiliar Room Lighting button.
 
-20. **Large pickers: gate on virtualization before toggling.** One monitored-device input held 457
+21. **Large pickers: gate on virtualization before toggling.** One monitored-device input held 457
     devices. Before editing, open the picker and compare the rendered `label.is-checked` count to the
     known selection count. 481 checkboxes rendered with exactly 457 checked ⇒ the full set is in the
     DOM, not virtualized ⇒ Update reads all of it and toggling two is safe. If fewer render than are
@@ -196,11 +216,11 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     full baseline from `configure/json` first and diff after: the 457-device edit was verified to change
     exactly `{old}→{new}`, 455 others untouched.
 
-21. **Rule Machine trigger devices hide behind Select Trigger Events, and RM keeps two settings —
+22. **Rule Machine trigger devices hide behind Select Trigger Events, and RM keeps two settings —
     verify via `state.trigDevs`.** The trigger device is not on the rule's main page: **Select Trigger
     Events** (`button[name="_action_href_name|selectTriggers|N"]`) → click the existing trigger row (a
     `<div>` reading e.g. "mZone-X motion reports active") → a `Motion sensors` picker bound to
-    `settings[tDev1]`; swap it like any picker (add-new-before-remove-old, gotcha 16). **RM stores two
+    `settings[tDev1]`; swap it like any picker (add-new-before-remove-old, gotcha 17). **RM stores two
     device settings, `tDev1` and `tDev-1`** — the trigger editor updates only `tDev1`, while `tDev-1` is
     a staging leftover that keeps pointing at the old device. The authoritative live subscription is
     **`state.trigDevs`** (e.g. `{"1580:Motion":["1"]}`), with `state.trigDevsW` listing withdrawn
@@ -209,7 +229,7 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     but that reference is **inert** (no live subscription) — deleting the old device is safe and RM keeps
     firing on the new one (verified 2.5.1.131).
 
-22. **`browser_run_code_unsafe` runs *real* interactions — batch bulk re-points with it.**
+23. **`browser_run_code_unsafe` runs *real* interactions — batch bulk re-points with it.**
     `mcp__playwright__browser_run_code_unsafe` runs genuine Playwright calls (`page.locator(sel).click()`,
     `page.goto`, `page.waitForTimeout`) in a loop inside one tool call. These are **trusted events that
     persist exactly like `browser_click`** — not the synthetic `element.click()` gotcha 4 forbids. It
@@ -224,15 +244,15 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     - `page.url()` reads **stale** right after a confirm-Yes navigation — verify via HTTP
       (`statusJson`/`fullJson`), not the returned url.
 
-23. **To make an app scriptably installable, author its device inputs `required: false` — it sidesteps
-    gotcha 16.** Gotcha 16's empty→filled trap blocks a scripted install of any app with a *required*
+24. **To make an app scriptably installable, author its device inputs `required: false` — it sidesteps
+    gotcha 17.** Gotcha 17's empty→filled trap blocks a scripted install of any app with a *required*
     device input. An **optional** device input clears Done validation under automation, and the picker's
     populated hidden-input value still persists on Done even while the button stays `device-btn-empty`
     (verified: the instance saved all members and created its child device). A member-less instance is
     then harmless and inert. This does not rescue a third-party app whose input is already required —
-    there it stays gotcha 16 (verified 2.5.1.131).
+    there it stays gotcha 17 (verified 2.5.1.131).
 
-24. **Swap a device's driver in place — it keeps the id, DNI, and every app reference.** Changing an
+25. **Swap a device's driver in place — it keeps the id, DNI, and every app reference.** Changing an
     existing device's Type re-points nothing: consumers (Room Lighting, Device Activity Check, Rule
     Machine) keep working transparently, which makes it the clean fix for a device on the wrong driver
     (e.g. off the auto-inactivating built-in Virtual Motion Sensor, `rules/driver-lifecycle.md`). On the
@@ -242,21 +262,22 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     `.p-dropdown-filter`, click the `.p-dropdown-item` matching the driver name exactly, then page
     **Save**. The swap re-runs the new driver's `installed()`, so the device's states reset — reconcile
     the owning app after (its `updated()` re-derives and re-drives). Batches cleanly via
-    `browser_run_code_unsafe` (gotcha 22) — 19 devices swapped this way (verified 2.5.1.131).
+    `browser_run_code_unsafe` (gotcha 23) — 19 devices swapped this way (verified 2.5.1.131).
 
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
-`skills/_reference/endpoints.md`); gotchas 10–15 verified on 2.5.1.128 while installing a user app instance
+`skills/_reference/endpoints.md`); gotchas 10–13 and 15–16 verified on 2.5.1.128 while installing a user app instance
 end-to-end (2 device radios, 25 contact-sensor checkboxes across two multi-selects, 5 enum dropdowns,
-Done). Gotchas 16–20 verified on 2.5.1.131 while re-pointing two live apps' device inputs (Room
-Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 21–24 verified on
+Done). Gotchas 17–21 verified on 2.5.1.131 while re-pointing two live apps' device inputs (Room
+Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 22–25 verified on
 2.5.1.131 across a 19-zone Zone Motion Controllers → custom-app migration (Rule Machine trigger
 re-pointing, `browser_run_code_unsafe` batching, `required: false` scriptable install, in-place driver
-swap). Gotchas 1, 2, 5,
-10, 16, 19 and 22 are the load-bearing ones — each was reached the expensive way in real usage; 5
-corrupted a live scene, 10 silently discarded a setting while the page looked correct, 16 blocks
-automated install of any app with a required device input, 19 switched real lights on, and 22 is the
+swap). Gotcha 14 verified on 2.5.1.131 while wiring 15 app instances' optional plug inputs on Zone
+Motion Watchdog (14 single-plug zones, hidden value + Done, no picker). Gotchas 1, 2, 5,
+10, 17, 20 and 23 are the load-bearing ones — each was reached the expensive way in real usage; 5
+corrupted a live scene, 10 silently discarded a setting while the page looked correct, 17 blocks
+automated install of any app with a required device input, 20 switched real lights on, and 23 is the
 only reason the 19-zone migration was practical.
 
 **Everything here fails silently, which is why 13 is the habit that pays**: a `ref` that clicks a
