@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **`hubStartupHandler()` skips `initialize()` — guard `state.*` or it NPEs on boot** (`rules/app-lifecycle.md`, closes #47). A shipped-app failure surfaced by Error Monitor: `java.lang.NullPointerException: cannot invoke method keySet() on null object (hubStartupHandler)`. The app set up its state maps in `initialize()`, but `hubStartupHandler()` runs on hub startup **without** routing through `installed()`/`updated()`/`initialize()`, so on a boot where the map was still null a shared `reconcile()` reading `state.activeSince.keySet()` blew up. The same trap catches any entry point the platform can invoke before the first Done or after a state reset — a subscribed event, a scheduled job. `app-lifecycle` gains a "Handlers that skip initialize()" section next to the reinitialize idiom: put state-map setup in a small `ensureState()` helper called from every entry point that reads it (or null-guard at the read site), and test it with a spec that drives the startup path on a never-initialized instance and asserts no NPE — it fails before the guard, passes after.
+
 ## 0.1.24 — 2026-07-19
 
 ### Added
