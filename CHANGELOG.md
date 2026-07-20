@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **Skip the picker for an *optional* device input — write the hidden value and let Done serialize it** (`skills/_reference/playwright-ui.md` 14, `rules/ui-automation.md`, closes #51). From wiring 15 app instances' optional `capability.switch` plug inputs (`plug_<id>` on Zone Motion Watchdog) via the Playwright MCP on 2.5.1.131: the app config page's **Done** button (`button[name="_action_update"]`) serializes the form's hidden `input[name="settings[<name>]"]` values over the websocket, so an optional device input needs no picker at all — set the hidden input's `.value` to the id list in `browser_evaluate`, click Done, and it persists. Collapses each input from ~9 tool calls to ~3. It is **not** the gotcha 2/4 synthetic-event trap: you write the real commit-signal field (gotcha 13), the exact value the picker's own Update writes and Done reads. Scope limit — **optional inputs only**: a `required: true` input still validates on Done via `device-btn-empty` (gotcha 17), which this does not flip, so a required-empty input stays rejected (the #41 empty→filled trap) — use the real picker there, or edit an already-filled one. Verified 2.5.1.131 across 14 single-plug zones: the value survives Done in `configure/json` and every other hidden `settings[*]` stays untouched. The new gotcha 14 lands right after gotcha 13 (its direct consequence), renumbering the former 14–24 to 15–25.
+
 ## 0.1.25 — 2026-07-20
 
 ### Added
