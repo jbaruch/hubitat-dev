@@ -66,14 +66,6 @@ This file is updated when running `tessl install`. If a linked file is missing, 
 
 @plugins/jbaruch/coding-policy/rules/script-as-black-box.md [script-as-black-box](plugins/jbaruch/coding-policy/rules/script-as-black-box.md)
 
-## jbaruch/coding-policy — plugin-evals
-
-@plugins/jbaruch/coding-policy/rules/plugin-evals.md [plugin-evals](plugins/jbaruch/coding-policy/rules/plugin-evals.md)
-
-## jbaruch/coding-policy — author-model-declaration
-
-@plugins/jbaruch/coding-policy/rules/author-model-declaration.md [author-model-declaration](plugins/jbaruch/coding-policy/rules/author-model-declaration.md)
-
 ## jbaruch/coding-policy — stateful-artifacts
 
 @plugins/jbaruch/coding-policy/rules/stateful-artifacts.md [stateful-artifacts](plugins/jbaruch/coding-policy/rules/stateful-artifacts.md)
