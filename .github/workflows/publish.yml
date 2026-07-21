@@ -1,54 +1,26 @@
 name: Publish Plugin
 
+# Thin caller for the canonical fleet publish pipeline
+# (jbaruch/coding-policy#206). Display name preserved for run-name watchers.
+
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   id-token: write
   contents: write
-
-concurrency:
-  group: publish-plugin
-  cancel-in-progress: false
+  pull-requests: write
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        with:
-          # Full history so the changed-skills review can diff github.event.before..HEAD.
-          fetch-depth: 0
-      - uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
-        with:
-          python-version: "3.11"
-      - name: Install Tessl CLI
-        uses: tesslio/setup-tessl@25ec223fc0da33b41b8044ff5ab2b85235f4f91e # v2
-        with:
-          token: ${{ secrets.TESSL_TOKEN }}
-      - name: Plugin lint
-        run: tessl plugin lint
-      - name: Install dev tooling
-        run: pip install -r requirements-dev.txt
-      - name: Pyright (zero-findings gate)
-        run: pyright skills/_scripts/
-      - name: Unit tests
-        run: python -m unittest discover -s skills/_scripts/tests -p 'test_*.py'
-      # Reviews only the skills whose files changed in this push, against the
-      # latest published jbaruch/coding-policy. `credit-outage: skip` skips the
-      # affected skill on a tessl out-of-credits (403) outage (flagged in the
-      # run summary + the action's unreviewed-skills output); every other
-      # review failure still hard-fails. De-vendored now that the native input
-      # exists (jbaruch/coding-policy#188 / #190).
-      - name: Skill review (changed only)
-        uses: jbaruch/coding-policy/.github/actions/skill-review@3e3f74e90f1ff6ae283fedc51a7191d1b628b543
-        with:
-          threshold: '85'
-          credit-outage: 'skip'
-      - name: Stamp CHANGELOG with the version being published
-        uses: jbaruch/coding-policy/.github/actions/stamp-changelog@2d30094f068c6793b572e8fd802c598cc442a4c0 # main @ 2026-07-14
-      - uses: tesslio/patch-version-publish@d1363877846ebf6bc09e032e2dc8612f1d7e38dd # v1
-        with:
-          token: ${{ secrets.TESSL_TOKEN }}
+    uses: jbaruch/coding-policy/.github/workflows/publish-plugin.yml@b7eb9d08b78f72810891aa5fe7bf3e4fa6eb55f6
+    secrets:
+      TESSL_TOKEN: ${{ secrets.TESSL_TOKEN }}
+    with:
+      python-version: '3.11'
+      pre-publish-script: .github/pre-publish.sh
+      stamp-changelog: true
+      skill-review-credit-outage: skip
