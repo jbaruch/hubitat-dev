@@ -18,3 +18,4 @@ __pycache__/
 .github/dependabot.yml
 requirements-dev.txt
 pyrightconfig.json
+.github/pre-publish.sh
