@@ -1,6 +1,6 @@
 {
   "name": "jbaruch/hubitat-dev",
-  "version": "0.1.41",
+  "version": "0.1.42",
   "description": "Context for developing and debugging Hubitat Elevation apps, drivers, and hub environment — sandbox constraints, lifecycle idioms, capability contracts, plus grounded deploy/log-tail/lint mechanisms.",
   "private": false,
   "rules": "rules/",

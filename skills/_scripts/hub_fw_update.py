@@ -64,7 +64,10 @@ from hubclient import HubError, resolve_base_from_args  # noqa: E402
 
 POLL_SECS = 15
 STALL_SECS = 240          # abort a flash if percent has not advanced for this long (at ANY %)
-XFER_TIMEOUT = 20 * 60    # hard ceiling per flash
+XFER_TIMEOUT = 35 * 60    # hard backstop per flash; the no-progress watchdog is the real hang guard,
+#                           so this stays generous — a slow-but-still-advancing transfer (marginal
+#                           link) must not be killed at an artificial ceiling (a ZEN04/Leviton at
+#                           ~-90 dBm hit 93% at the old 20 min ceiling and was failed one step short)
 VERIFY_TIMEOUT = 4 * 60   # post-reboot re-interview ceiling
 CANARY_WINDOW = 75        # seconds to watch for ANY node's lastTime to advance (radio-alive)
 REBOOT_SETTLE = 150       # seconds for zwaveJS to re-init (interview all nodes) after a reboot

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.42 — 2026-07-22
+
+### Fixed
+
+- **`hub_fw_update.py` gave up on a slow device one step short of the finish** (`skills/_scripts/hub_fw_update.py`). The per-flash `XFER_TIMEOUT` hard ceiling was 20 min, but a marginal-link Leviton/ZEN04 (~−90 dBm) transfers slowly — one hit the ceiling at **93%** and was logged `failed`, yet the device **completed the OTA on its own** moments later and re-interviewed at the target version (confirmed: the very next idempotent run `SKIP`ped it as already-current). The ceiling is only a backstop; the **no-progress watchdog** (abort if `percent` stalls at any level) is the real hang guard, so a slow-but-still-advancing transfer must not be killed at an artificial limit. Raised to 35 min. Fourth and final live-hardened tuning (0.1.39 reboot token, 0.1.40 only-after-failure, 0.1.41 any-node/wide-window canary, 0.1.42 generous ceiling).
+
 ## 0.1.41 — 2026-07-22
 
 ### Fixed
