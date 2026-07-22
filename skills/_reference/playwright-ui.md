@@ -362,12 +362,13 @@ Materialize `<ul>` a human clicks). Set the native select directly and skip the 
 
 - `browser_select_option` on the native `<select multiple>`, values = the **display names**
   (`["Ecobee Suite", "Homebridge v2", …]`).
-- **Verify against the native select's `selectedOptions`, not the Materialize `<ul>`** — the cosmetic
-  list does **not** repaint after `selectOption` (`li.is-checked` stays empty). Same principle as gotcha
-  1: trust the framework's authoritative selection state, not the cosmetic class. Unlike gotcha 4's
-  Vue-wrapped `<select>` (where `select_option` never registers), here it **does** persist — once you
-  dispatch the events below.
-- Fire `change` (and `input`) on the select so HPM's submit picks it up:
+- **Verify against the native select's `selectedOptions`, not the Materialize `<ul>`** — the Materialize
+  list does **not** repaint after `browser_select_option` (`li.is-checked` stays empty). Same principle
+  as gotcha 1 — read whichever surface the framework treats as authoritative, not whichever merely looks
+  selected; there that surface happens to be the class `label.is-checked`, here it is the native
+  `selectedOptions` and the Materialize `<ul>` is the stale one. Unlike gotcha 4's Vue-wrapped `<select>`
+  (where `browser_select_option` never registers), here it **does** persist — once you dispatch the event below.
+- Fire a `change` event on the select so HPM's submit picks it up:
   `sel.dispatchEvent(new Event('change', {bubbles:true}))`.
 - Each `option.value` is the package's **`packageManifest.json` raw URL** (author-identifying), not the
   display text — read it to confirm each selection maps to the intended author/package
