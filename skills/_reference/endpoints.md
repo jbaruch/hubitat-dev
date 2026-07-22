@@ -129,17 +129,27 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 | Endpoint | Body / params | Effect |
 |----------|---------------|--------|
 | `POST /hub/zwave/nodeRemove` | `zwaveNodeId=<decimalNodeId>` (`application/x-www-form-urlencoded`, no CSRF token) | Force-removes a **FAILED** Z-Wave orphan → 302 to `/hub/zwaveInfo`; the node drops out of `/hub/zwaveDetails/json`. Removal is **async** — poll the census, don't assume instant |
+| `GET /hub/zwaveRepair2?resetStats=false&maxHealth=10` | UI defaults; other values untested | Starts a **full Z-Wave network rebuild** (zwaveJS) → 200. Poll with the two below (2026-07-22) |
+| `GET /hub/zwaveRepair2Status` | — | Rebuild progress `{stage, html}`; `html` lists `Pending` / `Skipped` node ids in **hex** (`57` = node 87) (2026-07-22) |
+| `GET /hub/checkZwaveRepairRunning` | — | `{"isZWaveNetworkHealRunning":"true"}` — whether a rebuild is in progress (2026-07-22) |
 | `POST /device/runmethod` | JSON `{"id":<deviceId>,"method":"<command>","args":[<secondaryValues>]}` | Sends a device command **without a Maker API app or token** → 200. `args` is the ordered command params (`setLevel` → `[level, duration]`) |
 | `POST /installedapp/disable` | JSON `{"id":<appId>,"disable":<bool>}` | Enables (`false`) / disables (`true`) any app instance → 200 `{"result":<bool>}` (verified 2026-07-21) |
 | `GET /installedapp/createchild/hubitat/<ChildAppName>/parent/<parentAppId>` | path-encoded `<ChildAppName>` (e.g. `Room%20Lights`) | Creates a **parent/child** app instance → 302 to `/installedapp/configure/<newId>/mainPage` (2026-07-22) |
 | `GET /installedapp/create/<appTypeId>` | `<appTypeId>` from `/hub2/appsList` `userAppTypes[].id` | Creates a **standalone** user-app instance → 302 to the transient configure page (2026-07-22) |
 | `GET /device/listJson?capability=<capability.foo[,capability.bar]>` | capabilities comma-joined | Capability-filtered device list `[{id, displayName, …}]` — the list the classic `.btn-device` picker fetches; enumerate an input's candidate devices without the UI (2026-07-22) |
+| `GET /device/addToMesh/<deviceId>` | — | **Hub Mesh: share** a local device to the mesh (run on the **source** hub) → 200; the device joins `sharedDevices[]` (2026-07-22) |
+| `GET /device/createLinked/<sourceHubId>/<sourceDeviceId>` | `<sourceHubId>` = peer hub UUID (`hubMeshJson` `hubId` / `sharedDevices[].sourceHubId`) | **Hub Mesh: link** a peer-shared device (run on the **destination** hub) → 200; mints a new local linked device bound to the source (2026-07-22) |
+| `GET /device/hubMeshFullRefreshNow` | — | Hub Mesh full resync (either hub) → 200; does **not** by itself link available devices (2026-07-22) |
+
+**Hub Mesh sharing is two-sided.** The *source* hub shares a device (`addToMesh`); the *destination* hub must then explicitly **link** it (`createLinked`) — a shared device does not auto-appear on the destination, and neither a Linked-devices refresh nor `hubMeshFullRefreshNow` links it. The Hub Mesh UI lives at `/device/hubMesh` (**not** `/hub2/hubMesh`, which 404s). **Un-share / un-link are not yet captured** — `removeFromMesh` and a `removeLinked` counterpart are likely but unverified; do not assume the path. Read side is `/hub2/hubMeshJson` (Hub mesh section below); this grounds the cross-hub re-home in `skills/device-migration/SKILL.md`.
 
 **Instance creation is transient.** `createchild` (parent/child, e.g. Room Lighting) and `create` (standalone user app) both land on `/installedapp/configure/<newId>/mainPage` that persists only on **Done** (`_action_update`) and is discarded on Cancel — the parent/child and standalone companions to `GET /installedapp/direct/<builtInAppType>` for built-in apps (above). The UI-drive mechanics for filling and committing those config pages are in `skills/_reference/playwright-ui.md` (gotchas 16, 27–28).
 
 **`nodeRemove` is guarded to FAILED orphans only.** Verified 23× live on nodes with no bound `deviceId`, each confirmed by census diff against `/hub/zwaveDetails/json`. Behavior on a healthy/OK node (strict `removeFailedNode` vs. general remove) is **untested** — gate every call on `present + no deviceId + nodeState:FAILED`, and never POST a real device id.
 
 **`runmethod` is the "flash a stale device to wake it" primitive** — verified `{"id":389,"method":"on","args":[]}` turned a plug on and flipped its Z-Wave `nodeState` FAILED→OK.
+
+**Z-Wave rebuild is gated by node type.** The per-node "Rebuild route" action is offered only for **mains / always-listening** nodes (repeaters, plugs, lamps); **sleepy battery** nodes (e.g. a door lock) show only Refresh · State — no on-demand route rebuild. The global rebuild (`zwaveRepair2`) is the only lever that touches a sleepy node, and its route rebuilds **on its next wake** — it sits in the status `Pending` list and completes async. zwaveJS backend only (the "Rebuild network" label); legacy uses different wording. For a marginal battery node the durable fix is RF/topology — a repeater — not a repair click (`rules/zwave-zigbee-mesh.md`).
 
 ## Z-Wave & Zigbee mesh detail (undocumented — grounded 2026-07-15)
 
@@ -169,9 +179,10 @@ node read as 5.02 h on `America/Chicago`). The zone is `timeZone` in `GET /hub/d
 
 ## Hub mesh (undocumented — grounded 2026-07-16)
 
-`GET /hub2/hubMeshJson` — the hub's own peer table. Hub mesh carries **commands** between hubs, so a
+`GET /hub2/hubMeshJson` — the hub's own peer table (read side). Hub mesh carries **commands** between hubs, so a
 peer with a stale record drops them while every radio metric stays green; `skills/_scripts/hub_mesh.py`
-analyzes it and the `mesh-health` skill reads it.
+analyzes it and the `mesh-health` skill reads it. The write side — share (`addToMesh`) and link
+(`createLinked`) a device — is in the UI-fired requests section above.
 
 | Field | Shape |
 |-------|-------|
