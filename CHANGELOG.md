@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **Hub Mesh: share + link a device over HTTP** (`skills/_reference/endpoints.md`, closes #70). Reverse-engineered by driving Settings → Hub Mesh with Playwright across two C-8 Pro hubs (2.5.1.132, Hub Security off, 2026-07-22). The Hub Mesh UI lives at `/device/hubMesh` (**not** `/hub2/hubMesh`, which 404s), and sharing is **two-sided**: the *source* hub shares a device (`GET /device/addToMesh/<deviceId>` → joins `sharedDevices[]`) and the *destination* hub must explicitly **link** it (`GET /device/createLinked/<sourceHubId>/<sourceDeviceId>` → mints a new local linked device). A shared device does not auto-appear on the destination — neither a Linked-devices refresh nor `GET /device/hubMeshFullRefreshNow` links it. `<sourceHubId>` is the peer hub UUID from `hubMeshJson`. Added to the UI-fired requests table with the two-sided note and a write-side cross-ref from the Hub mesh read section; grounds the cross-hub re-home in `device-migration`. Un-share / un-link (`removeFromMesh` and a `removeLinked` counterpart) flagged as not-yet-captured — do not assume the path.
+
 ## 0.1.42 — 2026-07-22
 
 ### Fixed
