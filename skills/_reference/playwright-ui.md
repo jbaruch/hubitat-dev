@@ -185,6 +185,11 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     `device-btn-filled`, and the trap never fires. This is the biggest limiter here: automated app
     *install* (empty required input) is unreliable while *edits* are fine (verified 2.5.1.131). If you
     author the app, declaring the input `required: false` sidesteps this entirely (gotcha 24).
+    **Picker/build-scoped:** this empty→filled failure is specific to the picker you are on — reproduced
+    on the 2.5.1.131 re-point picker and the inline-Vue picker (gotcha 26), but **not** on the classic
+    `.btn-device` picker RL's own inputs use (gotcha 27, RL v1.2.3), where a fresh *required* input
+    commits cleanly and scripted RL installs are viable. Confirm the flip empirically per input rather
+    than assuming the trap.
 
 18. **`is-invalid` on a text input is a red herring.** An MDL text input keeps `class="… is-invalid"`
     on an app that saved fine, and it does not block Done. Do not chase it — in a failed Done the real
@@ -196,8 +201,10 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     sub-pages instead of concluding a setting is unreachable. Room Lighting:
     `button[name="_action_href_name|onMeansPage|N"]` → `motions`; `…|offMeansPage|N` → `motionsOff`.
     Device Activity Check: `button[name="_action_href_pageDeviceGroup1Href|pageDeviceGroup|1"]` →
-    `group1.devices`. Return via `_action_previous` ("Done with …") or `_action_next` (`id=btnNext`);
-    final commit is the main-page `_action_update` (`id=btnDone`).
+    `group1.devices`. The `|N` index **shifts on every `submitOnChange` partial re-render** (committing
+    one input renumbers the sub-page buttons) — re-scan `button[name^="_action_href"]` before every
+    navigation, never hardcode N. Return via `_action_previous` ("Done with …") or `_action_next`
+    (`id=btnNext`); final commit is the main-page `_action_update` (`id=btnDone`).
 
 20. **Room Lighting has live-trigger buttons that look like navigation — they have side effects.**
     The buttons with id `settings[activate]` ("Activate") and `settings[turnOff]` ("Turn Off") are
@@ -270,6 +277,64 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     - **The switch pickers `settings[switchesD]`/`settings[switchesOE]` render as an *inline* Vue list, not `#deviceListModal`.** The button is `button[data-elemname="switchesD"][data-target="#deviceListModal"]`, but `#deviceListModal` is a **dead empty shell** — the real list (Filter box + scrollable MDL checkboxes `input[name="<elemname>"][value="<devId>"]` + a `Select all / Unselect all / Update` footer) mounts **inline under the button**. Recipe: (a) real-click the `data-elemname` button to open; (b) **filter with real keystrokes** — `page.keyboard.type("<name>")`, **not** `locator.fill()`, which sets the value without triggering the Vue filter and leaves all rows rendered; (c) **check the row by coordinate** — read the label's `getBoundingClientRect()` and `page.mouse.click(left+10, midY)`; a `label`-*locator* click auto-scrolls and the dropdown treats it as an outside-click and **collapses**; (d) **click `Update` by coordinate** — it is a `div.mdl-button` reading "Update", **not** a `<button>` (match on text / any element), and it flips the button `device-btn-empty`→`device-btn-filled`; (e) Done up the chain (`_action_previous` ×2 → `_action_update`), then verify via `configure/json` (`page.url()` reads stale right after — gotcha 23).
     - **Both `switchesD` and `switchesOE` are required once their enum is set.** A half-set guard (enum set, device empty) makes the RL config page **self-reject with a validation alert on load**, which blocks further tool calls until dismissed (a gotcha-17 variant). The hidden-value shortcut (gotcha 14) can't fill them — they are required, and manually flipping the class + hidden value does not pass validation. Revert path: clear both enums via the SumoSelect close-gesture, then Done.
 
+27. **Which device picker am I on? RL's own inputs use the *classic* `.btn-device` picker (the gotcha
+    10–13 family), NOT the inline-Vue picker of gotcha 26 — and a fresh *required* input DOES commit
+    here.** Three device-picker mechanisms exist; do not assume which one is in front of you:
+    - *MDL `.device-save` picker* (gotchas 10–13) — tag-then-click, hidden `settings[<name>]` commit signal.
+    - *Classic `.btn-device` delegated picker* (this gotcha) — the same `.device-save`/hidden-input
+      family, driven by the delegated handler `$(document).on('click', '.btn-device, .btn-device-required', …)`.
+      RL's `roomDevsL`, `motions`, `switchesOnDO`, … render as `button[data-elemname="<name>"]`; a real
+      click `$.getJSON('/device/listJson?capability=…')`, builds MDL rows into `#<name>-options`
+      (`input[name="<name>"][value="<id>"]`, `id="<name><id>"`), pre-checks selected via `is-checked`,
+      then `fadeIn()`s the sibling `.device-list`.
+    - *Inline-Vue picker* (gotcha 26) — RL activation-options switch guards `switchesD`/`switchesOE`
+      **only**; keystroke filter + coordinate click, and a label-click **collapses** it.
+
+    Recipe for the classic picker (verified RL v1.2.3, 2026-07-21): real `browser_click` on
+    `button[data-elemname="<name>"]` → `page.waitForFunction` until `#<name>-options input[name="<name>"]`
+    count > 0 (rows build from the fetch — do **not** pre-reveal via `style.display`) → real click
+    `label[for="<name><id>"]` to check it (a label-click does **not** collapse this picker, unlike the
+    Vue one) → tag + real-click the `.device-save` "Update" (scope per gotcha 12) → verify the hidden
+    `settings[<name>]` holds the id and the button flipped `device-btn-empty`→`device-btn-filled`
+    (gotcha 13). **Gotcha-17 exception:** a fresh **required** input (`btn-device-required`) **does**
+    flip empty→filled on first fill and Done accepts it (verified on `motions` and `switchesOnDO`, both
+    starting empty+required) — so **scripted fresh RL installs are viable** here.
+
+28. **Building a new Room Lighting instance end-to-end.** Verified RL "Version 1.2.3 (6/26/2025)",
+    2.5.1.x, 2026-07-21, across an 8-rule RM motion-lighting → RL migration.
+    - **Create the child:** `GET /installedapp/createchild/hubitat/Room%20Lights/parent/<parentId>` (the
+      app-type segment is the URL-encoded name `Room Lights`; the
+      parent RL app id is per-hub) → lands on `/installedapp/configure/<newId>/mainPage`, transient
+      until **Done** (`_action_update`, `id=btnDone`); Cancel discards (transient-instance family, gotcha 16).
+    - **Page tree**, each reached by an `_action_href` button (gotcha 19 — re-scan for the shifting `|N`):
+      mainPage (`roomDevsL` lights, `origLabel` name) → `onMeansPage` (Means to Activate) → `optionsOnPage`
+      (Activate Lights Options); `offMeansPage` (Means to Turn Off) → `optionsOffPage` (Turn Off Lights Options).
+    - **SumoSelect enums commit on dropdown close, exactly as gotcha 26's `onDisable`/`onEnable`:**
+      `onMeans`, `onConds`, `modeXD`, `offMeans`, `modeXOff`, `offConds`. Multi-select — click each
+      `li.opt` to toggle, existing selections stay; scope via `select[name="settings[<x>]"].closest('.SumoSelect')`.
+    - **`offConds` polarity trap (near-miss, cost real care):** "*Limit Turning Off under these
+      Conditions*" lists the condition that **prevents** turn-off, so it is inverted from intuition. To
+      keep lights ON while a switch (e.g. Housekeeping) is on, set `offConds` = **"Switch is on"**
+      (reveals `switchesOnDO`, renders *"Don't Turn Off when Switches are on: <switch>"*); **"Switch is
+      off" is backwards** — it blocks turn-off while the switch is off, the normal state. Same shape on
+      activate: `onConds` = "Mode is" reveals `modeXD` labeled *"Don't Activate when mode is"*. **Always
+      read the rendered `_action_href` summary text before Done** — it states the guard in plain English
+      and catches an inverted condition.
+
+## Room Lighting: the gotchas that travel together
+
+RL knowledge is spread across the numbered list above; in build/edit order it reads as one path:
+
+1. **Create + navigate** — new child instance and its page tree (gotcha 28); sub-pages are `_action_href`
+   buttons whose `|N` index shifts on every re-render (gotcha 19).
+2. **Pick devices** — RL's own inputs (`roomDevsL`, `motions`, `switchesOnDO`) use the classic
+   `.btn-device` picker, where fresh required inputs commit (gotcha 27); **only** the activation-options
+   switch guards (`switchesD`/`switchesOE`) use the inline-Vue picker (gotcha 26).
+3. **Set conditions** — SumoSelect enums commit on dropdown close (gotchas 26, 28); watch the
+   `offConds`/`onConds` polarity and read the rendered summary before Done (gotcha 28).
+4. **Don't trip the live buttons** — `settings[activate]`/`settings[turnOff]` physically switch the room (gotcha 20).
+5. **Don't auto-recapture** — "Done with Room Lights" re-captures physical state and can overwrite a live scene (gotcha 5).
+
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
@@ -282,11 +347,15 @@ re-pointing, `browser_run_code_unsafe` batching, `required: false` scriptable in
 swap). Gotcha 14 verified on 2.5.1.131 while wiring 15 app instances' optional plug inputs on Zone
 Motion Watchdog (14 single-plug zones, hidden value + Done, no picker). Gotcha 26 verified on
 2.5.1.x (2026-07-21) wiring the "Watching Living Room TV" movie-scene switch guard on RL instances
-#918/#921 — the inline Vue picker, keystroke filter, and coordinate-clicked checkbox/Update. Gotchas 1, 2, 5,
+#918/#921 — the inline Vue picker, keystroke filter, and coordinate-clicked checkbox/Update. Gotchas
+27–28 verified on RL v1.2.3 (2.5.1.x, 2026-07-21) building a Room Lighting instance end-to-end during
+an 8-rule RM→RL migration — the classic `.btn-device` picker (fresh required inputs commit), `createchild`
+instance creation, the SumoSelect enum set, and the `offConds` polarity trap. Gotchas 1, 2, 5,
 10, 17, 20 and 23 are the load-bearing ones — each was reached the expensive way in real usage; 5
 corrupted a live scene, 10 silently discarded a setting while the page looked correct, 17 blocks
-automated install of any app with a required device input, 20 switched real lights on, and 23 is the
-only reason the 19-zone migration was practical.
+automated install where the required-input flip fails (picker/build-dependent — not the classic RL
+picker, gotcha 27), 20 switched real lights on, and 23 is the only reason the 19-zone migration was
+practical.
 
 **Everything here fails silently, which is why 13 is the habit that pays**: a `ref` that clicks a
 container, an Update that never commits, and a working page are indistinguishable on screen. Read the
