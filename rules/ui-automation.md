@@ -22,6 +22,7 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - A device input persists to the hub on the page's **Done** over a WebSocket, not over observable HTTP. Forcing `.checked` or dispatching synthetic events does not persist.
 - An **optional** device input needs no picker — set its hidden `settings[<name>]` value directly and Done serializes it; the empty→filled validation only gates **required** inputs (`skills/_reference/playwright-ui.md` gotcha 14; the required-input validation trap is gotcha 17).
 - Commit device inputs **before** filling the sections a `submitOnChange` gates — the dependent controls do not exist until the picker's Update commits.
+- Not every device picker is the MDL `device-save` picker. Newer **inline Vue** pickers (Room Lighting *activation-options* switch guards, `switchesD`/`switchesOE`) mount inline under the button, **not** in `#deviceListModal` (a dead shell): filter with real keystrokes (`locator.fill()` doesn't trigger the Vue filter) and click the checkbox and its `div.mdl-button` **Update** by coordinate — a label-locator click collapses the dropdown (`skills/_reference/playwright-ui.md` gotcha 26).
 
 ## Verify every mutation
 

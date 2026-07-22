@@ -264,6 +264,12 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     the owning app after (its `updated()` re-derives and re-drives). Batches cleanly via
     `browser_run_code_unsafe` (gotcha 23) — 19 devices swapped this way (verified 2.5.1.131).
 
+26. **RL activation-options switch guards use SumoSelect enums + an *inline* Vue picker — not `#deviceListModal`.** The "Disable/Re-enable Activation when a switch turns on/off" guard on an RL instance's *Activate Lights Options* sub-page
+    (`/installedapp/configure/<id>/mainPage/onMeansPage/optionsOnPage`) has two control types, both automatable via `browser_run_code_unsafe` (gotcha 23 — these are `page.*` calls). Verified end-to-end on #918/#921, 2.5.1.x, 2026-07-21.
+    - **Enums `settings[onDisable]`/`settings[onEnable]` are SumoSelect** (`select.SumoUnder`, wrapper `.SumoSelect`) that commit via `submitOnChange` on dropdown **close**, not per option-click: real-click `.CaptionCont` (open) → click the `li.opt` for the value → real-click `.CaptionCont` again (close). The close fires the AJAX partial re-render that persists the enum **and** reveals the dependent device picker (same reveal contract as gotcha 15).
+    - **The switch pickers `settings[switchesD]`/`settings[switchesOE]` render as an *inline* Vue list, not `#deviceListModal`.** The button is `button[data-elemname="switchesD"][data-target="#deviceListModal"]`, but `#deviceListModal` is a **dead empty shell** — the real list (Filter box + scrollable MDL checkboxes `input[name="<elemname>"][value="<devId>"]` + a `Select all / Unselect all / Update` footer) mounts **inline under the button**. Recipe: (a) real-click the `data-elemname` button to open; (b) **filter with real keystrokes** — `page.keyboard.type("<name>")`, **not** `locator.fill()`, which sets the value without triggering the Vue filter and leaves all rows rendered; (c) **check the row by coordinate** — read the label's `getBoundingClientRect()` and `page.mouse.click(left+10, midY)`; a `label`-*locator* click auto-scrolls and the dropdown treats it as an outside-click and **collapses**; (d) **click `Update` by coordinate** — it is a `div.mdl-button` reading "Update", **not** a `<button>` (match on text / any element), and it flips the button `device-btn-empty`→`device-btn-filled`; (e) Done up the chain (`_action_previous` ×2 → `_action_update`), then verify via `configure/json` (`page.url()` reads stale right after — gotcha 23).
+    - **Both `switchesD` and `switchesOE` are required once their enum is set.** A half-set guard (enum set, device empty) makes the RL config page **self-reject with a validation alert on load**, which blocks further tool calls until dismissed (a gotcha-17 variant). The hidden-value shortcut (gotcha 14) can't fill them — they are required, and manually flipping the class + hidden value does not pass validation. Revert path: clear both enums via the SumoSelect close-gesture, then Done.
+
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
@@ -274,7 +280,9 @@ Lighting + Device Activity Check) from an old zone device to a new one. Gotchas 
 2.5.1.131 across a 19-zone Zone Motion Controllers → custom-app migration (Rule Machine trigger
 re-pointing, `browser_run_code_unsafe` batching, `required: false` scriptable install, in-place driver
 swap). Gotcha 14 verified on 2.5.1.131 while wiring 15 app instances' optional plug inputs on Zone
-Motion Watchdog (14 single-plug zones, hidden value + Done, no picker). Gotchas 1, 2, 5,
+Motion Watchdog (14 single-plug zones, hidden value + Done, no picker). Gotcha 26 verified on
+2.5.1.x (2026-07-21) wiring the "Watching Living Room TV" movie-scene switch guard on RL instances
+#918/#921 — the inline Vue picker, keystroke filter, and coordinate-clicked checkbox/Update. Gotchas 1, 2, 5,
 10, 17, 20 and 23 are the load-bearing ones — each was reached the expensive way in real usage; 5
 corrupted a live scene, 10 silently discarded a setting while the page looked correct, 17 blocks
 automated install of any app with a required device input, 20 switched real lights on, and 23 is the

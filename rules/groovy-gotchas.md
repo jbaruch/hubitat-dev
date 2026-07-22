@@ -22,6 +22,19 @@ These pass the sandbox compiler and then misbehave at runtime. They are the bulk
 - A non-`required` device input is `null` until selected. `lights.on()` throws when `lights` is null.
 - Use safe-navigation (`lights?.on()`) or mark the input `required: true`.
 
+## Changing an input's type strands the stored value
+
+- Redeclaring an existing input under a new `type` changes the picker's form, not the value already stored. An instance first saved with `type: "capability.thermostat"` still hands back a `DeviceWrapper` from `settings.thermostat` after the code switches that input to `type: "enum"` (String id) — the new code throws `No signature of method … DeviceWrapper`.
+- Compile-clean, and invisible until an **in-place upgrade**. A fresh install stores the new type, and the offline test harness builds `settings` as a plain map with the author's type — both correct. Only a real instance *carried across the type change* holds the old type, so CI and a re-install stay green while the user who upgraded in place is the one who hits it. It took down the config page and would take down `initialize()` and every handler while the instance stayed subscribed.
+- Prefer remove-and-recreate over in-place reuse when an input's type changes. Reusing the instance to spare the user re-selecting devices is the trap.
+- If in-place must survive, guard at the point of use by type, not just null. For a scalar String id, branch on the type — `String id = (settings.thermostat instanceof String) ? settings.thermostat : null` — never `settings.thermostat.findAll { … }`, which iterates a **String's characters** and yields a list of one-char strings, mangling the id. Filter with `findAll { it instanceof String }` only when the value is a multi-select List. A device value assigned to `String id = settings.foo` coerces via `toString()` (wrong id, no throw); passed to `someMethod(String)` it throws MissingMethod.
+- Detect the stale type with `getObjectClassName(v)` — not `getClass()` (sandbox-banned, `rules/sandbox-constraints.md`) — and log it so the cause is visible. Sibling of the `state`-side DeviceWrapper trap (`rules/state-vs-attributes.md`), reappearing from `settings` where newer code expects a scalar. Observed on 2.5.1.128.
+
+## `removeSetting` is deferred — not a same-execution guard
+
+- `app.removeSetting(name)` does not update the in-memory `settings` map within the same execution. A `dropIncompatibleSettings()` that removes the setting then reads it again later in the same render still reads the OLD value and still throws.
+- It is correct **cleanup** — the value is gone by the next execution, so the picker re-renders empty for re-selection — but the crash-guard has to be the defensive read above. Use both. `updateSetting`/`removeSetting`/`clearSetting` are otherwise undocumented (`rules/app-lifecycle.md`).
+
 ## Reserved and colliding names
 
 - Don't name an input `hubitatQueryString` (reserved — holds the JSON of URL query params).

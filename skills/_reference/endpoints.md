@@ -122,6 +122,20 @@ Correlating an app's log line against an event across these two silently mis-ord
 
 Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/apps/api/<makerAppId>/<path>?access_token=<token>`. Key paths: `/devices` (list), `/devices/all` (full JSON: capabilities, attributes, commands), `/devices/<id>`, `/devices/<id>/<command>/<secondaryValue>` (send command), `/devices/<id>/events`. Multi-hub note: with hubs meshed, one Maker API instance can expose devices from secondary hubs too — but **code** endpoints are per-hub and have no mesh.
 
+## UI-fired requests you can replay (undocumented — grounded 2026-07-19)
+
+Several operations documented as "UI-only" are ordinary HTTP requests the UI fires. Drive the UI **once** with Playwright, read the request the button fires (`browser_network_requests`), then **replay it directly** thereafter — the UI is the discovery tool, not the runtime. Baseline for this section: **C-8 Pro, 2.5.1.x, zwaveJS backend, local network, Hub Security off**; re-verify after a platform update. Still expanding as findings accumulate.
+
+| Endpoint | Body / params | Effect |
+|----------|---------------|--------|
+| `POST /hub/zwave/nodeRemove` | `zwaveNodeId=<decimalNodeId>` (`application/x-www-form-urlencoded`, no CSRF token) | Force-removes a **FAILED** Z-Wave orphan → 302 to `/hub/zwaveInfo`; the node drops out of `/hub/zwaveDetails/json`. Removal is **async** — poll the census, don't assume instant |
+| `POST /device/runmethod` | JSON `{"id":<deviceId>,"method":"<command>","args":[<secondaryValues>]}` | Sends a device command **without a Maker API app or token** → 200. `args` is the ordered command params (`setLevel` → `[level, duration]`) |
+| `POST /installedapp/disable` | JSON `{"id":<appId>,"disable":<bool>}` | Enables (`false`) / disables (`true`) any app instance → 200 `{"result":<bool>}` (verified 2026-07-21) |
+
+**`nodeRemove` is guarded to FAILED orphans only.** Verified 23× live on nodes with no bound `deviceId`, each confirmed by census diff against `/hub/zwaveDetails/json`. Behavior on a healthy/OK node (strict `removeFailedNode` vs. general remove) is **untested** — gate every call on `present + no deviceId + nodeState:FAILED`, and never POST a real device id.
+
+**`runmethod` is the "flash a stale device to wake it" primitive** — verified `{"id":389,"method":"on","args":[]}` turned a plug on and flipped its Z-Wave `nodeState` FAILED→OK.
+
 ## Z-Wave & Zigbee mesh detail (undocumented — grounded 2026-07-15)
 
 Both return clean JSON on 2.5.1.128, no auth with Hub Security off. Drive them for mesh

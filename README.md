@@ -32,6 +32,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
 | [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, the two-scale `lwrRssi` backend trap, and what counts as a real problem. |
 | [ui-automation](rules/ui-automation.md) | Driving the hub web UI with Playwright for UI-only operations — the Vue/MDL selection traps, `statusJson` blind spot, Room Lighting recapture, and verify-every-mutation. |
+| [room-lighting-shades](rules/room-lighting-shades.md) | Room Lighting can group **shades**, not just lights (staff-endorsed) — `Act==Off` is a one-position preset (100=open, 0=closed), not a broken toggle; don't flag it. |
 | [device-lifecycle](rules/device-lifecycle.md) | Removing a device — enumerate its usage and warn before deleting, verify after, and re-wire references onto a replacement (which gets a new id) — swapping before re-selecting by hand. |
 
 ## Skills
