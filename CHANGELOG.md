@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.38 — 2026-07-22
+
+### Added
+
+- **Firmware-update skill: safe Z-Wave OTA batch-flashing** (`rules/firmware-update.md`, `skills/firmware-update/SKILL.md`, `skills/_scripts/hub_fw_update.py`, closes #64). Grounded live on 2.5.1.132 (C-8 Pro, zwaveJS) flashing ~67 Zooz/Leviton devices across two hubs. Uses the hub's **native** Device firmware updater (`/hub/zwave/deviceFirmware/{files,details,available,start,progress}` + `/hub/fileManager/upload/firmware`) — flashes **in place** over LR+S2 with no driver swap; the community driver-swap updaters stall on LR/S2 ("Please wake up your sleepy device" on a *mains* device = wrong tool). The load-bearing finding, learned twice the hard way: a **failed OR stalled** OTA hangs the **entire** zwaveJS controller — the hub returns `success:true` but transmits nothing, freezing every Z-Wave node at once while **Zigbee stays up** (the diagnostic tell), the Hub-Mesh peer still reads `active/reachable`, and downstream it **staleness-poisons every lux/temperature-gated automation** (a "Motion at Dark" rule fired lights in daylight off a frozen illuminance sensor). A big fleet hides it (successes after a failure re-kick the radio); the trailing/only failure is the dangerous one. `hub_fw_update.py` carries the guards, **all required** (a canary-only guard *missed* a mid-transfer stall): a **no-progress watchdog** (abort if `percent` stops advancing at ANY level, not just 0%), a **canary** radio-health probe between flashes that **reboots + re-checks** on a hang, and an **RSSI floor** (default −95 dBm) that skips hang-prone floor-signal nodes (`--flash-weak` to force, attended only) — plus idempotent skip, a circuit breaker, and `--wait-pid` to chain one radio. `SKILL.md` walks discover (`/device/fullJson` → `device.data.firmwareVersion`) → **vendor-latest, NOT auto-discovery** (the Z-Wave JS service lagged ZEN04 2.30 vs shipped 2.60, missing the 2.50 SDK 7.19→7.24 S2/SPAN fix, and offered a Springs shade a bogus downgrade) → hardware-revision-correct image (700 vs 800LR) → stage (upload once per model, reusable) → flash → verify (hub caches the old version until the post-reboot re-interview). Recovery: `getManagementToken` → `/management/reboot` clears the hang; nothing bricks (`nodeState OK`), a stalled node sometimes completes post-reboot.
+
 ## 0.1.37 — 2026-07-22
 
 ### Added
