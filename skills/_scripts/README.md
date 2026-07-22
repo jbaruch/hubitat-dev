@@ -20,6 +20,7 @@ end-of-life on 2024-10-07; CI runs 3.11.
 | `hub_mesh.py` | Fetch Z-Wave/Zigbee mesh detail **and hub-mesh peer health**; flag failed/ghost nodes, PER, weak routes, unreachable peers; rank staleness | HTTP |
 | `hub_radiolog.py` | Tail the `zwaveLogsocket`/`zigbeeLogsocket` for per-frame radio traffic | WebSocket |
 | `hub_device_usage.py` | Report where a device is used (blast radius) before removing it | HTTP |
+| `hub_fw_update.py` | Batch-flash Z-Wave firmware via the native zwaveJS updater, with a no-progress watchdog, canary radio-health probe + auto-reboot recovery, and an RSSI floor (a failed/stalled OTA can hang the whole controller) | HTTP |
 | `hubs_config.py` | Owner of `hubs.json` — init/add/set-default/remove/list hubs (imported + CLI) | — |
 
 The hub endpoints these drive are undocumented and version-sensitive — see `../_reference/endpoints.md`
