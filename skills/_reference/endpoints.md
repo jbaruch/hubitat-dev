@@ -131,7 +131,7 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 | `POST /hub/zwave/nodeRemove` | `zwaveNodeId=<decimalNodeId>` (`application/x-www-form-urlencoded`, no CSRF token) | Force-removes a **FAILED** Z-Wave orphan → 302 to `/hub/zwaveInfo`; the node drops out of `/hub/zwaveDetails/json`. Removal is **async** — poll the census, don't assume instant |
 | `POST /device/runmethod` | JSON `{"id":<deviceId>,"method":"<command>","args":[<secondaryValues>]}` | Sends a device command **without a Maker API app or token** → 200. `args` is the ordered command params (`setLevel` → `[level, duration]`) |
 | `POST /installedapp/disable` | JSON `{"id":<appId>,"disable":<bool>}` | Enables (`false`) / disables (`true`) any app instance → 200 `{"result":<bool>}` (verified 2026-07-21) |
-| `GET /installedapp/createchild/hubitat/<ChildAppName>/parent/<parentAppId>` | path-encoded `<ChildAppName>` (e.g. `Room%20Lights`) | Creates a **parent/child** app instance → 302 to `/installedapp/configure/<newChildId>/mainPage` (2026-07-22) |
+| `GET /installedapp/createchild/hubitat/<ChildAppName>/parent/<parentAppId>` | path-encoded `<ChildAppName>` (e.g. `Room%20Lights`) | Creates a **parent/child** app instance → 302 to `/installedapp/configure/<newId>/mainPage` (2026-07-22) |
 | `GET /installedapp/create/<appTypeId>` | `<appTypeId>` from `/hub2/appsList` `userAppTypes[].id` | Creates a **standalone** user-app instance → 302 to the transient configure page (2026-07-22) |
 | `GET /device/listJson?capability=<capability.foo[,capability.bar]>` | capabilities comma-joined | Capability-filtered device list `[{id, displayName, …}]` — the list the classic `.btn-device` picker fetches; enumerate an input's candidate devices without the UI (2026-07-22) |
 
