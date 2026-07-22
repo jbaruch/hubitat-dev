@@ -71,8 +71,9 @@ Full argument/flow/hazard contract: the `hub_fw_update.py` module docstring. It 
 nodes already at target) and carries **two required guards plus a floor**:
 - **No-progress watchdog** — aborts a flash if `percent` stops advancing at **any** level (a frozen
   transfer never emits DONE/FAILED and would hang the radio forever).
-- **Canary** (`--canary devId:nodeId`, a known-healthy **mains** node) — after each flash, confirms the
-  controller still transmits; if not, it **reboots the hub and re-checks**, aborting if it stays hung.
+- **Canary** (`--canary devId:nodeId`, a known-healthy **mains** node) — after a **failed** flash (a
+  verified success already proved the radio transmits), confirms the controller still transmits; if not,
+  it **reboots the hub and re-checks**, aborting if it stays hung.
 - **RSSI floor** (`--rssi-floor`, default −95 dBm) — skips hang-prone floor-signal nodes; override only
   when attended with `--flash-weak`.
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.40 — 2026-07-22
+
+### Fixed
+
+- **`hub_fw_update.py` rebooted the hub after every *successful* flash** (`skills/_scripts/hub_fw_update.py`, `skills/firmware-update/SKILL.md`, `rules/firmware-update.md`). The canary radio-health probe ran after *each* flash, but a just-flashed device reboots and re-interviews, which busies the radio — so the canary's node didn't answer inside its 30s window and the guard **false-concluded "hung" and rebooted the hub after a clean flash** (caught live: node 312 verified 3.6, then an unnecessary reboot). A batch would thus reboot the hub once per device. Fixed: run the canary/reboot recovery **only after a `failed` flash** — a verified success already proves the radio transmits; only a failed/stalled flash can have hung it. Also hardened `node_lasttime` to tolerate a momentarily-unreachable hub (mid-reboot) instead of crashing the run, and the `rebooted` counter is now incremented. Silver lining: the false trigger exercised the (0.1.39-fixed) reboot recovery end-to-end — HUNG → reboot → "hub back up" → re-check — confirming detection *and* recovery now both work.
+
+
 ## 0.1.39 — 2026-07-22
 
 ### Fixed
