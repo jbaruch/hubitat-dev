@@ -1,5 +1,8 @@
 # Changelog
 
+### Added
+
+- **Changing an input's `type` between versions strands the stored setting; `removeSetting` is deferred** (`rules/groovy-gotchas.md`, `rules/app-lifecycle.md`, closes #36). From a live in-place upgrade of `jbaruch/hubitat-ecobee-lite` (its #29/#30, verified 2.5.1.128): Hubitat keeps a setting's original type across a code change, so an input redeclared from `type: "capability.thermostat"` to `type: "enum"` still hands the new code a `DeviceWrapper` from `settings.thermostat`, and a String-typed method throws `No signature of method … DeviceWrapper` — which took down the config page and would take down `initialize()` and every handler while the instance stayed subscribed. Invisible until upgrade: a fresh install and the offline test harness both store the new type correctly, so CI and a re-install stay green while the in-place upgrader is the one who breaks. `groovy-gotchas` gains the trap after "Null device inputs": prefer remove-and-recreate, or if in-place must survive consume defensively by type (`settings.x.findAll { it instanceof String }`), detecting the stale value with `getObjectClassName` (not sandbox-banned `getClass`). Plus its sibling: `removeSetting` is **deferred** — it does not update the in-memory `settings` map in the same execution, so it is cleanup for the next wake, never a same-render crash-guard (the guard is the defensive read). `app-lifecycle` gains a one-line note that `updateSetting`/`removeSetting`/`clearSetting` exist and that `removeSetting` is deferred.
 ## 0.1.28 — 2026-07-20
 
 ### Added

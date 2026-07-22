@@ -46,6 +46,11 @@ def hubStartupHandler() { reconcile() }
 
 - Test it: a spec that drives the startup/handler path on a freshly-loaded, **never-initialized** instance and asserts no NPE catches this deterministically — it fails before the guard, passes after (`skills/test`).
 
+## Mutating settings from code
+
+- `app.updateSetting(name, value)` writes a setting; `app.removeSetting(name)` / `clearSetting(name)` drop one. All undocumented platform methods.
+- `removeSetting` is **deferred** — the in-memory `settings` map still returns the old value for the rest of the current execution, so it is cleanup for the next wake, never a same-render crash-guard (`rules/groovy-gotchas.md`).
+
 ## Subscriptions & scheduling
 
 - Handler method names are passed as **bare strings**: `subscribe(dev, "switch", "switchHandler")`, `runIn(300, "checkState")`. A typo'd or missing handler name fails quietly — see `rules/groovy-gotchas.md`.
