@@ -336,6 +336,63 @@ RL knowledge is spread across the numbered list above; in build/edit order it re
 4. **Don't trip the live buttons** — `settings[activate]`/`settings[turnOff]` physically switch the room (gotcha 20).
 5. **Don't auto-recapture** — "Done with Room Lights" re-captures physical state and can overwrite a live scene (gotcha 5).
 
+## HPM (Hubitat Package Manager) uninstall
+
+Removing HPM packages is a **destructive multi-step wizard** with no single endpoint — drive it via
+Playwright and verify over HTTP. Grounded on **HPM v1.9.11, platform 2.5.1.132** (C-8 Pro, Hub Security
+off), removing 12 packages in one pass → **27 apps + 11 drivers** removed, all keep-packages intact.
+
+**Page flow** — under the HPM *instance* id (the installed app id, e.g. `3`; **not** the
+`dcm.hpm:Hubitat Package Manager` *code* id in `/hub2/userAppTypes`):
+
+```
+/installedapp/configure/<id>/prefOptions               ← main menu ("What would you like to do?") → "Uninstall"
+…/prefOptions/prefPkgUninstall                         ← package multi-select → Next
+…/prefPkgUninstallConfirm                              ← THE GATE: expands each package into its apps + drivers
+  → Next (this COMMITS, server-side, immediately)
+…/prefPkgUninstallConfirm/prefUninstall               ← "in progress…" → "complete" → Next → main menu
+```
+
+Main-menu buttons: Install / Update / Modify / Repair / Uninstall / Match Up / View Apps and Drivers /
+Package Manager Settings.
+
+**The package multi-select is a native `<select multiple>` wrapped by a Materialize widget** — both
+render in the a11y tree (a `listbox` of `option`s = the real select, and a `list` of `listitem`s = the
+Materialize `<ul>` a human clicks). Set the native select directly and skip the per-`<li>` clicks:
+
+- `browser_select_option` on the native `<select multiple>`, values = the **display names**
+  (`["Ecobee Suite", "Homebridge v2", …]`).
+- **Verify against the native select's `selectedOptions`, not the Materialize `<ul>`** — the Materialize
+  list does **not** repaint after `browser_select_option` (`li.is-checked` stays empty). Same principle
+  as gotcha 1 — read whichever surface the framework treats as authoritative, not whichever merely looks
+  selected; there that surface happens to be the class `label.is-checked`, here it is the native
+  `selectedOptions` and the Materialize `<ul>` is the stale one. Unlike gotcha 4's Vue-wrapped `<select>`
+  (where `browser_select_option` never registers), here it **does** persist — once you dispatch the event below.
+- Fire a `change` event on the select so HPM's submit picks it up:
+  `sel.dispatchEvent(new Event('change', {bubbles:true}))`.
+- Each `option.value` is the package's **`packageManifest.json` raw URL** (author-identifying), not the
+  display text — read it to confirm each selection maps to the intended author/package
+  (`Ecobee Suite → SANdood/Ecobee-Suite`) before committing.
+
+**The confirmation page is the authoritative gate.** It expands every selected package into its
+component **apps AND drivers** (child instances included) and warns "be sure the apps and device
+drivers are not in use." Read it fully — a mis-selected keep-package shows here before anything is deleted.
+
+**Scope limits:**
+
+- HPM only lists/removes packages **it installed** (or "Match Up"'d). **Manually-pasted code never
+  appears** — delete that directly via `/app/list` (Apps code) and `/driver/list` (Drivers code).
+- Removing a package with a **running instance** or a **driver bound to a device** orphans them — HPM
+  warns but does not block. Check `/hub2/appsList` and device driver usage first
+  (`skills/_reference/endpoints.md` device usage / blast radius).
+
+**Verify over HTTP, not the UI** — the uninstall commits server-side immediately (no "Done"): diff the
+names in `GET /hub2/userAppTypes` (apps) and `GET /hub2/userDeviceTypes` (drivers) before/after
+(`skills/_reference/endpoints.md` code enumeration).
+
+**Reversible:** HPM removal reinstalls from the same public-repo manifests via the Install flow — it
+passes the "undo exists" test and is **not** a no-undo action.
+
 ## Grounding
 
 Endpoints and hub behavior verified on a C-8 Pro with Hub Security off (baseline
