@@ -303,7 +303,7 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 
 28. **Building a new Room Lighting instance end-to-end.** Verified RL "Version 1.2.3 (6/26/2025)",
     2.5.1.x, 2026-07-21, across an 8-rule RM motion-lighting → RL migration.
-    - **Create the child:** `GET /installedapp/createchild/hubitat/Room%20Lights/parent/<parentId>` — the
+    - **Create the child:** `GET /installedapp/createchild/hubitat/Room%20Lights/parent/<parentAppId>` — the
       parent RL app id is per-hub (endpoint spec, and the standalone `create/<appTypeId>` variant, live in
       `skills/_reference/endpoints.md`). Lands on the transient `/installedapp/configure/<newId>/mainPage`,
       persisted only on **Done** (`_action_update`, `id=btnDone`), discarded on Cancel (transient-instance family, gotcha 16).
