@@ -284,7 +284,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     - *Classic `.btn-device` delegated picker* (this gotcha) — the same `.device-save`/hidden-input
       family, driven by the delegated handler `$(document).on('click', '.btn-device, .btn-device-required', …)`.
       RL's `roomDevsL`, `motions`, `switchesOnDO`, … render as `button[data-elemname="<name>"]`; a real
-      click `$.getJSON('/device/listJson?capability=…')`, builds MDL rows into `#<name>-options`
+      click `$.getJSON('/device/listJson?capability=…')` (usable directly to enumerate an input's candidate
+      devices — `skills/_reference/endpoints.md`), builds MDL rows into `#<name>-options`
       (`input[name="<name>"][value="<id>"]`, `id="<name><id>"`), pre-checks selected via `is-checked`,
       then `fadeIn()`s the sibling `.device-list`.
     - *Inline-Vue picker* (gotcha 26) — RL activation-options switch guards `switchesD`/`switchesOE`
@@ -302,10 +303,10 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 
 28. **Building a new Room Lighting instance end-to-end.** Verified RL "Version 1.2.3 (6/26/2025)",
     2.5.1.x, 2026-07-21, across an 8-rule RM motion-lighting → RL migration.
-    - **Create the child:** `GET /installedapp/createchild/hubitat/Room%20Lights/parent/<parentId>` (the
-      app-type segment is the URL-encoded name `Room Lights`; the
-      parent RL app id is per-hub) → lands on `/installedapp/configure/<newId>/mainPage`, transient
-      until **Done** (`_action_update`, `id=btnDone`); Cancel discards (transient-instance family, gotcha 16).
+    - **Create the child:** `GET /installedapp/createchild/hubitat/Room%20Lights/parent/<parentId>` — the
+      parent RL app id is per-hub (endpoint spec, and the standalone `create/<appTypeId>` variant, live in
+      `skills/_reference/endpoints.md`). Lands on the transient `/installedapp/configure/<newId>/mainPage`,
+      persisted only on **Done** (`_action_update`, `id=btnDone`), discarded on Cancel (transient-instance family, gotcha 16).
     - **Page tree**, each reached by an `_action_href` button (gotcha 19 — re-scan for the shifting `|N`):
       mainPage (`roomDevsL` lights, `origLabel` name) → `onMeansPage` (Means to Activate) → `optionsOnPage`
       (Activate Lights Options); `offMeansPage` (Means to Turn Off) → `optionsOffPage` (Turn Off Lights Options).

@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **App-instance creation endpoints + the device-picker list endpoint** (`skills/_reference/endpoints.md`, closes #50). #50 reopened with three more UI-fired requests found building 7 Room Lighting instances + a Zone Motion Watchdog instance end-to-end (jbaruch/hubitat-app#8, 2026-07-22): `GET /installedapp/createchild/hubitat/<ChildAppName>/parent/<parentAppId>` creates a **parent/child** instance (path-encode the name, e.g. `Room%20Lights`); `GET /installedapp/create/<appTypeId>` creates a **standalone** user-app instance (`appTypeId` from `/hub2/appsList` `userAppTypes[].id`); both land on a transient `/installedapp/configure/<newId>/mainPage` that persists only on Done — the parent/child and standalone companions to the existing `/installedapp/direct/` built-in-app entry. `GET /device/listJson?capability=<…>` returns the capability-filtered device list the classic `.btn-device` picker fetches, usable directly to enumerate an input's candidate devices. **Deduped against the #59 playwright-ui gotchas** per the review pass: the endpoint spec now lives once in `endpoints.md`, and gotchas 27 (`listJson`) and 28 (`createchild`) reference it instead of restating the URLs. `POST /installedapp/disable` was re-confirmed (already documented from the first #50 batch).
+
 ## 0.1.35 — 2026-07-22
 
 ### Added
