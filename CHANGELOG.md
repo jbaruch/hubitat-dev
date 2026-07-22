@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.39 — 2026-07-22
+
+### Fixed
+
+- **`hub_fw_update.py` auto-reboot recovery could not get a management token** (`skills/_scripts/hub_fw_update.py`). `GET /hub/advanced/getManagementToken` returns a **bare token string**, not JSON — the reboot path read it with `json.load`, which threw `Expecting value: line 1 column 1`, so when a failed OTA hung the controller the guard detected the hang but **never actually rebooted**. Caught live: a ZEN76 flash hit `stage=FAILED`, the canary correctly saw the radio hung, then the reboot silently no-op'd and the hub stayed hung until a manual reboot. Fixed to read the token as text (`.read().decode().strip().strip('"')`). The detection half (watchdog + canary) worked; only the recovery half was broken.
+
+
 ## 0.1.38 — 2026-07-22
 
 ### Added
