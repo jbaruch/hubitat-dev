@@ -66,8 +66,8 @@ POLL_SECS = 15
 STALL_SECS = 240          # abort a flash if percent has not advanced for this long (at ANY %)
 XFER_TIMEOUT = 20 * 60    # hard ceiling per flash
 VERIFY_TIMEOUT = 4 * 60   # post-reboot re-interview ceiling
-CANARY_ADVANCE = 30       # seconds to wait for a canary lastTime to advance
-REBOOT_SETTLE = 120       # seconds for zwaveJS to re-init after a reboot comes back
+CANARY_WINDOW = 75        # seconds to watch for ANY node's lastTime to advance (radio-alive)
+REBOOT_SETTLE = 150       # seconds for zwaveJS to re-init (interview all nodes) after a reboot
 RSSI_FLOOR_DEFAULT = -95
 MAX_CONSEC_FAIL = 3
 
@@ -108,29 +108,37 @@ def node_rssi(base, node):
     return None
 
 
-def node_lasttime(base, node):
+def _all_lasttimes(base):
+    """{nodeId: lastTime} for every node. {} if the hub is momentarily unreachable (mid-reboot)."""
     try:
-        for n in _get(base, "/hub/zwaveDetails/json").get("nodes", []):
-            if str(n.get("nodeId")) == str(node):
-                return n.get("lastTime")
+        return {n.get("nodeId"): n.get("lastTime") for n in _get(base, "/hub/zwaveDetails/json").get("nodes", [])}
     except Exception:
-        return None  # hub momentarily unreachable (e.g. mid-reboot) — treat as "no reading"
-    return None
+        return {}
 
 
 def canary_transmits(base, canary_dev, canary_node):
-    """True if the controller actually transmits: refresh the canary, confirm lastTime advances."""
+    """Radio-alive check, robust against a single quiet/slow node and a freshly-rebooted hub.
+
+    A HUNG controller freezes EVERY node's lastTime (it transmits nothing); a healthy hub always
+    has some node reporting, and a rebooting hub advances lastTimes as it re-interviews. So nudge
+    the canary node, then over a wide window return True if ANY node's lastTime advances — do not
+    hang the verdict on one node answering a refresh inside a tight window (that false-positived
+    both ways on a 75-LR-node hub: needless reboot, then a false "still hung")."""
     if not canary_dev:
         return True
-    before = node_lasttime(base, canary_node)
+    before = _all_lasttimes(base)
     try:
         _post(base, "/device/runmethod", {"id": int(canary_dev), "method": "refresh"})
     except Exception as e:
         log(f"  canary refresh error: {e}")
-    for _ in range(CANARY_ADVANCE // 5):
-        time.sleep(5)
-        if node_lasttime(base, canary_node) != before:
+    deadline = time.time() + CANARY_WINDOW
+    while time.time() < deadline:
+        time.sleep(6)
+        after = _all_lasttimes(base)
+        if any(after.get(k) not in (None, v) for k, v in before.items()):
             return True
+        if before and not after:  # hub unreachable right now (still rebooting) — keep waiting
+            continue
     return False
 
 
