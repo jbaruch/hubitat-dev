@@ -33,9 +33,10 @@ a mid-transfer stall):
   1. NO-PROGRESS WATCHDOG. Abort a flash if `progress.percent` stops advancing for --stall-secs at
      ANY percent (not only at 0%). A frozen transfer never emits FAILED/DONE, so a plain
      start->wait-for-DONE loop hangs forever and takes the radio with it.
-  2. CANARY radio-health probe between flashes. Refresh a known-healthy MAINS node and confirm its
-     Z-Wave `lastTime` advances. If it does not, the controller is hung -> reboot and re-probe;
-     abort the batch if it does not come back.
+  2. CANARY radio-health probe, run ONLY after a FAILED flash (a verified success already proved the
+     radio transmits, and the flashed device's own re-interview would else busy the radio and
+     false-trigger a reboot). Refresh a known-healthy MAINS node and confirm its Z-Wave `lastTime`
+     advances; if it does not, the controller is hung -> reboot and re-probe; abort if it stays hung.
 
 Plus an RSSI FLOOR: devices at/below --rssi-floor dBm (default -95; the Silicon Labs 700-series RX
 floor is -97, 800-series LR -110) are hang-prone and rarely flash — skip them unless --flash-weak.
@@ -108,9 +109,12 @@ def node_rssi(base, node):
 
 
 def node_lasttime(base, node):
-    for n in _get(base, "/hub/zwaveDetails/json").get("nodes", []):
-        if str(n.get("nodeId")) == str(node):
-            return n.get("lastTime")
+    try:
+        for n in _get(base, "/hub/zwaveDetails/json").get("nodes", []):
+            if str(n.get("nodeId")) == str(node):
+                return n.get("lastTime")
+    except Exception:
+        return None  # hub momentarily unreachable (e.g. mid-reboot) — treat as "no reading"
     return None
 
 
@@ -150,8 +154,10 @@ def reboot_hub(base):
     log("  hub back up; re-checking radio")
 
 
-def ensure_radio_ok(base, canary_dev, canary_node, allow_reboot):
-    """After each flash: if the radio is hung, reboot once and re-check. True if healthy."""
+def ensure_radio_ok(base, canary_dev, canary_node, allow_reboot, results=None):
+    """Called ONLY after a failed flash: if the radio is hung, reboot once and re-check.
+    True if healthy. (A verified success already proves the radio transmits, and the flashed
+    device's own re-interview would else busy the radio and false-trigger a reboot.)"""
     if not canary_dev:
         return True
     if canary_transmits(base, canary_dev, canary_node):
@@ -160,6 +166,8 @@ def ensure_radio_ok(base, canary_dev, canary_node, allow_reboot):
         log("  radio hung and --no-reboot set — aborting")
         return False
     reboot_hub(base)
+    if results is not None:
+        results["rebooted"] += 1
     if canary_transmits(base, canary_dev, canary_node):
         log("  radio recovered after reboot")
         return True
@@ -255,7 +263,10 @@ def run(base, work, canary_dev, canary_node, rssi_floor, flash_weak, allow_reboo
         if consec >= MAX_CONSEC_FAIL:
             log(f"ABORT: {consec} consecutive failures — stopping to avoid cascading damage")
             break
-        if not ensure_radio_ok(base, canary_dev, canary_node, allow_reboot):
+        # Only a FAILED/stalled flash can have hung the controller; a verified success just
+        # proved the radio transmits (and the flashed device's re-interview would false-trigger
+        # the canary). Check — and possibly reboot-recover — only after a failure.
+        if r == "failed" and not ensure_radio_ok(base, canary_dev, canary_node, allow_reboot, results):
             log("ABORT: Z-Wave controller hung and did not recover")
             break
         time.sleep(5)

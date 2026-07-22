@@ -39,7 +39,7 @@ Grounded live twice (2026-07-22). A flash that **fails mid-transfer**, or **stal
 ## Guardrails (all required — one alone is not enough)
 
 1. **No-progress watchdog.** Abort a flash if `percent` stops advancing for a few minutes at **ANY** level, not only at 0%. A frozen transfer never emits `DONE`/`FAILED`, so a plain start→wait-for-DONE loop hangs forever and takes the radio with it. (A canary-only guard *missed* a mid-transfer stall — that's why this is separate.)
-2. **Canary radio-health probe** between flashes: refresh a known-healthy **mains** node and confirm its Z-Wave `lastTime` advances. If it doesn't, the controller is hung → **reboot and re-check**; abort the batch if it stays hung.
+2. **Canary radio-health probe**, run **only after a failed flash**: refresh a known-healthy **mains** node and confirm its Z-Wave `lastTime` advances. If it doesn't, the controller is hung → **reboot and re-check**; abort the batch if it stays hung. Do **not** probe after a *successful* flash — the success already proves the radio transmits, and the flashed device's own reboot/re-interview busies the radio and will **false-trigger a needless reboot** (learned live: a canary after every flash rebooted the hub after a clean flash).
 3. **RSSI floor.** Skip nodes at/below ~−95 dBm `lwrRssi` (SiLabs RX floor: −97 dBm 700-series, −110 dBm 800-LR) — floor-signal nodes are hang-prone and rarely flash. Not worth risking a whole-hub Z-Wave blackout to update one bathroom plug; force only when attended.
 
 Never fire-and-forget across marginal devices. Flash strong-signal devices; leave floor-RSSI ones on their current firmware.
