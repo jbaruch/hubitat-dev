@@ -291,7 +291,7 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
       **only**; keystroke filter + coordinate click, and a label-click **collapses** it.
 
     Recipe for the classic picker (verified RL v1.2.3, 2026-07-21): real `browser_click` on
-    `button[data-elemname="<name>"]` → `waitForFunction` until `#<name>-options input[name="<name>"]`
+    `button[data-elemname="<name>"]` → `page.waitForFunction` until `#<name>-options input[name="<name>"]`
     count > 0 (rows build from the fetch — do **not** pre-reveal via `style.display`) → real click
     `label[for="<name><id>"]` to check it (a label-click does **not** collapse this picker, unlike the
     Vue one) → tag + real-click the `.device-save` "Update" (scope per gotcha 12) → verify the hidden
@@ -302,7 +302,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 
 28. **Building a new Room Lighting instance end-to-end.** Verified RL "Version 1.2.3 (6/26/2025)",
     2.5.1.x, 2026-07-21, across an 8-rule RM motion-lighting → RL migration.
-    - **Create the child:** `GET /installedapp/createchild/hubitat/Room Lights/parent/<parentId>` (the
+    - **Create the child:** `GET /installedapp/createchild/hubitat/Room%20Lights/parent/<parentId>` (the
+      app-type segment is the URL-encoded name `Room Lights`; the
       parent RL app id is per-hub) → lands on `/installedapp/configure/<newId>/mainPage`, transient
       until **Done** (`_action_update`, `id=btnDone`); Cancel discards (transient-instance family, gotcha 16).
     - **Page tree**, each reached by an `_action_href` button (gotcha 19 — re-scan for the shifting `|N`):
