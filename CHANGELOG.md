@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.1.41 — 2026-07-22
+
+### Fixed
+
+- **`hub_fw_update.py` canary false-positived "hung" both ways on a busy hub** (`skills/_scripts/hub_fw_update.py`, `rules/firmware-update.md`). The canary refreshed **one** node and waited a tight 30 s for *that* node's `lastTime` to advance. On a 75-LR-node hub a single presence plug often doesn't answer within 30 s even when the radio is fine, so after a (legitimately) failed flash the guard **false-read "hung" and rebooted a healthy hub**, then — while zwaveJS was still interviewing all nodes post-reboot — **false-read "still hung"** and aborted. Verified live: a 0%-stall on node 373 (which transfers nothing, so cannot wedge the radio) triggered a needless main reboot; an independent 4-node probe confirmed the radio was ALIVE the whole time. Fixed: a hung controller freezes **every** node's `lastTime`, so the check now nudges the canary and, over a wider window (75 s), returns healthy if **ANY** node's `lastTime` advances — robust to one quiet/slow node and to a re-interviewing hub. Reboot settle raised to 150 s. This is the third and final guard-tuning fix (0.1.39 reboot token, 0.1.40 only-after-failure, 0.1.41 any-node/wide-window); detection now matches the real hung-controller signature (all nodes frozen) instead of one node's timing.
+
 ## 0.1.40 — 2026-07-22
 
 ### Fixed
