@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.34 — 2026-07-22
+
 ### Added
 
 - **Room Lighting can group *shades* (staff-endorsed) — `Act==Off` is a one-position preset, not a broken toggle** (`rules/room-lighting-shades.md`, closes #57). An automated audit of a live hub flagged two RL instances (`Alice Office Shades`, `Amir Bedroom Shades`, both `0/0`) as bugs — "activator has no open path, Act==Off position." False positive: Room Lighting drives `capability.windowShade`, and repurposing an RL activator device as a shade group is a pattern Hubitat staff (bravenel) endorse (community thread `t/new-app-room-lighting/93098`). In the per-device capture table the **Position (Act)** column is the position sent on activation (**100 = open, 0 = closed**) and **Off** is the deactivation position, so an RL shade group is a position preset, not an open/close toggle — `Act==Off` is a valid one-position group (`0/0` = always close, `100/100` = always open), composed into a nested activator hierarchy where opening is done by a *different* group. New always-on rule: don't flag a shade RL instance as broken merely because `Act==Off` or because "no path opens the shades in this instance" — verify intent from the hierarchy and `position 0 == closed` before calling it a bug.
