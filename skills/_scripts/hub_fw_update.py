@@ -133,8 +133,9 @@ def canary_transmits(base, canary_dev, canary_node):
 def reboot_hub(base):
     log(f"!!! Z-Wave controller appears HUNG on {base} — rebooting to recover")
     try:
-        tok = _get(base, "/hub/advanced/getManagementToken")
-        tok = tok if isinstance(tok, str) else tok.get("token", tok)
+        # NB: /hub/advanced/getManagementToken returns a BARE token string, not JSON — read as text.
+        with urllib.request.urlopen(base + "/hub/advanced/getManagementToken", timeout=15) as r:
+            tok = r.read().decode("utf-8", "replace").strip().strip('"')
         urllib.request.urlopen(f"{base}/management/reboot?token={tok}", timeout=15).read()
     except Exception as e:
         log(f"  reboot request error: {e}")
