@@ -7,6 +7,9 @@ description: Update Z-Wave device firmware on a Hubitat hub via the native zwave
 
 Process steps in order. Do not skip ahead.
 
+The always-on knowledge — why this is dangerous, the prerequisites, vendor-latest sourcing, and the
+guardrails — is `rules/firmware-update.md`. This skill is the step-by-step procedure; read the rule first.
+
 Hubitat's built-in **Device firmware updater** (Settings → Z-Wave Details → Maintenance) flashes OTA
 over the same radio the device already uses — no driver swap, no self-hosting, and it handles **LR +
 S2** that the community driver-swap updaters stall on. Its HTTP surface and every field are grounded
