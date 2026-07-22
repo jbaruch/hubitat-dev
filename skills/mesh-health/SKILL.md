@@ -45,7 +45,7 @@ Proceed to Step 3.
 - Zigbee `zigbee.network_problems[]` — `weakChannel`, offline, or unhealthy network. A whole-radio issue, not one device.
 - `hub_mesh.problems[]` — a peer that cannot carry commands. `peer_unreachable` / `peer_identity_mismatch` are probe findings and outrank the hub's own `active`/`offline`/`warning` claims, which stay green on a stale record (`rules/zwave-zigbee-mesh.md` The command path). Quote `shared_device_count` as the blast radius before advising a re-add, and prefer editing the peer's address over remove-and-re-add.
 
-These are grounded and definite. Removal and hub-mesh repair are hub-UI actions the skill guides but does not perform (`rules/zwave-zigbee-mesh.md` Device lifecycle). Proceed to Step 4.
+These are grounded and definite. Removal and hub-mesh repair are actions the skill guides but does not perform (`rules/zwave-zigbee-mesh.md` Device lifecycle; the groundable-vs-hub-UI split is in Step 7). Proceed to Step 4.
 
 ## Step 4 — Split the staleness rankings by actuator vs reporter
 
@@ -73,7 +73,7 @@ Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 - `zwave.ranked.by_rtt_ms` / `by_rssi` — worst-first. **Check `zwave.backend` first**: `lwrRssi` is absolute dBm under `zwavejs` and dB-above-noise under `legacy` — the same number means different things.
 - `zwave.weak_signal_heuristic[]` — backend-aware RSSI-near-floor flags; each carries `heuristic:true` and a cited `basis`. Present as a hint, not a fact.
 - `zwave.route_fan_in` — how many nodes route through each repeater (`rules/zwave-zigbee-mesh.md` Route fan-in). `repeaters[]` is topology, **not a fault list**: a repeater carrying 12 nodes is a normal mesh and needs no remedy. Read `load_bearing_concerns[]` — a repeater that is itself never-heard/FAILED/weak, ranked by how many nodes sit behind it. Quote its `dependent_count` as the **scope** of the warning that node already carries in `never_heard[]`/`failed[]`, never as extra findings. Check the dependents' freshness first: a node reporting behind a flagged repeater proves that repeater still relays.
-- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair.
+- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair, and a **sleepy battery node** has no per-node "Rebuild route" even then — only a global rebuild reaches it, on its next wake, so a repeater near it is the durable fix, not a repair click.
 - `zigbee.dead_devices[]` — `active:false`; `likely_incomplete_join:true` marks the `"Device"`/`"Device"` ghost. `zigbee.stalest` ranks by activity age.
 
 Correlate a flagged node against the reported symptom. Proceed to Step 6.
@@ -112,5 +112,7 @@ peer's address; re-add only if the edit will not take) and a DHCP reservation on
 is what stops it recurring.
 Ghost/failed-node removal and channel changes are **hub-UI actions** (Z-Wave Details → Refresh then
 Remove; Zigbee Details → change channel/power) — this skill does not automate destructive mesh
-operations. Guide the user through the UI step, and offer `Skill(skill: "debug")` if a driver-level
-log-tail would confirm the device side. Finish here.
+operations. A FAILED-**orphan** force-remove via `POST /hub/zwave/nodeRemove` and a full Z-Wave network
+rebuild via `GET /hub/zwaveRepair2` are groundable HTTP (`skills/_reference/endpoints.md`), but destructive
+removal stays guide-the-user, never auto-run. Guide the user through the UI step, and offer
+`Skill(skill: "debug")` if a driver-level log-tail would confirm the device side. Finish here.

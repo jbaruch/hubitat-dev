@@ -57,6 +57,7 @@ healthy, so the devices are fine" — see `The command path`.
 - **LR is a star**: every LR node talks **directly** to the hub — no routing, no hops, **no repeaters** (Z-Wave Alliance / Silicon Labs). `neighbors:0` and a direct `route` (`01 -> <node>`) are inherent to LR, not faults. LR uses per-transmission dynamic power control over a long link budget, so a distant LR node sitting at −85…−93 dBm can be normal.
 - **Never suggest a repeater or a Z-Wave repair for an LR node** — neither exists in a star. An **unreliable LR device at distance** (weak signal and/or high RTT, intermittently FAILED) is a genuine tradeoff, not one fix. Improving the direct link (hub antenna/placement, LR channel/interference) keeps LR's simplicity and its reliability-when-the-link-holds. Re-including as classic mesh gains repeater routing for a marginal link but takes on mesh's routing flakiness (route changes, LWR failures, slow hops). The choice is situational and contested — **many networks find LR more reliable than mesh, so do not default to mesh** — surface the tradeoff and let the owner decide.
 - **Classic mesh** (id ≤ 232) is the only place `neighbors`, multi-hop `route`, `routeChanges`, repeaters, and Z-Wave repair apply.
+- **A sleepy battery node has no on-demand route rebuild.** Its Z-Wave Details row offers only Refresh · State — no per-node "Rebuild route". Only a **global network rebuild** reaches it (`GET /hub/zwaveRepair2`, `skills/_reference/endpoints.md`), and its route rebuilds **on its next wake**, sitting in the rebuild's Pending list and completing async. For a marginal battery node the durable fix is RF/topology — a repeater near it — not a repair click.
 
 ## Zigbee: liveness, and where signal actually lives
 
@@ -76,8 +77,8 @@ healthy, so the devices are fine" — see `The command path`.
 
 - **LR devices join via SmartStart, not classic inclusion** — the DSK/QR is added to the hub's provisioning list and the device auto-includes on power-up (no add-mode, no button). LR inclusion is S2-mandatory; the new node gets an id ≥ 256.
 - **Graceful removal is two steps and one is physical**: remove the device from the SmartStart provisioning list (else it re-includes), *and* exclude/factory-reset the physical device. An agent cannot do the physical step — so removal is guide-the-user, not automate.
-- **The tooling confirms a removal, it does not trigger one.** No groundable zwaveJS action endpoint exists (only `/hub/dismissWeakZigbee`); inclusion/exclusion/remove are hub-UI + physical. Confirm a removal two ways: the snapshot node-count/id diff, and the radio-log signature (`skills/_reference/zwave-lifecycle.md`).
-- Force-remove (`RemoveFailedNode`) applies only to a FAILED **orphan ghost**, never a recoverable real device.
+- **The tooling confirms a removal, it does not trigger one.** Including or excluding a real device is hub-UI + physical — no endpoint triggers it. Confirm a removal two ways: the snapshot node-count/id diff, and the radio-log signature (`skills/_reference/zwave-lifecycle.md`).
+- Force-remove (`RemoveFailedNode`) applies only to a FAILED **orphan ghost**, never a recoverable real device — groundable via `POST /hub/zwave/nodeRemove`. A full Z-Wave network rebuild is groundable too, via `GET /hub/zwaveRepair2` — both in `skills/_reference/endpoints.md`.
 
 ## Grounding sources
 
