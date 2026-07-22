@@ -122,7 +122,7 @@ Correlating an app's log line against an event across these two silently mis-ord
 
 Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/apps/api/<makerAppId>/<path>?access_token=<token>`. Key paths: `/devices` (list), `/devices/all` (full JSON: capabilities, attributes, commands), `/devices/<id>`, `/devices/<id>/<command>/<secondaryValue>` (send command), `/devices/<id>/events`. Multi-hub note: with hubs meshed, one Maker API instance can expose devices from secondary hubs too — but **code** endpoints are per-hub and have no mesh.
 
-## UI-fired requests you can replay (undocumented — grounded 2026-07-19)
+## UI-fired requests you can replay (undocumented — grounded 2026-07-19 – 07-22)
 
 Several operations documented as "UI-only" are ordinary HTTP requests the UI fires. Drive the UI **once** with Playwright, read the request the button fires (`browser_network_requests`), then **replay it directly** thereafter — the UI is the discovery tool, not the runtime. Baseline for this section: **C-8 Pro, 2.5.1.x, zwaveJS backend, local network, Hub Security off**; re-verify after a platform update. Still expanding as findings accumulate.
 
