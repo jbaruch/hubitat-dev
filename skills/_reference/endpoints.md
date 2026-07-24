@@ -100,6 +100,7 @@ Correlating an app's log line against an event across these two silently mis-ord
 | `GET /hub2/hubData` | Newer JSON hub backend |
 | `GET /hub2/devicesList` | Devices: `{suggestBackup, devices:[{key, data:{id, name, ...}, children[], parent, child}]}` — a **tree**: `parent`/`child` are bools ("is a parent" / "is a child"), and children appear **only nested** in `children[]`, never at the top level. Iterating `devices[]` flat misses every child device (`skills/_reference/parent-child-devices.md`) |
 | `GET /hub2/appsList` | Installed apps + `systemAppTypes` |
+| `GET /modes/json` | Real hub mode ids and names. Room Lighting's setting value `"0"` is an **All Modes sentinel**, not an id from this list |
 | `GET /hub/edit` | The **Settings** page (UI). Not `/hub/settings`, which 404s — the nav link is the authority |
 | `GET /installedapp/direct/<builtInAppType>` | Opens a built-in app, redirecting to a transient instance at `/installedapp/configure/<newId>/mainPage` (e.g. `swapDevice` → Settings → Swap Device). The instance takes the next app id and is **not** a persistent install: its **Cancel** discards it, after which `/installedapp/statusJson/<id>` returns `{}` and it is absent from `/hub2/appsList`. Verified 2.5.1.128 |
 
@@ -109,14 +110,42 @@ Correlating an app's log line against an event across these two silently mis-ord
 
 | Field | Shape |
 |-------|-------|
-| `appsUsing` | Array of `{id, name, label, trueLabel, disabled}` — the apps referencing the device. `disabled` is the **load-bearing (enabled) vs inert (disabled)** split the removal warning turns on |
+| `appsUsing` | Array of `{id, name, label, trueLabel, disabled}` — every app referencing the device. `disabled` is only the app's switch state; **enabled does not prove the reference is live** |
 | `appsUsingCount` | **String** on the wire (`"2"`) |
 | `appsUsingForDialog` / `appsUsingForDialogMore` | The same list shaped for the "in use by N apps" confirm dialog |
 | `dashboards` | Array of dashboards showing the device (`[]` when none) |
 | `parentApp` | The app that created the device, or `null` (non-null for app-managed integrations like CoCoHue / HubiThings Replica) |
 | `childDevices` / `hasChildren` | `childDevices` is a dict `{parentId: [child device objects]}`; a delete of the parent takes the children with it |
 
-**`statusJson` blind spot:** `/installedapp/statusJson/<appId>` reports device-input `settings` as `None` even when set (its `eventSubscriptions` covers event subscriptions only). Verify a specific device input via `/installedapp/configure/json/<appId>/<page>` (the `settings` object) — that page also carries `removeButton` (an app with `removeButton:false` cannot be removed from the UI). `fullJson.appsUsing` is the hub's computed list and does not have the `statusJson` blind spot.
+`appsUsing` is the **delete blast radius**, not a liveness list. Rule Machine can leave a stale
+`tDev-N` setting and `state.trigDevsW` entry after its live trigger moved; the old device remains in
+`appsUsing` even though `state.trigDevs` points elsewhere. The inert reference still belongs in a
+delete warning.
+
+## Installed-app configuration and live-consumer surfaces (grounded through 2026-07-24)
+
+`GET /installedapp/statusJson/<appId>` carries several distinct surfaces:
+
+| Field | Meaning |
+|-------|---------|
+| `settings` | Null for device/capability inputs on the verified builds; do not use it to inventory them |
+| `appSettings[]` | Resolved settings, including `name`, `deviceIdsForDeviceList`, and `deviceList`; best one-call answer to "which input holds this device?" |
+| `eventSubscriptions[]` | Current subscriptions; match the device against `typeId` for positive live evidence |
+| `state.trigDevs` / `appState.trigDevs` | Rule Machine's authoritative trigger-device map |
+| `state.trigDevsW` / `appState.trigDevsW` | Rule Machine withdrawn trigger bookkeeping; not a live trigger |
+| `scheduledJobs[].prevRunTime` | Null until that schedule has fired since creation/reset; null does not mean disabled |
+
+`GET /installedapp/configure/json/<appId>/<page>.settings` remains the page-specific configured-input
+view and also carries `removeButton`. A page value is a device-id→label map, not a `{value: ...}`
+wrapper. Configuration alone does not prove liveness.
+
+For Rule Machine, read `trigDevs` even when `eventSubscriptions` is empty: a false Required
+Expression temporarily removes subscriptions while the trigger remains correctly configured.
+Absence from `trigDevs` is a negative only for a trigger-role reference. A Rule Machine action or
+condition device may be live without appearing in that trigger map.
+For arbitrary apps, a missing subscription is not a safe negative because command-only consumers
+do not subscribe. `skills/_scripts/hub_device_usage.py --live` applies this three-state audit and
+leaves unsupported negative cases `unknown`.
 
 ## Device control (official — Maker API)
 
@@ -151,9 +180,9 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 
 **Z-Wave rebuild is gated by node type.** The per-node "Rebuild route" action is offered only for **mains / always-listening** nodes (repeaters, plugs, lamps); **sleepy battery** nodes (e.g. a door lock) show only Refresh · State — no on-demand route rebuild. The global rebuild (`zwaveRepair2`) is the only lever that touches a sleepy node, and its route rebuilds **on its next wake** — it sits in the status `Pending` list and completes async. zwaveJS backend only (the "Rebuild network" label); legacy uses different wording. For a marginal battery node the durable fix is RF/topology — a repeater — not a repair click (`rules/zwave-zigbee-mesh.md`).
 
-## Z-Wave & Zigbee mesh detail (undocumented — grounded 2026-07-15)
+## Z-Wave & Zigbee mesh detail (undocumented — grounded through 2026-07-23)
 
-Both return clean JSON on 2.5.1.128, no auth with Hub Security off. Drive them for mesh
+Both return clean JSON through 2.5.1.132, no auth with Hub Security off. Drive them for mesh
 diagnostics; the `mesh-health` skill reads them via `skills/_scripts/hub_mesh.py`.
 
 | Endpoint | Returns |
@@ -169,6 +198,17 @@ weigh `per` against it), `per` (cumulative packet-error **count**, not a %), `av
 `lwrRssi` (string — see scale note), `neighbors` (int), `routeChanges` (int or `N/A`), `route`,
 `security`, `listening`, `beaming`, `batteryPercent`, `lastTime` (when the hub last heard the node —
 see the timestamp trap below; **absent** on a node never heard, which is reported `nodeState:OK`).
+
+`listening:true` is the always-on / classic-mesh repeater indicator. `beaming` means the node
+**requires** beam wake-up, not that it beams for others; its JSON value was false for every sampled
+node on 2.5.1.132, including FLiRS locks, so read the Z-Wave Details UI Beaming column when that
+status matters. `route` uses hexadecimal ids and includes hub plus destination: `01 -> 57` is direct
+to node `0x57`; only intermediate ids are repeaters.
+
+**Zigbee `devices[]` liveness trap:** `active` is not freshness. Devices silent for years still
+reported `active:true` on 2.5.1.132. Use the offset-bearing `lastActivity` timestamp; a missing
+timestamp is unknown. A generic `name:"Device"` / `type:"Device"` remains the unfinished-join
+signature.
 
 **Timestamp trap (grounded 2026-07-16, 2.5.1.128):** `lastTime` carries a different shape per Z-Wave
 backend. The **legacy** backend emits an explicit offset — `2026-07-16T00:49:14+0000`, true UTC. The
@@ -205,7 +245,8 @@ side can be correct while the other is stale.
 **Zigbee `devices[]` per-device fields:** `id`, `name`, `type`, `active` (bool), `ping`,
 `messageCount`, `lastActivity`, `lastMessage`, `shortZigbeeId` (16-bit), `zigbeeId` (64-bit IEEE).
 **No per-device LQI or RSSI is exposed here** — per-device (router) LQI is in `getChildAndRouteInfo`
-above; per-frame LQI+RSSI in the radio log sockets below; this snapshot is liveness + network-level only.
+above; per-frame LQI+RSSI in the radio log sockets below. Use `lastActivity` for snapshot liveness;
+`active` is not a freshness field.
 
 **Live radio log websockets** (verified 2026-07-15 on 2.5.1.128, `HTTP 101`, unmasked text frames,
 case-sensitive paths) — the per-frame decoded traffic, distinct from the driver `/logsocket`. Tail via `skills/_scripts/hub_radiolog.py`:

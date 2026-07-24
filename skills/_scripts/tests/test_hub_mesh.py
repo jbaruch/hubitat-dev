@@ -27,6 +27,7 @@ def zw_node(**kw):
     base = {"nodeId": 10, "deviceId": 100, "deviceName": "Dev", "nodeState": "OK",
             "per": 0, "averageRtt": "30.0", "lwrRssi": "-50db", "neighbors": 5,
             "routeChanges": 0, "route": "01 -> 0A", "security": "S2_Authenticated",
+            "listening": True, "beaming": False,
             "lastTime": "2026-07-15T17:00:00+0000"}
     base.update(kw)
     return base
@@ -150,6 +151,12 @@ class TestAnalyzeZwave(unittest.TestCase):
         self.assertEqual(r["backend"], "legacy")
         self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rssi"]], [2, 1])  # 5 (near noise) worst
 
+    def test_listening_and_beaming_are_surfaced_raw(self):
+        d = zwave_details([zw_node(listening=False, beaming=True)])
+        node = m.analyze_zwave(d, NOW)["ranked"]["by_rssi"][0]
+        self.assertFalse(node["listening"])
+        self.assertTrue(node["beaming"])
+
 
 class TestAnalyzeZigbee(unittest.TestCase):
     def test_weak_channel_is_network_problem(self):
@@ -161,13 +168,40 @@ class TestAnalyzeZigbee(unittest.TestCase):
                                             enabled=False), NOW)
         self.assertEqual(len(r["network_problems"]), 3)
 
-    def test_dead_device_and_incomplete_join(self):
-        devs = [zb_device(id=1, active=True),
-                zb_device(id=2, active=False, name="Device", type="Device",
+    def test_generic_device_is_incomplete_join(self):
+        devs = [zb_device(id=2, active=False, name="Device", type="Device",
                           lastActivity=None, lastMessage=None, messageCount=0)]
         r = m.analyze_zigbee(zigbee_details(devs), NOW)
-        self.assertEqual([d["id"] for d in r["dead_devices"]], [2])
-        self.assertTrue(r["dead_devices"][0]["likely_incomplete_join"])
+        self.assertEqual([d["id"] for d in r["incomplete_joins"]], [2])
+        self.assertTrue(r["incomplete_joins"][0]["likely_incomplete_join"])
+
+    def test_active_false_is_surfaced_but_not_called_dead(self):
+        devs = [zb_device(id=2, active=False, name="Outlet", type="Generic Zigbee Outlet")]
+        r = m.analyze_zigbee(zigbee_details(devs), NOW)
+        self.assertEqual([d["id"] for d in r["active_false_devices"]], [2])
+        self.assertEqual(r["incomplete_joins"], [])
+
+    def test_active_true_does_not_hide_stale_last_activity(self):
+        devs = [
+            zb_device(id=1, active=True, lastActivity="2025-01-01T00:00:00+0000"),
+            zb_device(id=2, active=True, lastActivity="2026-07-15T17:00:00+0000"),
+        ]
+        r = m.analyze_zigbee(zigbee_details(devs), NOW)
+        self.assertEqual([d["id"] for d in r["stalest"]], [1, 2])
+        self.assertTrue(r["stalest"][0]["active"])
+
+    def test_missing_last_activity_is_unknown_even_when_last_message_exists(self):
+        devs = [zb_device(id=3, active=True, lastActivity=None,
+                          lastMessage="2026-07-15T17:00:00+0000")]
+        r = m.analyze_zigbee(zigbee_details(devs), NOW)
+        self.assertEqual([d["id"] for d in r["activity_unknown"]], [3])
+        self.assertEqual(r["stalest"], [])
+
+    def test_unparseable_last_activity_is_unknown(self):
+        devs = [zb_device(id=4, active=True, lastActivity="not-a-timestamp")]
+        r = m.analyze_zigbee(zigbee_details(devs), NOW)
+        self.assertEqual([d["id"] for d in r["activity_unknown"]], [4])
+        self.assertEqual(r["stalest"], [])
 
     def test_activity_age_injected_now(self):
         d = zb_device(id=9, lastActivity="2026-07-15T16:00:00+0000")  # 2h before NOW
@@ -278,10 +312,17 @@ class TestZwaveStaleness(unittest.TestCase):
 class TestAnalyzeRollup(unittest.TestCase):
     def test_summary_counts_across_radios(self):
         zw = zwave_details([zw_node(nodeState="FAILED"), zw_node(per=10)])
-        zb = zigbee_details([zb_device(active=False)], weakChannel=True)
+        zb = zigbee_details([
+            zb_device(active=False, name="Device", type="Device", lastActivity=None)
+        ], weakChannel=True)
         r = m.analyze(zw, zb, NOW)
-        # 1 failed + 1 weakChannel = 2 critical; 1 PER + 1 dead device = 2 warnings
+        # 1 failed + 1 weakChannel = 2 critical; 1 PER + 1 incomplete join = 2 warnings
         self.assertEqual(r["summary"], {"critical": 2, "warnings": 2})
+
+    def test_active_false_alone_does_not_reach_warning_counter(self):
+        zb = zigbee_details([zb_device(active=False)])
+        r = m.analyze(None, zb, NOW)
+        self.assertEqual(r["summary"], {"critical": 0, "warnings": 0})
 
     def test_missing_radio_is_none(self):
         r = m.analyze(zwave_details([zw_node()]), None, NOW)

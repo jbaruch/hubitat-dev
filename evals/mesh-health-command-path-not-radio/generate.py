@@ -158,6 +158,10 @@ def zwave_raw() -> dict:
             "routeChanges": "N/A",
             "route": route,
             "security": "S2",
+            "listening": name.startswith(
+                ("Extender", "Outlet", "Lamp", "Switch", "Dimmer", "Relay")),
+            # Mirrors the 2.5.1.132 JSON trap: false even where a FLiRS UI row may say Beaming.
+            "beaming": False,
             "lastTime": last,
         })
     for node_id, name, last, rtt, rssi, msgs, route in ZWAVE_LR_NODES:
@@ -174,6 +178,8 @@ def zwave_raw() -> dict:
             "routeChanges": "N/A",
             "route": route,
             "security": "S2",        # LR inclusion is S2-mandatory
+            "listening": False,
+            "beaming": False,
             "lastTime": last,
         })
     return {
@@ -258,9 +264,9 @@ def assert_ground_truth(result: dict) -> None:
         if zwave[bucket]:
             problems.append(f"zwave.{bucket} is non-empty ({len(zwave[bucket])}) — every axis "
                             f"must measure green so staleness is the only evidence.")
-    if zwave["healthy"] is not True or zigbee["network_problems"] or zigbee["dead_devices"]:
+    if zwave["healthy"] is not True or zigbee["network_problems"] or zigbee["incomplete_joins"]:
         problems.append("zwave.healthy must be true and Zigbee must report no network problems "
-                        "or dead devices.")
+                        "or incomplete joins.")
     if mesh["problems"]:
         problems.append(f"hub_mesh.problems is non-empty ({len(mesh['problems'])}) — the peer "
                         f"link must be ruled out on evidence (both peers probe clean).")

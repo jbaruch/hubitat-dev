@@ -17,9 +17,9 @@ end-of-life on 2024-10-07; CI runs 3.11.
 | `hub_pull.py` | Pull an app or driver's source + version from a hub | HTTP |
 | `hub_deploy.py` | Deploy source to a hub (create/update, version optimistic-concurrency) | HTTP |
 | `hub_logtail.py` | Tail the `/logsocket` or `/eventsocket` websocket, filtered | WebSocket |
-| `hub_mesh.py` | Fetch Z-Wave/Zigbee mesh detail **and hub-mesh peer health**; flag failed/ghost nodes, PER, weak routes, unreachable peers; rank staleness | HTTP |
+| `hub_mesh.py` | Fetch Z-Wave/Zigbee mesh detail **and hub-mesh peer health**; flag failed/ghost nodes, PER, weak routes, incomplete joins, unreachable peers; rank timestamp liveness | HTTP |
 | `hub_radiolog.py` | Tail the `zwaveLogsocket`/`zigbeeLogsocket` for per-frame radio traffic | WebSocket |
-| `hub_device_usage.py` | Report where a device is used (blast radius) before removing it | HTTP |
+| `hub_device_usage.py` | Report a device's delete blast radius; `--live` audits subscriptions and Rule Machine `trigDevs` separately | HTTP |
 | `hub_fw_update.py` | Batch-flash Z-Wave firmware via the native zwaveJS updater, with a no-progress watchdog, canary radio-health probe + auto-reboot recovery, and an RSSI floor (a failed/stalled OTA can hang the whole controller) | HTTP |
 | `hubs_config.py` | Owner of `hubs.json` — init/add/set-default/remove/list hubs (imported + CLI) | — |
 

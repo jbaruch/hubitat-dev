@@ -13,13 +13,28 @@ them onto the new id.
 ## Enumerate before removing
 
 - The hub computes a device's usage itself — read it from `GET /device/fullJson/<id>` via `skills/_scripts/hub_device_usage.py` (output contract in its module docstring). Never delete a device whose usage has not been read first.
-- The report splits `appsUsing` into **enabled** (live automations a delete breaks) and **disabled** (inert), and lists dashboards, the `parentApp`, and child devices — the full blast radius (`skills/_reference/endpoints.md`).
-- Do not enumerate device inputs from `/installedapp/statusJson/<appId>` — it reports them as `None` even when set. `fullJson.appsUsing` is the hub's computed list; for a specific input, read `/installedapp/configure/json/<appId>/<page>` instead.
+- The report splits `appsUsing` by the app's **enabled/disabled switch state** and lists dashboards, the `parentApp`, and child devices — the full reference blast radius (`skills/_reference/endpoints.md`).
+- **Enabled does not mean live.** An enabled app may retain an inert device reference. Rule Machine keeps withdrawn `tDev-N` settings and `state.trigDevsW` entries in `appsUsing` after its live trigger moved elsewhere.
+- The `settings` field returned by `GET /installedapp/statusJson/<appId>` is null for device inputs. Its `appSettings[]` entries carry `deviceIdsForDeviceList`, `deviceList`, and the setting name. Use that one-call inventory or `/installedapp/configure/json/<appId>/<page>.settings` to identify which configured input points at the device.
+
+## Audit live consumers separately
+
+- Run `skills/_scripts/hub_device_usage.py --live` when the question is "what actually consumes this device?"
+- The three-state result is `live`, `not_live`, or `unknown`.
+- Never report `unknown` as inert.
+- For a subscription-driven app, a matching `statusJson.eventSubscriptions[].typeId` is positive live evidence.
+- Subscription absence is conclusive only for an app type known to consume the device by subscription.
+- Command-only consumers legitimately have no subscription and remain `unknown` without another live surface.
+- For a Rule Machine **trigger**, `state.trigDevs` is authoritative. A trigger remains there while a Required Expression is false even though its event subscription is temporarily absent.
+- A Rule Machine action or condition device need not appear in `trigDevs`. Absence from that trigger map is not a liveness negative without trigger-role evidence such as a matching `tDev*` setting or `trigDevsW` entry.
+- `state.trigDevsW` and stale `tDev-N` settings are withdrawn bookkeeping, not live triggers. They remain deletion blast-radius references.
 
 ## Warn with the concrete blast radius
 
-- Surface the actual list before deleting — name each enabled app, dashboard, parent app, and child device that references the device.
-- Distinguish load-bearing from inert: an enabled app is a live automation; a disabled app or an idle monitor is inert. State which is which, never a bare count.
+- Surface the actual list before deleting — name every enabled and disabled app reference, dashboard, parent app, and child device.
+- Distinguish **reference state** from **consumer liveness**.
+- State that enabled/disabled is the app switch state.
+- Use the live audit before calling an enabled reference active or inert.
 - The usage script only reads — it never deletes. Deletion is irreversible: read the hub-UI confirm dialog's "in use by N apps" state with Playwright (`skills/_reference/playwright-ui.md`), then have the **user** perform the final removal — the agent guides and confirms, it does not click the destructive delete. A radio (Z-Wave/Zigbee) device also needs a physical exclusion/factory-reset only the user can do (`rules/zwave-zigbee-mesh.md`).
 
 ## Verify after removing
@@ -31,7 +46,7 @@ them onto the new id.
 
 - App-managed integrations (CoCoHue, HubiThings Replica) always create the replacement as a **new device id** — every prior reference points at the old, now-deleted id and silently breaks.
 - Capture the old device's app / dashboard / scene memberships **before** deleting it (the enumerate step above is the capture).
-- After the replacement is created or imported, restore those memberships onto the new device id, then report exactly what was re-wired versus left for the user. Selecting the new device in each app is a UI action (`skills/_reference/playwright-ui.md`) — verify each one stuck.
+- After the replacement is created or imported, restore those memberships onto the new device id, then report what was re-wired versus left for the user. Selecting the new device in each app is a UI action (`skills/_reference/playwright-ui.md`) — verify the configured input and its live surface.
 
 ## Swap before re-selecting by hand
 

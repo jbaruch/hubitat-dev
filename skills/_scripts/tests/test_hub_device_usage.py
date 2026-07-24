@@ -6,7 +6,9 @@ The fixtures mirror the real /device/fullJson/<id> shape verified live on 2.5.1.
 appsUsing entries carry {id, name, label, trueLabel, disabled}; appsUsingCount is a STRING;
 childDevices is a dict {parentId: [child objects]}."""
 
+import contextlib
 import importlib.util
+import io
 import json
 import unittest
 from pathlib import Path
@@ -116,6 +118,182 @@ class TestAnalyzeUsage(unittest.TestCase):
     def test_dashboards_passed_through(self):
         f = full_json(dashboards=[{"id": 1, "name": "Main"}])
         self.assertEqual(m.analyze_usage(f)["blast_radius"]["dashboards"], 1)
+
+
+def status_json(**kw):
+    base = {
+        "settings": None,
+        "appSettings": [],
+        "eventSubscriptions": [],
+        "state": {},
+    }
+    base.update(kw)
+    return base
+
+
+class TestAnalyzeLiveness(unittest.TestCase):
+    def test_rule_machine_withdrawn_reference_is_configured_not_live(self):
+        apps = [m.normalize_app(app(
+            id=788, name="Rule Machine", label="Stairs rule", disabled=False))]
+        statuses = {
+            788: status_json(
+                appSettings=[{
+                    "name": "tDev-11",
+                    "value": None,
+                    "deviceIdsForDeviceList": [1612],
+                    "deviceList": {"1612": "mZone-Stairs"},
+                }],
+                eventSubscriptions=[{"typeId": 220, "handler": "allHandlerX"}],
+                state={
+                    "trigDevs": {"220:Motion": ["1"]},
+                    "trigDevsW": {"1612:Motion": []},
+                }),
+        }
+
+        result = m.analyze_liveness(1612, apps, statuses)
+
+        audited = result["apps"][0]
+        self.assertEqual(audited["status"], "not_live")
+        self.assertEqual(audited["method"], "rule_machine_trig_devs")
+        self.assertFalse(audited["trigger_in_trig_devs"])
+        self.assertTrue(audited["trigger_in_trig_devs_w"])
+        self.assertEqual(audited["configured_settings"], ["tDev-11"])
+        self.assertEqual(audited["rule_machine_trigger_settings"], ["tDev-11"])
+        self.assertEqual(result["summary"]["enabled_configured_not_live"], 1)
+        self.assertEqual([a["id"] for a in result["enabled_configured_not_live"]], [788])
+
+    def test_required_expression_false_uses_trig_devs_not_subscriptions(self):
+        apps = [m.normalize_app(app(
+            id=819, name="Rule Machine", label="Motion at Night", disabled=False))]
+        statuses = {
+            "819": status_json(
+                eventSubscriptions=[],
+                appState=[{"name": "trigDevs", "value": '{"1580:Motion":["1"]}'}]),
+        }
+
+        result = m.analyze_liveness(1580, apps, statuses)
+
+        audited = result["apps"][0]
+        self.assertEqual(audited["status"], "live")
+        self.assertTrue(audited["trigger_in_trig_devs"])
+        self.assertEqual(audited["matching_subscription_count"], 0)
+        self.assertEqual(result["summary"]["enabled_configured_not_live"], 0)
+
+    def test_rule_machine_action_reference_absent_from_trig_devs_stays_unknown(self):
+        apps = [m.normalize_app(app(
+            id=820, name="Rule Machine", label="Control fan", disabled=False))]
+        statuses = {
+            820: status_json(
+                appSettings=[{
+                    "name": "actionDevice",
+                    "deviceIdsForDeviceList": [1612],
+                    "deviceList": {"1612": "Office Fan"},
+                }],
+                state={"trigDevs": {"220:Motion": ["1"]}}),
+        }
+
+        audited = m.analyze_liveness(1612, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "unknown")
+        self.assertEqual(audited["method"], "rule_machine_non_trigger_reference")
+        self.assertFalse(audited["trigger_in_trig_devs"])
+        self.assertEqual(audited["rule_machine_trigger_settings"], [])
+        self.assertFalse(audited["configured_not_live"])
+
+    def test_rule_machine_non_trigger_subscription_is_live_evidence(self):
+        apps = [m.normalize_app(app(
+            id=821, name="Rule Machine", label="Watch illuminance", disabled=False))]
+        statuses = {
+            821: status_json(
+                appSettings=[{
+                    "name": "conditionDevice",
+                    "deviceIdsForDeviceList": [1612],
+                    "deviceList": {"1612": "Office Lux"},
+                }],
+                eventSubscriptions=[{"typeId": 1612}],
+                state={"trigDevs": {"220:Motion": ["1"]}}),
+        }
+
+        audited = m.analyze_liveness(1612, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "live")
+        self.assertEqual(audited["method"], "event_subscription")
+        self.assertFalse(audited["trigger_in_trig_devs"])
+
+    def test_rule_machine_tdev_setting_is_negative_trigger_evidence(self):
+        apps = [m.normalize_app(app(
+            id=822, name="Rule Machine", label="Old trigger", disabled=False))]
+        statuses = {
+            822: status_json(
+                appSettings=[{
+                    "name": "tDev-4",
+                    "deviceIdsForDeviceList": [1612],
+                    "deviceList": {"1612": "Old Motion"},
+                }],
+                state={"trigDevs": {"220:Motion": ["1"]}}),
+        }
+
+        audited = m.analyze_liveness(1612, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "not_live")
+        self.assertEqual(audited["method"], "rule_machine_trig_devs")
+        self.assertEqual(audited["rule_machine_trigger_settings"], ["tDev-4"])
+        self.assertTrue(audited["configured_not_live"])
+
+    def test_matching_event_subscription_is_positive_live_evidence(self):
+        apps = [m.normalize_app(app(id=12, name="Motion Lighting", disabled=False))]
+        statuses = {
+            12: status_json(
+                appSettings=[{
+                    "name": "motions",
+                    "deviceIdsForDeviceList": [1611],
+                    "deviceList": {"1611": "mZone-Study"},
+                }],
+                eventSubscriptions=[{"typeId": "1611"}, {"typeId": 44}]),
+        }
+
+        audited = m.analyze_liveness(1611, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "live")
+        self.assertEqual(audited["method"], "event_subscription")
+        self.assertEqual(audited["matching_subscription_count"], 1)
+        self.assertEqual(audited["configured_settings"], ["motions"])
+
+    def test_no_subscription_stays_unknown_for_command_only_consumer(self):
+        apps = [m.normalize_app(app(id=13, name="Room Lighting", disabled=False))]
+        statuses = {
+            13: status_json(appSettings=[{
+                "name": "roomDevsL",
+                "deviceIdsForDeviceList": [99],
+                "deviceList": {"99": "Kitchen Light"},
+            }]),
+        }
+
+        audited = m.analyze_liveness(99, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "unknown")
+        self.assertEqual(audited["method"], "no_authoritative_liveness_surface")
+        self.assertFalse(audited["configured_not_live"])
+
+    def test_disabled_app_is_not_live_without_status_json(self):
+        apps = [m.normalize_app(app(id=14, disabled=True))]
+
+        result = m.analyze_liveness(99, apps, {})
+
+        audited = result["apps"][0]
+        self.assertEqual(audited["status"], "not_live")
+        self.assertEqual(audited["method"], "app_disabled")
+        self.assertEqual(result["summary"],
+                         {"live": 0, "not_live": 1, "unknown": 0,
+                          "enabled_configured_not_live": 0})
+
+    def test_rule_machine_without_state_stays_unknown(self):
+        apps = [m.normalize_app(app(id=15, name="Rule Machine", disabled=False))]
+
+        audited = m.analyze_liveness(99, apps, {15: status_json()})["apps"][0]
+
+        self.assertEqual(audited["status"], "unknown")
+        self.assertEqual(audited["method"], "rule_machine_state_unavailable")
 
 
 def devices_list(*names_ids):
@@ -241,6 +419,38 @@ class TestFetchDevices(unittest.TestCase):
             m.fetch_devices("http://h:8080", transport=FakeTransport(401, "login"))
 
 
+class TestFetchAppStatus(unittest.TestCase):
+    def test_ok(self):
+        body = json.dumps(status_json(eventSubscriptions=[{"typeId": 40}]))
+        out = m.fetch_app_status("http://h:8080", 12, transport=FakeTransport(200, body))
+        self.assertEqual(out["eventSubscriptions"][0]["typeId"], 40)
+
+    def test_non_200_raises(self):
+        with self.assertRaises(m.HubError):
+            m.fetch_app_status("http://h:8080", 12, transport=FakeTransport(404, "missing"))
+
+    def test_non_object_raises(self):
+        with self.assertRaises(m.HubError):
+            m.fetch_app_status("http://h:8080", 12, transport=FakeTransport(200, "[]"))
+
+    def test_fetch_statuses_skips_disabled_apps(self):
+        calls = []
+
+        def transport(method, url, body):
+            calls.append((method, url, body))
+            return 200, {}, json.dumps(status_json())
+
+        apps = [
+            m.normalize_app(app(id=12, disabled=False)),
+            m.normalize_app(app(id=13, disabled=True)),
+        ]
+        statuses = m.fetch_app_statuses("http://h:8080", apps, transport=transport)
+
+        self.assertEqual(list(statuses), [12])
+        self.assertEqual(len(calls), 1)
+        self.assertTrue(calls[0][1].endswith("/installedapp/statusJson/12"))
+
+
 class TestMain(unittest.TestCase):
     def test_missing_hub_target_exits_2(self):
         self.assertEqual(m.main(["--device", "252"]), 2)
@@ -258,6 +468,34 @@ class TestMain(unittest.TestCase):
         self.assertEqual(
             m.main(["--ip", "1.2.3.4", "--name", "kitchen light"], transport=RouteTransport(routes)),
             0)
+
+    def test_live_mode_adds_audit(self):
+        body = full_json(
+            appsUsing=[app(id=788, name="Rule Machine", disabled=False)],
+            appsUsingCount="1")
+        routes = {
+            "/device/fullJson/": (200, json.dumps(body)),
+            "/installedapp/statusJson/": (
+                200,
+                json.dumps(status_json(
+                    appSettings=[{
+                        "name": "tDev-11",
+                        "deviceIdsForDeviceList": [1612],
+                        "deviceList": {"1612": "mZone-Stairs"},
+                    }],
+                    state={"trigDevs": {"220:Motion": ["1"]}}))),
+        }
+        stdout = io.StringIO()
+
+        with contextlib.redirect_stdout(stdout):
+            rc = m.main(
+                ["--ip", "1.2.3.4", "--device", "1612", "--live"],
+                transport=RouteTransport(routes))
+
+        self.assertEqual(rc, 0)
+        payload = json.loads(stdout.getvalue())
+        self.assertEqual(payload["live_audit"]["apps"][0]["status"], "not_live")
+        self.assertEqual(payload["live_audit"]["summary"]["enabled_configured_not_live"], 1)
 
 
 if __name__ == "__main__":

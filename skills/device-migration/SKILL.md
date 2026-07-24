@@ -25,14 +25,15 @@ The Step 5 verification and the manual path both need this, and it must be read 
 changes:
 
 ```
-python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --device <id> --ip <addr>
-python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --name "<display name>" --ip <addr>
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --device <id> --ip <addr> --live
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py --name "<display name>" --ip <addr> --live
 ```
 
 Argument and output contract: `skills/_scripts/hub_device_usage.py` module docstring. Use `--hub <name>`
 instead of `--ip` to resolve via `hubs.json` (`hub-config` skill). Keep the report — it is the
-capture, listing apps (enabled vs disabled), dashboards, `parentApp`, and child devices. Proceed to
-Step 2.
+capture, listing app references by enabled/disabled switch state, dashboards, `parentApp`, and child
+devices. `live_audit` is separate: enabled does not mean live, and unknown does not mean inert.
+Proceed to Step 2.
 
 ## Step 2 — Try Settings → Swap Device
 
@@ -106,11 +107,19 @@ the only offline device, the swap's "old" pick is unambiguous. With others offli
 id/name captured in Step 1 — `data.source: Linked` marks it as the mesh link. The emptied link is
 then a normal removal (`Skill(skill: "device-removal")`). Proceed to Step 5.
 
-## Step 5 — Verify the references actually moved
+## Step 5 — Verify the configured and live surfaces
 
-Re-run Step 1's script against **both** devices. The new device should now carry the apps the old one
-had; the old should be down to nothing (or only what you intended to leave). A swap that reports
-success in the UI but leaves references behind is the failure this step exists to catch.
+Re-run Step 1's `--live` command against **both** devices. Compare two axes:
+
+- `appsUsing` is the reference blast radius. The new device should carry the configured app
+  references. The old should be empty or list only references you explicitly intend to leave.
+- `live_audit` is behavioral evidence. For a Rule Machine trigger migration, `trigDevs` must name
+  the new device and not the old one.
+- A Rule Machine action/condition reference may remain `unknown`.
+- Verify an unknown reference through its configured input and type-specific live surface instead
+  of converting unknown to success.
+
+A swap that reports success in the UI but fails either applicable re-read is incomplete.
 
 **Dashboards are not covered by any claim here.** Hubitat's doc scopes the swap to "all apps" and
 says nothing about dashboard tiles. Check the old device's dashboards from the Step 1 capture and
@@ -142,15 +151,24 @@ Re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
   `tDev-1` beside `tDev1`. Verify its re-point via `state.trigDevs` in the rule's `statusJson`, never the
   raw `tDev*` setting.
 
-Verify each app individually via `/installedapp/configure/json/<appId>/<page>` (the `settings`
-object). Do **not** verify device *inputs* with `/installedapp/statusJson/<appId>` — it reports them as
-`None` even when set (`skills/_reference/endpoints.md`). Its `childDevices` list is a separate, reliable
-field: a managed child device such as `mZone*` is absent from `/hub2/devicesList` top level, and its id
-is read from the parent app's `statusJson.childDevices` (`skills/_reference/parent-child-devices.md`).
-Trust this device-level re-read over the picker values — it is what catches a turn-off sensor left
-behind in `motionsInactive`. A stale Rule Machine `tDev-1` keeps a re-pointed old device listing the
-rule in Step 1's script, but that reference is **inert** — no live subscription. Once `state.trigDevs`
-shows the new device, the old one is safe to delete. Re-run Step 1's script when done. Proceed to Step 7.
+Verify each app's configured input via `appSettings[]` from
+`GET /installedapp/statusJson/<appId>` or the page-specific
+`/installedapp/configure/json/<appId>/<page>.settings`. The former names every resolved device
+setting in one call. Its sibling top-level `settings` field is null
+(`skills/_reference/endpoints.md`). `statusJson.childDevices` is a separate reliable field: a managed
+child such as `mZone*` is absent from `/hub2/devicesList` top level, and its id comes from the parent
+app (`skills/_reference/parent-child-devices.md`).
+
+Trust the configured and live re-reads over picker values:
+
+- The configured input catches a turn-off sensor left in `motionsInactive`.
+- `eventSubscriptions[].typeId` proves a subscription-driven app is listening.
+- Rule Machine's `state.trigDevs` proves its trigger even while a Required Expression suppresses
+  subscriptions.
+- A stale RM `tDev-1` / `trigDevsW` reference can keep the old device in `appsUsing` after
+  `trigDevs` moved. Report it as blast-radius bookkeeping, not a live trigger.
+
+Re-run Step 1's `--live` command when done. Proceed to Step 7.
 
 ## Step 7 — Report what moved and what is left
 

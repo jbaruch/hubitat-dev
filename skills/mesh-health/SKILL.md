@@ -54,15 +54,21 @@ staleness and never flag it. Split the ranking (`rules/zwave-zigbee-mesh.md` The
 
 - **Reporters** (lock, motion, presence, extender) transmit on their own — fresh means the radio works.
 - **Actuators** (shade, outlet, lamp) transmit only after being commanded — `lastTime` is when a command last landed, so silence is unknown, not broken.
+- Zigbee device `active` is not liveness in either direction. Long-dead devices can remain
+  `active:true`.
+- Use `lastActivity` / `age_seconds` for liveness.
+- Treat `active_false_devices[]` as raw metadata only.
+- `zigbee.activity_unknown[]` has no parseable `lastActivity` to rank. Report that as unknown
+  evidence, never as fresh or dead.
 - **Reporters fresh + actuators frozen ⇒ the command path is broken, not the radio.** Spanning both radios at once rules out any radio fault. Check `hub_mesh.problems[]` first, then the app that commands them.
 - A cluster of actuator timestamps in one narrow window is the last moment commands worked — say when it was, and name the automation likely to have run then.
 - `zwave.never_heard[]` is not staleness: no timestamp is unknown age, not infinite age. Read it against the `deviceId` split in Step 3, **and against each entry's `dependent_count`** — a never-heard leaf is one silent device, while a never-heard node carrying 12 dependents is 12 nodes pathing through something the hub has no evidence is alive (Step 5, `rules/zwave-zigbee-mesh.md` Route fan-in).
 
 **Only now can an all-clear be reported.** If `summary.critical` and `summary.warnings` are both 0,
-`fetch_warnings` is empty, **and** no actuator/reporter asymmetry appears, report the mesh healthy
-and finish. If the counters are 0 but actuators are frozen while reporters are fresh, the mesh is
-**not** healthy — say so, and proceed. Never report "healthy" on the counters alone against a
-symptom of devices not responding, and never over an unmeasured axis.
+`fetch_warnings` and `zigbee.activity_unknown[]` are empty, **and** no actuator/reporter asymmetry
+appears, report the mesh healthy and finish. If the counters are 0 but actuators are frozen while
+reporters are fresh, the mesh is **not** healthy — say so, and proceed. Never report "healthy" on
+the counters alone against a symptom of devices not responding, and never over an unmeasured axis.
 
 Proceed to Step 5.
 
@@ -72,9 +78,13 @@ Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 - `zwave.packet_errors[]` — nonzero PER (cumulative error count); weigh against the node's `msgCount` and its peers, not an absolute number.
 - `zwave.ranked.by_rtt_ms` / `by_rssi` — worst-first. **Check `zwave.backend` first**: `lwrRssi` is absolute dBm under `zwavejs` and dB-above-noise under `legacy` — the same number means different things.
 - `zwave.weak_signal_heuristic[]` — backend-aware RSSI-near-floor flags; each carries `heuristic:true` and a cited `basis`. Present as a hint, not a fact.
+- Z-Wave `listening:true` marks an always-on classic-mesh node that can repeat.
+- `beaming` means the device requires beam wake-up, not that it beams for others.
+- The JSON `beaming` value is unreliable on the grounded build. Never use it to select a repeater.
 - `zwave.route_fan_in` — how many nodes route through each repeater (`rules/zwave-zigbee-mesh.md` Route fan-in). `repeaters[]` is topology, **not a fault list**: a repeater carrying 12 nodes is a normal mesh and needs no remedy. Read `load_bearing_concerns[]` — a repeater that is itself never-heard/FAILED/weak, ranked by how many nodes sit behind it. Quote its `dependent_count` as the **scope** of the warning that node already carries in `never_heard[]`/`failed[]`, never as extra findings. Check the dependents' freshness first: a node reporting behind a flagged repeater proves that repeater still relays.
 - **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair, and a **sleepy battery node** has no per-node "Rebuild route" even then — only a global rebuild reaches it, on its next wake, so a repeater near it is the durable fix, not a repair click.
-- `zigbee.dead_devices[]` — `active:false`; `likely_incomplete_join:true` marks the `"Device"`/`"Device"` ghost. `zigbee.stalest` ranks by activity age.
+- `zigbee.incomplete_joins[]` — the generic `"Device"` / `"Device"` unfinished-join signature.
+- `zigbee.stalest` ranks real activity age. It is the place long-dead `active:true` devices surface.
 
 Correlate a flagged node against the reported symptom. Proceed to Step 6.
 
