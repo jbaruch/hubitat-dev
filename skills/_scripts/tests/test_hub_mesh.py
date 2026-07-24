@@ -197,6 +197,12 @@ class TestAnalyzeZigbee(unittest.TestCase):
         self.assertEqual([d["id"] for d in r["activity_unknown"]], [3])
         self.assertEqual(r["stalest"], [])
 
+    def test_unparseable_last_activity_is_unknown(self):
+        devs = [zb_device(id=4, active=True, lastActivity="not-a-timestamp")]
+        r = m.analyze_zigbee(zigbee_details(devs), NOW)
+        self.assertEqual([d["id"] for d in r["activity_unknown"]], [4])
+        self.assertEqual(r["stalest"], [])
+
     def test_activity_age_injected_now(self):
         d = zb_device(id=9, lastActivity="2026-07-15T16:00:00+0000")  # 2h before NOW
         r = m.analyze_zigbee(zigbee_details([d]), NOW)

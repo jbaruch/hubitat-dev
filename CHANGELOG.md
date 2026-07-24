@@ -22,7 +22,9 @@
   `modeXD` from `modeXOff`; null `scheduledJobs[].prevRunTime` now means not-yet-fired since schedule
   creation/reset. Zigbee no longer uses `active` as liveness: `hub_mesh.py` ranks `lastActivity`,
   emits `active_false_devices` as non-counting metadata, and replaces the misleading `dead_devices`
-  bucket with the grounded `"Device"` / `"Device"` `incomplete_joins` signature.
+  bucket with the grounded `"Device"` / `"Device"` `incomplete_joins` signature. Missing and
+  unparseable activity timestamps now surface in `activity_unknown` instead of disappearing from
+  both liveness outputs.
 
 ## 0.1.43 — 2026-07-22
 

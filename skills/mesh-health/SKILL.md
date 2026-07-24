@@ -58,8 +58,8 @@ staleness and never flag it. Split the ranking (`rules/zwave-zigbee-mesh.md` The
   `active:true`.
 - Use `lastActivity` / `age_seconds` for liveness.
 - Treat `active_false_devices[]` as raw metadata only.
-- `zigbee.activity_unknown[]` has no `lastActivity` to rank. Report that as unknown evidence, never
-  as fresh or dead.
+- `zigbee.activity_unknown[]` has no parseable `lastActivity` to rank. Report that as unknown
+  evidence, never as fresh or dead.
 - **Reporters fresh + actuators frozen ⇒ the command path is broken, not the radio.** Spanning both radios at once rules out any radio fault. Check `hub_mesh.problems[]` first, then the app that commands them.
 - A cluster of actuator timestamps in one narrow window is the last moment commands worked — say when it was, and name the automation likely to have run then.
 - `zwave.never_heard[]` is not staleness: no timestamp is unknown age, not infinite age. Read it against the `deviceId` split in Step 3, **and against each entry's `dependent_count`** — a never-heard leaf is one silent device, while a never-heard node carrying 12 dependents is 12 nodes pathing through something the hub has no evidence is alive (Step 5, `rules/zwave-zigbee-mesh.md` Route fan-in).

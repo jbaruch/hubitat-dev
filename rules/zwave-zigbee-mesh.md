@@ -75,7 +75,7 @@ healthy, so the devices are fine" — see `The command path`.
 - Per-device `active` is **not liveness**. Long-dead devices can remain `active:true`.
 - Do not treat either `active` value as a freshness verdict.
 - Read `lastActivity` and rank its age.
-- A missing `lastActivity` timestamp is unknown, not fresh.
+- A missing or unparseable `lastActivity` timestamp is unknown, not fresh.
 - A generic `name:"Device"` of `type:"Device"` is a join that never initialized — the Zigbee ghost.
 - Network-level problems: `networkState` ≠ `ONLINE`, `healthy:false`, or `weakChannel:true` (interference on the current channel). Zigbee uses 2.4 GHz channels 11–26; `weakChannel` overlaps busy Wi-Fi.
 

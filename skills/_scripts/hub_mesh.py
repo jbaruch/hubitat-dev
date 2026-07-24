@@ -485,7 +485,9 @@ def analyze_zigbee(details: dict, now: datetime) -> dict:
         {**d, "likely_incomplete_join": True}
         for d in devices if d["name"] == "Device" and d["type"] == "Device"
     ]
-    activity_unknown = [d for d in devices if d["lastActivity"] in (None, "")]
+    # Missing and malformed timestamps both have unknown age. Keep either shape visible instead of
+    # silently excluding it from stalest[].
+    activity_unknown = [d for d in devices if d["age_seconds"] is None]
 
     ranked_age = sorted((d for d in devices if d["age_seconds"] is not None),
                         key=lambda d: d["age_seconds"], reverse=True)
@@ -500,7 +502,7 @@ def analyze_zigbee(details: dict, now: datetime) -> dict:
         "device_count": len(devices),
         "incomplete_joins": incomplete,                 # generic Device/Device signature
         "active_false_devices": active_false,           # metadata, NOT a liveness verdict
-        "activity_unknown": activity_unknown,           # no lastActivity to rank
+        "activity_unknown": activity_unknown,           # no parseable lastActivity to rank
         "stalest": ranked_age[:10],
     }
 

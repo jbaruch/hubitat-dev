@@ -15,7 +15,7 @@ them onto the new id.
 - The hub computes a device's usage itself — read it from `GET /device/fullJson/<id>` via `skills/_scripts/hub_device_usage.py` (output contract in its module docstring). Never delete a device whose usage has not been read first.
 - The report splits `appsUsing` by the app's **enabled/disabled switch state** and lists dashboards, the `parentApp`, and child devices — the full reference blast radius (`skills/_reference/endpoints.md`).
 - **Enabled does not mean live.** An enabled app may retain an inert device reference. Rule Machine keeps withdrawn `tDev-N` settings and `state.trigDevsW` entries in `appsUsing` after its live trigger moved elsewhere.
-- `/installedapp/statusJson/<appId>.settings` is null for device inputs. Its `appSettings[]` entries carry `deviceIdsForDeviceList`, `deviceList`, and the setting name. Use that one-call inventory or `/installedapp/configure/json/<appId>/<page>.settings` to identify which configured input points at the device.
+- The `settings` field returned by `GET /installedapp/statusJson/<appId>` is null for device inputs. Its `appSettings[]` entries carry `deviceIdsForDeviceList`, `deviceList`, and the setting name. Use that one-call inventory or `/installedapp/configure/json/<appId>/<page>.settings` to identify which configured input points at the device.
 
 ## Audit live consumers separately
 
@@ -46,7 +46,7 @@ them onto the new id.
 
 - App-managed integrations (CoCoHue, HubiThings Replica) always create the replacement as a **new device id** — every prior reference points at the old, now-deleted id and silently breaks.
 - Capture the old device's app / dashboard / scene memberships **before** deleting it (the enumerate step above is the capture).
-- After the replacement is created or imported, restore those memberships onto the new device id, then report exactly what was re-wired versus left for the user. Selecting the new device in each app is a UI action (`skills/_reference/playwright-ui.md`) — verify the configured input and its live surface.
+- After the replacement is created or imported, restore those memberships onto the new device id, then report what was re-wired versus left for the user. Selecting the new device in each app is a UI action (`skills/_reference/playwright-ui.md`) — verify the configured input and its live surface.
 
 ## Swap before re-selecting by hand
 

@@ -151,9 +151,10 @@ Re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
   `tDev-1` beside `tDev1`. Verify its re-point via `state.trigDevs` in the rule's `statusJson`, never the
   raw `tDev*` setting.
 
-Verify each app's configured input via `/installedapp/statusJson/<appId>.appSettings[]` or the
-page-specific `/installedapp/configure/json/<appId>/<page>.settings`. The former names every resolved
-device setting in one call. Its sibling top-level `statusJson.settings` field is null
+Verify each app's configured input via `appSettings[]` from
+`GET /installedapp/statusJson/<appId>` or the page-specific
+`/installedapp/configure/json/<appId>/<page>.settings`. The former names every resolved device
+setting in one call. Its sibling top-level `settings` field is null
 (`skills/_reference/endpoints.md`). `statusJson.childDevices` is a separate reliable field: a managed
 child such as `mZone*` is absent from `/hub2/devicesList` top level, and its id comes from the parent
 app (`skills/_reference/parent-child-devices.md`).

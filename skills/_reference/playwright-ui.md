@@ -66,8 +66,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
    Update is not a no-op, though — it commits into the form, and gotcha 10 is how you check that.
 
 3. **`statusJson.settings` hides device settings; `appSettings[]` exposes them.**
-   `/installedapp/statusJson/<id>.settings` reports capability/device inputs as null even when set.
-   The same payload's `appSettings[]` carries each setting `name` plus resolved
+   The `settings` field returned by `GET /installedapp/statusJson/<id>` reports capability/device
+   inputs as null even when set. The same payload's `appSettings[]` carries each setting `name` plus resolved
    `deviceIdsForDeviceList` / `deviceList`, making it the best one-call input inventory. Use
    `/installedapp/configure/json/<id>/<page>.settings` for the page-specific value. Neither
    configured surface proves the app actively consumes the device — verify its subscription or
