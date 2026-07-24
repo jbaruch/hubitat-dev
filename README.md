@@ -4,18 +4,18 @@
 
 Context for developing and debugging **Hubitat Elevation** apps, drivers, and the hub environment. This plugin does not write your Groovy for you — it makes an agent write it *correctly*: the sandbox constraints, lifecycle idioms, and capability contracts that the platform enforces but the docs bury, plus thin mechanisms for the deploy / log-tail / lint loop the hub gives you no official API for.
 
-Grounded against real hardware: Hubitat C-8 Pro, platform 2.5.1.125, local network, Hub Security off. The code-editor and logging endpoints it drives are undocumented and version-sensitive — see `skills/_reference/endpoints.md` for what was verified and when.
+Grounded against real hardware: Hubitat C-8 Pro, platform builds through 2.5.1.133, local network, Hub Security off. The code-editor and logging endpoints it drives are undocumented and version-sensitive — see `skills/_reference/endpoints.md` for what was verified and when.
 
 ## What it covers
 
 - **Authoring** — apps and drivers are single Groovy 2.4 files run in a locked-down sandbox. The rules encode what that sandbox forbids and the idioms that keep an app from silently doing nothing.
 - **Deploy / pull** — push source to a hub and pull it back over the same undocumented HTTP endpoints HPM and the VS Code extension use, with the `version` optimistic-concurrency token handled for you.
 - **Debug** — tail the hub's `/logsocket` and `/eventsocket` websockets (structured JSON, no library needed) and read them against the code.
-- **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and dead devices, then tail the live radio log sockets (`zwaveLogsocket`/`zigbeeLogsocket`) for per-frame signal (Zigbee LQI/RSSI, Z-Wave per-frame RSSI) — grounded in Hubitat's metrics and the Z-Wave Alliance/Silabs/IEEE 802.15.4 protocol specs.
+- **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and incomplete joins; rank real `lastActivity` liveness without trusting Zigbee's misleading `active` flag; then tail the live radio log sockets (`zwaveLogsocket`/`zigbeeLogsocket`) for per-frame signal (Zigbee LQI/RSSI, Z-Wave per-frame RSSI) — grounded in Hubitat's metrics and the Z-Wave Alliance/Silabs/IEEE 802.15.4 protocol specs.
 - **Lint** — catch the sandbox violations and silent-failure traps (bad imports, handler-name typos, capability→command gaps, the `installed()`/`updated()` first-run trap) before you paste.
 - **Test** — take apps and drivers off-hub for real unit tests.
 - **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`skills/_reference/playwright-ui.md`).
-- **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`), warn with the concrete blast radius (enabled automations vs inert references, dashboards, parent/child), and verify the references cleared after. A replacement device gets a new id, so capture the old memberships and re-wire them onto the new one.
+- **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`) and warn with the concrete reference blast radius (enabled/disabled app switch state, dashboards, parent/child). Audit actual consumers separately through subscriptions or type-specific live state; a replacement device gets a new id, so capture the old memberships and re-wire them onto the new one.
 
 ## Rules
 
@@ -30,10 +30,10 @@ All rules are always-on — installing the plugin means you want this context.
 | [state-vs-attributes](rules/state-vs-attributes.md) | Attributes via `sendEvent` (subscribable) vs. `state`/`atomicState` (private, JSON-serializable). Why a value's timestamp can't tell you the source is alive. |
 | [groovy-gotchas](rules/groovy-gotchas.md) | Silent-failure traps the compiler misses: string handler names, `0`-is-falsy, null device inputs, reserved names. |
 | [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
-| [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, the two-scale `lwrRssi` backend trap, and what counts as a real problem. |
-| [ui-automation](rules/ui-automation.md) | Driving the hub web UI with Playwright for UI-only operations — the Vue/MDL selection traps, `statusJson` blind spot, Room Lighting recapture, and verify-every-mutation. |
+| [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, including `listening` vs `beaming`, hex routes, the two-scale `lwrRssi` split, and `lastActivity` vs misleading `active`. |
+| [ui-automation](rules/ui-automation.md) | Driving the hub web UI with Playwright for UI-only operations — the Vue/MDL selection traps, `statusJson.appSettings[]`, Room Lighting sentinel values, and verify-every-mutation. |
 | [room-lighting-shades](rules/room-lighting-shades.md) | Room Lighting can group **shades**, not just lights (staff-endorsed) — `Act==Off` is a one-position preset (100=open, 0=closed), not a broken toggle; don't flag it. |
-| [device-lifecycle](rules/device-lifecycle.md) | Removing a device — enumerate its usage and warn before deleting, verify after, and re-wire references onto a replacement (which gets a new id) — swapping before re-selecting by hand. |
+| [device-lifecycle](rules/device-lifecycle.md) | Removing a device — distinguish delete blast radius from live consumers, warn before deleting, verify after, and re-wire references onto a replacement. |
 
 ## Skills
 

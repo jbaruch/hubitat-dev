@@ -21,9 +21,16 @@ healthy, so the devices are fine" — see `The command path`.
 - `lastTime` — when the hub last heard the node; **absent** on a node never heard at all (`zwave.never_heard[]`). Such a node is reported `nodeState:OK` and passes every radio check, so no FAILED-keyed check sees it. A never-heard node with **no** `deviceId` is a ghost by the split above; with a `deviceId` it is a real device that has never spoken — judge it, don't assume either way.
 - `per` — cumulative packet-**error count** ("accumulation of packet errors for a node"), not a percentage. Lower is better; `0` is ideal. Nonzero means errors are occurring; judge severity relative to the node's `msgCount` and to peers.
 - `averageRtt` — round-trip time in ms; lower is better. No spec cutoff — rank, don't threshold.
+- `listening` — the always-on indicator. `true` identifies a mains-powered classic-mesh node that
+  can repeat; `false` identifies a sleepy node. Use this field instead of guessing from device type.
+- `beaming` — means the node **requires** beam wake-up; it does not mean the node sends beams or
+  repeats. The JSON field was false even for sampled FLiRS locks on 2.5.1.132. Use the Z-Wave
+  Details UI Beaming column when that requirement matters; never use the JSON key as repeater proof.
 - `routeChanges` — classic-mesh stability indicator; frequent changes mean the Last Working Route keeps failing. Reported by the **legacy** backend; `N/A` on the zwaveJS backend.
 - `neighbors` — how many nodes a **classic-mesh** node hears. `0` for Long Range nodes (a star has none — see below), not a backend artifact.
-- `route` — the path the hub uses to reach the node: hub (`01`) first, the node itself last, repeaters in between. `hub_mesh.py` reads the intermediate hops into `zwave.route_fan_in`.
+- `route` — hexadecimal node ids with hub (`01`) first, the destination itself last, and repeaters
+  only between them. `01 -> 57` reaches node `0x57` directly; `01 -> 1B -> 57` uses repeater
+  `0x1B`. `hub_mesh.py` reads only intermediate hops into `zwave.route_fan_in`.
 
 ## Route fan-in (a repeater's blast radius)
 
@@ -63,7 +70,10 @@ healthy, so the devices are fine" — see `The command path`.
 
 - The `zigbeeDetails` **snapshot** exposes no per-device LQI or RSSI — from it, judge liveness, not signal.
 - Per-device **LQI** lives in a different surface: `GET /hub/zigbee/getChildAndRouteInfo` (the neighbor/route table, text — `LQI:<n>` per router). Per-frame LQI+RSSI come from the live `zigbeeLogsocket`. Don't rank Zigbee signal off the snapshot; use one of those.
-- Per device (snapshot): `active:false` = not communicating (dead or an unfinished join). A generic `name:"Device"` of `type:"Device"` is a join that never initialized — the Zigbee ghost.
+- Per-device `active` is **not liveness**. Long-dead devices can remain `active:true`; do not treat
+  either value as a freshness verdict. Read `lastActivity` and rank its age. A missing timestamp is
+  unknown, not fresh.
+- A generic `name:"Device"` of `type:"Device"` is a join that never initialized — the Zigbee ghost.
 - Network-level problems: `networkState` ≠ `ONLINE`, `healthy:false`, or `weakChannel:true` (interference on the current channel). Zigbee uses 2.4 GHz channels 11–26; `weakChannel` overlaps busy Wi-Fi.
 
 ## Live radio traffic (the log sockets)

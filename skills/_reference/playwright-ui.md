@@ -42,7 +42,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 3. Act with **real** `browser_click` / `browser_type` — never `element.click()` inside
    `browser_evaluate` (gotcha 4).
 4. **Verify every mutation** by re-reading the DOM or the hub's `configure/json` — these UIs fail
-   silently. For a device input, `statusJson` lies (gotcha 3); read `configure/json` or run the code.
+   silently. For a device input, read `statusJson.appSettings[]` or `configure/json`, then verify the
+   type-specific live surface when behavior should change (gotcha 3).
 5. For destructive/irreversible actions (device/app delete, scene edits), read the confirm dialog
    first and re-verify after.
 
@@ -64,9 +65,13 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
    `.checked` or dispatching synthetic events bypasses the Vue model and does not persist.
    Update is not a no-op, though — it commits into the form, and gotcha 10 is how you check that.
 
-3. **`statusJson` hides device settings.** `/installedapp/statusJson/<id>` reports capability/device
-   inputs as `None` even when set. Verify device inputs via
-   `/installedapp/configure/json/<id>/<page>` (the `settings` object), or by running the code.
+3. **`statusJson.settings` hides device settings; `appSettings[]` exposes them.**
+   `/installedapp/statusJson/<id>.settings` reports capability/device inputs as null even when set.
+   The same payload's `appSettings[]` carries each setting `name` plus resolved
+   `deviceIdsForDeviceList` / `deviceList`, making it the best one-call input inventory. Use
+   `/installedapp/configure/json/<id>/<page>.settings` for the page-specific value. Neither
+   configured surface proves the app actively consumes the device — verify its subscription or
+   type-specific live state too.
 
 4. **`element.click()` in `browser_evaluate` does not trigger framework handlers** (jQuery/Vue
    toggles, MDL buttons). Use a real Playwright `browser_click` for anything with a bound handler.
@@ -229,12 +234,14 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     `<div>` reading e.g. "mZone-X motion reports active") → a `Motion sensors` picker bound to
     `settings[tDev1]`; swap it like any picker (add-new-before-remove-old, gotcha 17). **RM stores two
     device settings, `tDev1` and `tDev-1`** — the trigger editor updates only `tDev1`, while `tDev-1` is
-    a staging leftover that keeps pointing at the old device. The authoritative live subscription is
+    a staging leftover that keeps pointing at the old device. The authoritative live-trigger map is
     **`state.trigDevs`** (e.g. `{"1580:Motion":["1"]}`), with `state.trigDevsW` listing withdrawn
     devices. Verify a re-point via `state.trigDevs` from the rule's `statusJson`, never the raw `tDev*`
-    setting. Consequence: the stale `tDev-1` makes the old device still show in `hub_device_usage.py`,
-    but that reference is **inert** (no live subscription) — deleting the old device is safe and RM keeps
-    firing on the new one (verified 2.5.1.131).
+    setting. A Required Expression that is currently false removes the rule's event subscription but
+    leaves its valid trigger in `trigDevs`, so subscription absence is not an RM negative. The stale
+    `tDev-1` keeps the old device in `fullJson.appsUsing` and `hub_device_usage.py` because that endpoint
+    reports deletion blast radius, not liveness. `hub_device_usage.py --live` resolves the distinction
+    (verified through 2.5.1.133).
 
 23. **`browser_run_code_unsafe` runs *real* interactions — batch bulk re-points with it.**
     `mcp__playwright__browser_run_code_unsafe` runs genuine Playwright calls (`page.locator(sel).click()`,
@@ -312,7 +319,10 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
       (Activate Lights Options); `offMeansPage` (Means to Turn Off) → `optionsOffPage` (Turn Off Lights Options).
     - **SumoSelect enums commit on dropdown close, exactly as gotcha 26's `onDisable`/`onEnable`:**
       `onMeans`, `onConds`, `modeXD`, `offMeans`, `modeXOff`, `offConds`. Multi-select — click each
-      `li.opt` to toggle, existing selections stay; scope via `select[name="settings[<x>]"].closest('.SumoSelect')`.
+      `li.opt` to toggle, existing selections stay; scope via
+      `select[name="settings[<x>]"].closest('.SumoSelect')`. `modes:["0"]` means **All Modes**, not mode
+      id 0; resolve real ids from `/modes/json`. `modeXD` holds "don't activate in these modes";
+      `modeXOff` holds turn-off mode triggers.
     - **`offConds` polarity trap (near-miss, cost real care):** "*Limit Turning Off under these
       Conditions*" lists the condition that **prevents** turn-off, so it is inverted from intuition. To
       keep lights ON while a switch (e.g. Housekeeping) is on, set `offConds` = **"Switch is on"**
@@ -321,6 +331,11 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
       activate: `onConds` = "Mode is" reveals `modeXD` labeled *"Don't Activate when mode is"*. **Always
       read the rendered `_action_href` summary text before Done** — it states the guard in plain English
       and catches an inverted condition.
+
+29. **`scheduledJobs[].prevRunTime: null` means not-yet-fired, not disabled.** A newly created or
+    reset schedule has no previous run until its next natural firing. Use the job's scheduled time
+    and the app's configured schedule to judge whether it is enabled; treat null `prevRunTime` as a
+    schedule-reset clue.
 
 ## Room Lighting: the gotchas that travel together
 
@@ -331,8 +346,9 @@ RL knowledge is spread across the numbered list above; in build/edit order it re
 2. **Pick devices** — RL's own inputs (`roomDevsL`, `motions`, `switchesOnDO`) use the classic
    `.btn-device` picker, where fresh required inputs commit (gotcha 27); **only** the activation-options
    switch guards (`switchesD`/`switchesOE`) use the inline-Vue picker (gotcha 26).
-3. **Set conditions** — SumoSelect enums commit on dropdown close (gotchas 26, 28); watch the
-   `offConds`/`onConds` polarity and read the rendered summary before Done (gotcha 28).
+3. **Set conditions** — SumoSelect enums commit on dropdown close (gotchas 26, 28); treat mode `"0"`
+   as All Modes, watch the `offConds`/`onConds` polarity, and read the rendered summary before Done
+   (gotcha 28).
 4. **Don't trip the live buttons** — `settings[activate]`/`settings[turnOff]` physically switch the room (gotcha 20).
 5. **Don't auto-recapture** — "Done with Room Lights" re-captures physical state and can overwrite a live scene (gotcha 5).
 
@@ -408,7 +424,8 @@ Motion Watchdog (14 single-plug zones, hidden value + Done, no picker). Gotcha 2
 #918/#921 — the inline Vue picker, keystroke filter, and coordinate-clicked checkbox/Update. Gotchas
 27–28 verified on RL v1.2.3 (2.5.1.x, 2026-07-21) building a Room Lighting instance end-to-end during
 an 8-rule RM→RL migration — the classic `.btn-device` picker (fresh required inputs commit), `createchild`
-instance creation, the SumoSelect enum set, and the `offConds` polarity trap. Gotchas 1, 2, 5,
+instance creation, the SumoSelect enum set, and the `offConds` polarity trap. Gotcha 29 and the
+`modes:["0"]` sentinel were verified on 2.5.1.132. Gotchas 1, 2, 5,
 10, 17, 20 and 23 are the load-bearing ones — each was reached the expensive way in real usage; 5
 corrupted a live scene, 10 silently discarded a setting while the page looked correct, 17 blocks
 automated install where the required-input flip fails (picker/build-dependent — not the classic RL
@@ -419,7 +436,8 @@ practical.
 container, an Update that never commits, and a working page are indistinguishable on screen. Read the
 hidden input.
 
-The Vue/MDL selection model and the `statusJson` vs `configure/json` split are hub-firmware behavior;
+The Vue/MDL selection model and the `statusJson.appSettings[]` / `configure/json` split are
+hub-firmware behavior;
 re-verify after a platform update. Gotcha 1 is the standing warning about *how* they drift — the
 `input.checked` mechanism documented before 2.5.1.128 did not reproduce on it, while the guidance
 built on `label.is-checked` held. Prefer the safe superset over the mechanism.

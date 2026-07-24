@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Fetch a Hubitat hub's Z-Wave, Zigbee, and hub-mesh detail and flag network problems.
 
-The hub exposes three undocumented JSON endpoints (verified live on 2.5.1.128, C-8 Pro —
+The hub exposes three undocumented JSON endpoints (verified live through 2.5.1.132, C-8 Pro —
 see ../_reference/endpoints.md):
     GET /hub/zwaveDetails/json   -> {enabled, healthy, zwaveJS, region, nodes[...]}
     GET /hub/zigbeeDetails/json  -> {networkState, healthy, channel, weakChannel, devices[...]}
@@ -26,10 +26,15 @@ Grounding (rules/zwave-zigbee-mesh.md carries the citations):
   - nodeState FAILED marks an unreachable node. It splits by deviceId: FAILED + a bound deviceId
     is a REAL device currently unreachable (may be transient — recover, don't delete); FAILED with
     NO deviceId is an orphan ghost (a pairing that never bound a device — safe to remove).
-  - Zigbee's zigbeeDetails snapshot exposes no per-device LQI/RSSI — only liveness (active,
-    lastActivity, messageCount) and network-level state (channel, weakChannel, healthy,
-    networkState, powerLevel). Per-device LQI lives in /hub/zigbee/getChildAndRouteInfo
-    (neighbor table); per-frame LQI+RSSI in the live zigbeeLogsocket.
+  - Z-Wave `listening:true` identifies an always-on classic-mesh node that can repeat. `beaming`
+    means the node REQUIRES beam wake-up, not that it beams for others, and the JSON value was
+    false even for sampled FLiRS locks on 2.5.1.132. The route string is hexadecimal and includes
+    hub first plus destination last; only intermediate ids are repeaters.
+  - Zigbee's zigbeeDetails snapshot exposes no per-device LQI/RSSI. `active` is NOT liveness:
+    long-dead devices still report true. `lastActivity` is the live surface and is ranked here;
+    no numeric age threshold is invented. A generic name/type `"Device"` / `"Device"` remains the
+    unfinished-join signature. Per-device LQI lives in /hub/zigbee/getChildAndRouteInfo (neighbor
+    table); per-frame LQI+RSSI in the live zigbeeLogsocket.
   - ROUTE FAN-IN is a repeater's blast radius, the classic-mesh counterpart of a hub-mesh peer's
     shared_device_count: how many nodes route THROUGH it (zwave.route_fan_in). Like that count it
     is context, never a fault — a repeater carrying 12 nodes is a normal mesh — so it is ranked,
@@ -48,10 +53,11 @@ Grounding (rules/zwave-zigbee-mesh.md carries the citations):
     newest zwaveJS lastTime tracked local wall-clock to within 7 seconds, not UTC.
 
 Because Hubitat gives no numeric "bad" thresholds, this script HARD-flags only unambiguous,
-grounded signals (FAILED nodes, nonzero PER, dead/incomplete Zigbee joins, an unhealthy
-network) and otherwise RANKS nodes worst-first so the agent can judge severity against the
-rule. The one signal-quality heuristic (RSSI at/below the radio's sensitivity floor) is
-emitted with heuristic:true and a cited basis, never as a hard fact.
+grounded signals (FAILED nodes, nonzero PER, incomplete Zigbee joins, an unhealthy network) and
+otherwise RANKS nodes worst-first so the agent can judge severity against the rule. Zigbee
+`active:false` is surfaced as raw metadata and reaches no counter. The one signal-quality heuristic
+(RSSI at/below the radio's sensitivity floor) is emitted with heuristic:true and a cited basis,
+never as a hard fact.
 
 The deterministic pieces — parsing, ranking, flagging — are pure functions taking
 already-parsed JSON and are unit-tested without a hub. Only fetch() touches the network.
@@ -252,6 +258,11 @@ def normalize_zwave_node(node: dict, now: datetime, naive_tz=None) -> dict:
         "rtt_ms": parse_num(node.get("averageRtt")),
         "rssi": parse_rssi(node.get("lwrRssi")),
         "rssi_raw": node.get("lwrRssi"),
+        # listening=true is the always-on/repeater indicator on classic mesh. `beaming` means
+        # requires beam wake-up, not repeater capability, and its JSON value is unreliable on
+        # 2.5.1.132; both are surfaced raw so the skill can apply those constraints.
+        "listening": node.get("listening"),
+        "beaming": node.get("beaming"),
         "neighbors": node.get("neighbors"),
         "routeChanges": parse_num(node.get("routeChanges")),
         "route": node.get("route") or "",
@@ -441,8 +452,11 @@ def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
 
 
 def analyze_zigbee(details: dict, now: datetime) -> dict:
-    """Pure. Flag network-level problems and dead/incomplete device joins; report activity age.
-    `now` is injected so age is deterministic under test (never call the clock in here)."""
+    """Pure. Flag network problems and incomplete joins; rank real lastActivity liveness.
+
+    `active` is surfaced but never used as liveness. `now` is injected so age is deterministic
+    under test (never call the clock in here).
+    """
     net_problems = []
     if not details.get("enabled", True):
         net_problems.append("radio disabled")
@@ -455,18 +469,23 @@ def analyze_zigbee(details: dict, now: datetime) -> dict:
 
     devices = []
     for d in details.get("devices") or []:
-        last = parse_ts(d.get("lastActivity") or d.get("lastMessage"))
+        last = parse_ts(d.get("lastActivity"))
         devices.append({
             "id": d.get("id"), "name": d.get("name") or "", "type": d.get("type") or "",
             "active": d.get("active"), "messageCount": d.get("messageCount"),
             "lastActivity": d.get("lastActivity"),
+            "lastMessage": d.get("lastMessage"),
             "age_seconds": _age_seconds(last, now),
         })
 
-    # active==false = not communicating; a generic "Device"/"Device" name is an unfinished join.
-    dead = [d for d in devices if d["active"] is False]
-    for d in dead:
-        d["likely_incomplete_join"] = (d["name"] == "Device" and d["type"] == "Device")
+    # `active` stays true on long-dead devices, so neither value is a liveness verdict. Keep the
+    # false rows visible for diagnostics but do not count or label them dead.
+    active_false = [d for d in devices if d["active"] is False]
+    incomplete = [
+        {**d, "likely_incomplete_join": True}
+        for d in devices if d["name"] == "Device" and d["type"] == "Device"
+    ]
+    activity_unknown = [d for d in devices if d["lastActivity"] in (None, "")]
 
     ranked_age = sorted((d for d in devices if d["age_seconds"] is not None),
                         key=lambda d: d["age_seconds"], reverse=True)
@@ -479,7 +498,9 @@ def analyze_zigbee(details: dict, now: datetime) -> dict:
         "powerLevel": details.get("powerLevel"),
         "network_problems": net_problems,               # CRITICAL when non-empty
         "device_count": len(devices),
-        "dead_devices": dead,                            # active==false
+        "incomplete_joins": incomplete,                 # generic Device/Device signature
+        "active_false_devices": active_false,           # metadata, NOT a liveness verdict
+        "activity_unknown": activity_unknown,           # no lastActivity to rank
         "stalest": ranked_age[:10],
     }
 
@@ -615,7 +636,7 @@ def analyze(zwave: Optional[dict], zigbee: Optional[dict], now: datetime,
     if zigbee is not None:
         out["zigbee"] = analyze_zigbee(zigbee, now)
         critical += len(out["zigbee"]["network_problems"])
-        warnings += len(out["zigbee"]["dead_devices"])
+        warnings += len(out["zigbee"]["incomplete_joins"])
     if hub_mesh is not None:
         out["hub_mesh"] = hub_mesh
         critical += len(hub_mesh["problems"])

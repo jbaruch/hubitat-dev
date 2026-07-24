@@ -1,5 +1,27 @@
 # Changelog
 
+### Fixed
+
+- **Device references are blast radius, not proof of liveness** (`rules/device-lifecycle.md`,
+  `rules/ui-automation.md`, `skills/_scripts/hub_device_usage.py`, closes #74). `appsUsing.disabled`
+  only says whether the app itself is switched off; an enabled Rule Machine rule can retain stale
+  `tDev-N` / `trigDevsW` bookkeeping after its real trigger moved. Removed the enabled=live
+  inference from removal and migration guidance. `hub_device_usage.py --live` now performs a
+  separate three-state audit: Rule Machine uses authoritative `trigDevs` even while a false Required
+  Expression suppresses subscriptions, matching `eventSubscriptions[].typeId` supplies positive
+  evidence for other apps, and unsupported negative cases remain `unknown`. The statusJson guidance
+  now distinguishes null top-level `settings` from resolved `appSettings[]`, which names every
+  configured device input in one call.
+- **Misleading Hubitat fields now read by contract** (`rules/zwave-zigbee-mesh.md`,
+  `rules/ui-automation.md`, `skills/_scripts/hub_mesh.py`, closes #73). Z-Wave guidance identifies
+  `listening` as the classic-mesh repeater indicator, treats `beaming` as a wake-up requirement with
+  an unreliable JSON value, and makes the hex route endpoints explicit so a direct route is not
+  mistaken for a repeater hop. Room Lighting records `"0"` as the All Modes sentinel and separates
+  `modeXD` from `modeXOff`; null `scheduledJobs[].prevRunTime` now means not-yet-fired since schedule
+  creation/reset. Zigbee no longer uses `active` as liveness: `hub_mesh.py` ranks `lastActivity`,
+  emits `active_false_devices` as non-counting metadata, and replaces the misleading `dead_devices`
+  bucket with the grounded `"Device"` / `"Device"` `incomplete_joins` signature.
+
 ## 0.1.43 — 2026-07-22
 
 ### Added

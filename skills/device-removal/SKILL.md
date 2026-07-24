@@ -24,15 +24,18 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_usage.py -
 ```
 
 Use `--hub <name>` instead of `--ip` to resolve via `hubs.json` (`hub-config` skill). Argument and
-output contract: `skills/_scripts/hub_device_usage.py` module docstring. The report splits `appsUsing` into
-enabled vs disabled and lists dashboards, `parentApp`, and child devices. Proceed to Step 2.
+output contract: `skills/_scripts/hub_device_usage.py` module docstring. The report splits
+`appsUsing` by the app's enabled/disabled switch state and lists dashboards, `parentApp`, and child
+devices. This is the reference blast radius; enabled does not prove a live consumer. Proceed to
+Step 2.
 
 ## Step 2 — Warn with the concrete blast radius
 
-State the actual references, never a bare count — name each enabled app, dashboard, parent app, and
-child device. Distinguish load-bearing (enabled apps — live automations that break) from inert
-(disabled apps, idle monitors). If nothing references the device, say so and proceed. Do not delete
-anything in this step. Proceed to Step 3.
+State the actual references, never a bare count — name every enabled and disabled app reference,
+dashboard, parent app, and child device. Describe enabled/disabled as app switch state, not
+liveness. If deciding which configured reference currently drives behavior, rerun Step 1 with
+`--live`; its `unknown` verdict must stay unknown. If nothing references the device, say so and
+proceed. Do not delete anything in this step. Proceed to Step 3.
 
 ## Step 3 — Branch on retire vs replace
 

@@ -1,6 +1,6 @@
 ---
 alwaysApply: true
-description: Driving the Hubitat web UI with Playwright for UI-only operations — the silent-failure traps and the read-the-framework-state rule
+description: Driving the Hubitat web UI with Playwright for UI-only operations — silent-failure traps, authoritative state, and misleading field values
 ---
 
 # UI Automation
@@ -26,12 +26,18 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 
 ## Verify every mutation
 
-- These UIs fail silently — re-read the DOM or the hub's `configure/json` after every change.
+- These UIs fail silently — re-read the DOM or the hub's `configure/json` after every change, then re-read the app's live surface when the change is meant to alter behavior.
 - For a device picker the concrete signal is its hidden `input[name="settings[<name>]"]`: `""` until the picker's Update commits, a comma-separated id list after. Compare as a set — the order is selection order, not sorted.
 - Never navigate the tab configuring an app — nothing persists until **Done**. Use a second tab for work elsewhere.
-- `/installedapp/statusJson/<id>` reports device/capability inputs as `None` even when set. Verify device inputs via `/installedapp/configure/json/<id>/<page>` (the `settings` object), or by running the code.
+- Installed-app device verification follows `rules/device-lifecycle.md` **Audit live consumers separately**. Do not read `statusJson.settings` as the configured-input inventory; verify the configured and type-specific live surfaces defined there.
 - `mainPage` and its sub-pages use different table column layouts — identify a column by its hidden `settings[...]` input name or by content, never by index across pages.
 - Screenshots are not visually inspectable in this setup — read state from `browser_snapshot` and DOM reads, not `browser_take_screenshot`.
+
+## Interpret misleading values
+
+- Room Lighting `modes: ["0"]` means **All Modes**; it is not mode id 0. Resolve real ids from `/modes/json`.
+- Room Lighting activation exclusions live in `modeXD`; turn-off mode triggers live in `modeXOff`. Both use real mode ids, never the all-modes sentinel.
+- `scheduledJobs[].prevRunTime: null` records no previous firing for the current schedule. It does not mean the job is disabled.
 
 ## Destructive operations
 
