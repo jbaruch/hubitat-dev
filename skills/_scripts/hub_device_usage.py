@@ -23,8 +23,11 @@ hub-UI + physical action (rules/zwave-zigbee-mesh.md, ../_reference/playwright-u
 
 `--live` adds a second, deliberately separate audit over
 `GET /installedapp/statusJson/<appId>`:
-  - Rule Machine uses `state.trigDevs` / `appState.trigDevs`, which remains authoritative while a
-    Required Expression is false. `eventSubscriptions` can disappear in that state.
+  - Rule Machine trigger liveness uses `state.trigDevs` / `appState.trigDevs`, which remains
+    authoritative while a Required Expression is false. `eventSubscriptions` can disappear in that
+    state.
+  - Absence from `trigDevs` is negative only when `tDev*` settings or `trigDevsW` show that the
+    device held a trigger role. Rule Machine action and condition references otherwise stay unknown.
   - A matching `eventSubscriptions[].typeId` is positive evidence that another app is subscribed.
   - `appSettings[]` identifies which configured setting contains the device even though the legacy
     top-level `settings` field is null.
@@ -32,9 +35,10 @@ hub-UI + physical action (rules/zwave-zigbee-mesh.md, ../_reference/playwright-u
     not subscribe. Such entries stay `unknown`, never false-flagged as not live.
 
 The exact Rule Machine predicate and three-state result (`live`, `not_live`, `unknown`) live in
-`analyze_liveness()`. The mode flags enabled Rule Machine references that are absent from
+`analyze_liveness()`. The mode flags enabled Rule Machine trigger references that are absent from
 `trigDevs`; this catches stale withdrawn trigger bookkeeping without false-flagging a valid trigger
-whose Required Expression currently suppresses its subscription.
+whose Required Expression currently suppresses its subscription or an action-only consumer that
+never belongs in the trigger map.
 
 Grounding notes:
   - appsUsingCount is a STRING on the wire ("2"); parsed to int here.
@@ -245,13 +249,15 @@ def analyze_liveness(device_id: int, apps: list, statuses: dict) -> dict:
 
     Decision contract:
       - disabled app -> not_live (the app switch is off)
-      - Rule Machine with trigDevs state -> live iff device_id is a trigDevs key
-      - any other app with eventSubscriptions[].typeId == device_id -> live
+      - Rule Machine trigger present in trigDevs -> live
+      - matching eventSubscriptions[].typeId -> live
+      - Rule Machine reference absent from trigDevs -> not_live only when tDev* or trigDevsW proves
+        that the reference held a trigger role
       - every other enabled reference -> unknown
 
-    Only enabled Rule Machine references absent from trigDevs are flagged in
-    enabled_configured_not_live. A missing generic subscription cannot prove an app is inert because
-    command-only consumers legitimately have none.
+    Only enabled Rule Machine trigger references with authoritative negative evidence are flagged in
+    enabled_configured_not_live. A missing subscription or trigger-map entry cannot prove an
+    action/condition consumer is inert.
     """
     audited = []
     for app in apps:
@@ -263,6 +269,7 @@ def analyze_liveness(device_id: int, apps: list, statuses: dict) -> dict:
             "matching_subscription_count": 0,
             "trigger_in_trig_devs": None,
             "trigger_in_trig_devs_w": None,
+            "rule_machine_trigger_settings": [],
             "configured_not_live": False,
         })
 
@@ -278,6 +285,9 @@ def analyze_liveness(device_id: int, apps: list, statuses: dict) -> dict:
         status = _status_for_app(statuses, app.get("id"))
         entry["configured_settings"] = _configured_settings(status, device_id)
         entry["matching_subscription_count"] = _matching_subscription_count(status, device_id)
+        entry["rule_machine_trigger_settings"] = [
+            setting for setting in entry["configured_settings"] if setting.startswith("tDev")
+        ]
 
         trig_found, trig_devs = _state_value(status, "trigDevs")
         withdrawn_found, withdrawn = _state_value(status, "trigDevsW")
@@ -286,22 +296,39 @@ def analyze_liveness(device_id: int, apps: list, statuses: dict) -> dict:
 
         if trig_found:
             in_triggers = device_id in _state_device_ids(trig_devs)
+            in_withdrawn = (
+                device_id in _state_device_ids(withdrawn) if withdrawn_found else False
+            )
             entry.update({
-                "status": LIVE if in_triggers else NOT_LIVE,
-                "method": "rule_machine_trig_devs",
                 "trigger_in_trig_devs": in_triggers,
-                "trigger_in_trig_devs_w": (
-                    device_id in _state_device_ids(withdrawn) if withdrawn_found else False
-                ),
-                "configured_not_live": not in_triggers,
+                "trigger_in_trig_devs_w": in_withdrawn,
             })
-        elif is_rule_machine:
-            entry["method"] = "rule_machine_state_unavailable"
+
+            if in_triggers:
+                entry.update({
+                    "status": LIVE,
+                    "method": "rule_machine_trig_devs",
+                })
+            elif entry["matching_subscription_count"]:
+                entry.update({
+                    "status": LIVE,
+                    "method": "event_subscription",
+                })
+            elif in_withdrawn or entry["rule_machine_trigger_settings"]:
+                entry.update({
+                    "status": NOT_LIVE,
+                    "method": "rule_machine_trig_devs",
+                    "configured_not_live": True,
+                })
+            else:
+                entry["method"] = "rule_machine_non_trigger_reference"
         elif entry["matching_subscription_count"]:
             entry.update({
                 "status": LIVE,
                 "method": "event_subscription",
             })
+        elif is_rule_machine:
+            entry["method"] = "rule_machine_state_unavailable"
 
         audited.append(entry)
 

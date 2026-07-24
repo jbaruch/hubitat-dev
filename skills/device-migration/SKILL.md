@@ -112,10 +112,12 @@ then a normal removal (`Skill(skill: "device-removal")`). Proceed to Step 5.
 Re-run Step 1's `--live` command against **both** devices. Compare two axes:
 
 - `appsUsing` is the reference blast radius. The new device should carry the configured app
-  references; the old should be empty or list only references you explicitly intend to leave.
-- `live_audit` is behavioral evidence. Rule Machine must name the new device in `trigDevs` and not
-  the old one. A generic app may remain `unknown`; verify its configured input and type-specific
-  live surface instead of converting unknown to success.
+  references. The old should be empty or list only references you explicitly intend to leave.
+- `live_audit` is behavioral evidence. For a Rule Machine trigger migration, `trigDevs` must name
+  the new device and not the old one.
+- A Rule Machine action/condition reference may remain `unknown`.
+- Verify an unknown reference through its configured input and type-specific live surface instead
+  of converting unknown to success.
 
 A swap that reports success in the UI but fails either applicable re-read is incomplete.
 
@@ -151,17 +153,21 @@ Re-point traps, all grounded in `skills/_reference/playwright-ui.md`:
 
 Verify each app's configured input via `/installedapp/statusJson/<appId>.appSettings[]` or the
 page-specific `/installedapp/configure/json/<appId>/<page>.settings`. The former names every resolved
-device setting in one call; its sibling top-level `statusJson.settings` field is null
+device setting in one call. Its sibling top-level `statusJson.settings` field is null
 (`skills/_reference/endpoints.md`). `statusJson.childDevices` is a separate reliable field: a managed
 child such as `mZone*` is absent from `/hub2/devicesList` top level, and its id comes from the parent
 app (`skills/_reference/parent-child-devices.md`).
 
-Trust the configured and live re-reads over picker values. The configured input catches a turn-off
-sensor left in `motionsInactive`; `eventSubscriptions[].typeId` proves a subscription-driven app is
-listening; Rule Machine's `state.trigDevs` proves its trigger even while a Required Expression
-suppresses subscriptions. A stale RM `tDev-1` / `trigDevsW` reference can keep the old device in
-`appsUsing` after `trigDevs` moved. Report it as blast-radius bookkeeping, not a live trigger. Re-run
-Step 1's `--live` command when done. Proceed to Step 7.
+Trust the configured and live re-reads over picker values:
+
+- The configured input catches a turn-off sensor left in `motionsInactive`.
+- `eventSubscriptions[].typeId` proves a subscription-driven app is listening.
+- Rule Machine's `state.trigDevs` proves its trigger even while a Required Expression suppresses
+  subscriptions.
+- A stale RM `tDev-1` / `trigDevsW` reference can keep the old device in `appsUsing` after
+  `trigDevs` moved. Report it as blast-radius bookkeeping, not a live trigger.
+
+Re-run Step 1's `--live` command when done. Proceed to Step 7.
 
 ## Step 7 — Report what moved and what is left
 

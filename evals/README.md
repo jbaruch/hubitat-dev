@@ -117,3 +117,8 @@ burden onto a one-fixture tool). CI runs `--check` over every `evals/*/generate.
 fixture that stops matching its generator fails the build instead of rotting quietly. When
 an analyzer's contract changes, **regenerate — do not hand-patch the JSON.** Hand-patching
 forfeits the exact property that makes the fixture worth trusting.
+
+The eval runner consumes the committed JSON named by `scenario.json.include`; it does not invoke
+the authoring generator. The snapshot is therefore a platform-required generated artifact under
+`file-hygiene`. `.gitattributes` marks it `linguist-generated=true` and `merge=ours`; all authoring
+changes still flow through the generator and the CI `--check`.

@@ -9,9 +9,11 @@
   inference from removal and migration guidance. `hub_device_usage.py --live` now performs a
   separate three-state audit: Rule Machine uses authoritative `trigDevs` even while a false Required
   Expression suppresses subscriptions, matching `eventSubscriptions[].typeId` supplies positive
-  evidence for other apps, and unsupported negative cases remain `unknown`. The statusJson guidance
-  now distinguishes null top-level `settings` from resolved `appSettings[]`, which names every
-  configured device input in one call.
+  evidence for other consumers, and unsupported negative cases remain `unknown`. Rule Machine
+  action/condition references absent from the trigger-only `trigDevs` map also remain `unknown`
+  unless a matching `tDev*` setting or `trigDevsW` entry proves a withdrawn trigger role. The
+  statusJson guidance now distinguishes null top-level `settings` from resolved `appSettings[]`,
+  which names every configured device input in one call.
 - **Misleading Hubitat fields now read by contract** (`rules/zwave-zigbee-mesh.md`,
   `rules/ui-automation.md`, `skills/_scripts/hub_mesh.py`, closes #73). Z-Wave guidance identifies
   `listening` as the classic-mesh repeater indicator, treats `beaming` as a wake-up requirement with

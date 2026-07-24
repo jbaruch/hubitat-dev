@@ -141,6 +141,8 @@ wrapper. Configuration alone does not prove liveness.
 
 For Rule Machine, read `trigDevs` even when `eventSubscriptions` is empty: a false Required
 Expression temporarily removes subscriptions while the trigger remains correctly configured.
+Absence from `trigDevs` is a negative only for a trigger-role reference. A Rule Machine action or
+condition device may be live without appearing in that trigger map.
 For arbitrary apps, a missing subscription is not a safe negative because command-only consumers
 do not subscribe. `skills/_scripts/hub_device_usage.py --live` applies this three-state audit and
 leaves unsupported negative cases `unknown`.

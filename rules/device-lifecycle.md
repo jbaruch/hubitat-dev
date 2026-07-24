@@ -19,15 +19,22 @@ them onto the new id.
 
 ## Audit live consumers separately
 
-- Run `skills/_scripts/hub_device_usage.py --live` when the question is "what actually consumes this device?" The three-state result is `live`, `not_live`, or `unknown`; unknown must never be reported as inert.
-- For a subscription-driven app, a matching `statusJson.eventSubscriptions[].typeId` is positive live evidence. Absence is conclusive only when that app type is known to consume the device by subscription; command-only consumers legitimately have no subscription.
-- For Rule Machine, `state.trigDevs` is authoritative. A trigger remains there while a Required Expression is false even though its event subscription is temporarily absent.
+- Run `skills/_scripts/hub_device_usage.py --live` when the question is "what actually consumes this device?"
+- The three-state result is `live`, `not_live`, or `unknown`.
+- Never report `unknown` as inert.
+- For a subscription-driven app, a matching `statusJson.eventSubscriptions[].typeId` is positive live evidence.
+- Subscription absence is conclusive only for an app type known to consume the device by subscription.
+- Command-only consumers legitimately have no subscription and remain `unknown` without another live surface.
+- For a Rule Machine **trigger**, `state.trigDevs` is authoritative. A trigger remains there while a Required Expression is false even though its event subscription is temporarily absent.
+- A Rule Machine action or condition device need not appear in `trigDevs`. Absence from that trigger map is not a liveness negative without trigger-role evidence such as a matching `tDev*` setting or `trigDevsW` entry.
 - `state.trigDevsW` and stale `tDev-N` settings are withdrawn bookkeeping, not live triggers. They remain deletion blast-radius references.
 
 ## Warn with the concrete blast radius
 
 - Surface the actual list before deleting — name every enabled and disabled app reference, dashboard, parent app, and child device.
-- Distinguish **reference state** from **consumer liveness**. State that enabled/disabled is the app switch state; use the live audit before calling an enabled reference active or inert.
+- Distinguish **reference state** from **consumer liveness**.
+- State that enabled/disabled is the app switch state.
+- Use the live audit before calling an enabled reference active or inert.
 - The usage script only reads — it never deletes. Deletion is irreversible: read the hub-UI confirm dialog's "in use by N apps" state with Playwright (`skills/_reference/playwright-ui.md`), then have the **user** perform the final removal — the agent guides and confirms, it does not click the destructive delete. A radio (Z-Wave/Zigbee) device also needs a physical exclusion/factory-reset only the user can do (`rules/zwave-zigbee-mesh.md`).
 
 ## Verify after removing

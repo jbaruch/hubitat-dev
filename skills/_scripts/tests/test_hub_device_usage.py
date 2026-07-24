@@ -158,6 +158,7 @@ class TestAnalyzeLiveness(unittest.TestCase):
         self.assertFalse(audited["trigger_in_trig_devs"])
         self.assertTrue(audited["trigger_in_trig_devs_w"])
         self.assertEqual(audited["configured_settings"], ["tDev-11"])
+        self.assertEqual(audited["rule_machine_trigger_settings"], ["tDev-11"])
         self.assertEqual(result["summary"]["enabled_configured_not_live"], 1)
         self.assertEqual([a["id"] for a in result["enabled_configured_not_live"]], [788])
 
@@ -177,6 +178,67 @@ class TestAnalyzeLiveness(unittest.TestCase):
         self.assertTrue(audited["trigger_in_trig_devs"])
         self.assertEqual(audited["matching_subscription_count"], 0)
         self.assertEqual(result["summary"]["enabled_configured_not_live"], 0)
+
+    def test_rule_machine_action_reference_absent_from_trig_devs_stays_unknown(self):
+        apps = [m.normalize_app(app(
+            id=820, name="Rule Machine", label="Control fan", disabled=False))]
+        statuses = {
+            820: status_json(
+                appSettings=[{
+                    "name": "actionDevice",
+                    "deviceIdsForDeviceList": [1612],
+                    "deviceList": {"1612": "Office Fan"},
+                }],
+                state={"trigDevs": {"220:Motion": ["1"]}}),
+        }
+
+        audited = m.analyze_liveness(1612, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "unknown")
+        self.assertEqual(audited["method"], "rule_machine_non_trigger_reference")
+        self.assertFalse(audited["trigger_in_trig_devs"])
+        self.assertEqual(audited["rule_machine_trigger_settings"], [])
+        self.assertFalse(audited["configured_not_live"])
+
+    def test_rule_machine_non_trigger_subscription_is_live_evidence(self):
+        apps = [m.normalize_app(app(
+            id=821, name="Rule Machine", label="Watch illuminance", disabled=False))]
+        statuses = {
+            821: status_json(
+                appSettings=[{
+                    "name": "conditionDevice",
+                    "deviceIdsForDeviceList": [1612],
+                    "deviceList": {"1612": "Office Lux"},
+                }],
+                eventSubscriptions=[{"typeId": 1612}],
+                state={"trigDevs": {"220:Motion": ["1"]}}),
+        }
+
+        audited = m.analyze_liveness(1612, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "live")
+        self.assertEqual(audited["method"], "event_subscription")
+        self.assertFalse(audited["trigger_in_trig_devs"])
+
+    def test_rule_machine_tdev_setting_is_negative_trigger_evidence(self):
+        apps = [m.normalize_app(app(
+            id=822, name="Rule Machine", label="Old trigger", disabled=False))]
+        statuses = {
+            822: status_json(
+                appSettings=[{
+                    "name": "tDev-4",
+                    "deviceIdsForDeviceList": [1612],
+                    "deviceList": {"1612": "Old Motion"},
+                }],
+                state={"trigDevs": {"220:Motion": ["1"]}}),
+        }
+
+        audited = m.analyze_liveness(1612, apps, statuses)["apps"][0]
+
+        self.assertEqual(audited["status"], "not_live")
+        self.assertEqual(audited["method"], "rule_machine_trig_devs")
+        self.assertEqual(audited["rule_machine_trigger_settings"], ["tDev-4"])
+        self.assertTrue(audited["configured_not_live"])
 
     def test_matching_event_subscription_is_positive_live_evidence(self):
         apps = [m.normalize_app(app(id=12, name="Motion Lighting", disabled=False))]
@@ -415,7 +477,13 @@ class TestMain(unittest.TestCase):
             "/device/fullJson/": (200, json.dumps(body)),
             "/installedapp/statusJson/": (
                 200,
-                json.dumps(status_json(state={"trigDevs": {"220:Motion": ["1"]}}))),
+                json.dumps(status_json(
+                    appSettings=[{
+                        "name": "tDev-11",
+                        "deviceIdsForDeviceList": [1612],
+                        "deviceList": {"1612": "mZone-Stairs"},
+                    }],
+                    state={"trigDevs": {"220:Motion": ["1"]}}))),
         }
         stdout = io.StringIO()
 

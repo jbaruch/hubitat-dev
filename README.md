@@ -11,11 +11,14 @@ Grounded against real hardware: Hubitat C-8 Pro, platform builds through 2.5.1.1
 - **Authoring** — apps and drivers are single Groovy 2.4 files run in a locked-down sandbox. The rules encode what that sandbox forbids and the idioms that keep an app from silently doing nothing.
 - **Deploy / pull** — push source to a hub and pull it back over the same undocumented HTTP endpoints HPM and the VS Code extension use, with the `version` optimistic-concurrency token handled for you.
 - **Debug** — tail the hub's `/logsocket` and `/eventsocket` websockets (structured JSON, no library needed) and read them against the code.
-- **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and incomplete joins; rank real `lastActivity` liveness without trusting Zigbee's misleading `active` flag; then tail the live radio log sockets (`zwaveLogsocket`/`zigbeeLogsocket`) for per-frame signal (Zigbee LQI/RSSI, Z-Wave per-frame RSSI) — grounded in Hubitat's metrics and the Z-Wave Alliance/Silabs/IEEE 802.15.4 protocol specs.
+- **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and incomplete joins.
+- **Device liveness** — rank real `lastActivity` evidence without trusting Zigbee's misleading `active` flag.
+- **Live radio traffic** — tail `zwaveLogsocket` / `zigbeeLogsocket` for per-frame signal grounded in Hubitat's metrics and the Z-Wave Alliance/Silabs/IEEE 802.15.4 protocol specs.
 - **Lint** — catch the sandbox violations and silent-failure traps (bad imports, handler-name typos, capability→command gaps, the `installed()`/`updated()` first-run trap) before you paste.
 - **Test** — take apps and drivers off-hub for real unit tests.
 - **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`skills/_reference/playwright-ui.md`).
-- **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`) and warn with the concrete reference blast radius (enabled/disabled app switch state, dashboards, parent/child). Audit actual consumers separately through subscriptions or type-specific live state; a replacement device gets a new id, so capture the old memberships and re-wire them onto the new one.
+- **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`) and warn with the concrete reference blast radius (enabled/disabled app switch state, dashboards, parent/child). Audit actual consumers separately through subscriptions or type-specific live state.
+- **Device replacement** — capture old memberships before replacement and re-wire them onto the new device id.
 
 ## Rules
 
