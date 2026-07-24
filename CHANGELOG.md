@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.44 — 2026-07-24
+
 ### Fixed
 
 - **Device references are blast radius, not proof of liveness** (`rules/device-lifecycle.md`,
