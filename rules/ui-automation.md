@@ -23,6 +23,8 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - An **optional** device input needs no picker — set its hidden `settings[<name>]` value directly and Done serializes it; the empty→filled validation only gates **required** inputs (`skills/_reference/playwright-ui.md` gotcha 14; the required-input validation trap is gotcha 17).
 - Commit device inputs **before** filling the sections a `submitOnChange` gates — the dependent controls do not exist until the picker's Update commits.
 - Not every device picker is the MDL `device-save` picker. Newer **inline Vue** pickers (Room Lighting *activation-options* switch guards, `switchesD`/`switchesOE`) mount inline under the button, **not** in `#deviceListModal` (a dead shell): filter with real keystrokes (`locator.fill()` doesn't trigger the Vue filter) and click the checkbox and its `div.mdl-button` **Update** by coordinate — a label-locator click collapses the dropdown (`skills/_reference/playwright-ui.md` gotcha 26).
+- Rule Machine action dropdowns are **SumoSelect**. `browser_select_option` sets the native `select.value` and reports success, but the widget never fires `submitOnChange` and the page never advances — drive the widget (real-click `p.CaptionCont` to open, then the `li`), same as RL's enum guards (`skills/_reference/playwright-ui.md` gotcha 30).
+- The device picker's **Update** control is `class="… device-save"` but its **tag varies** — `<div>` on one rule, `<button>` on the next, same hub. Match by class or exact text, never by tag (`skills/_reference/playwright-ui.md` gotcha 12).
 
 ## Verify every mutation
 
@@ -33,6 +35,9 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Do not read `statusJson.settings` as the configured-input inventory.
 - Verify the configured and type-specific live surfaces defined in `rules/device-lifecycle.md`.
 - `mainPage` and its sub-pages use different table column layouts — identify a column by its hidden `settings[...]` input name or by content, never by index across pages.
+- A **disabled** Rule Machine rule's `configure/<id>/mainPage` is a stub — Cancel / Remove / Enable only, no `settings[...]`. Enable it first (`POST /installedapp/disable {"id":<id>,"disable":false}`) or an empty settings set reads as an empty rule (`skills/_reference/playwright-ui.md` gotcha 31).
+- Cutting a Rule Machine action leaves its `actType.N`/… settings behind — a present `settings[N]` does not mean action N exists. Verify against the rendered action rows or the "Select Actions to Run" summary (`skills/_reference/playwright-ui.md` gotcha 33).
+- To change a Rule Machine action's type, **add the replacement action before cutting the old** — the type cannot be changed in place, and add-before-cut keeps the rule from going actionless (`skills/_reference/playwright-ui.md` gotcha 32).
 - Screenshots are not visually inspectable in this setup — read state from `browser_snapshot` and DOM reads, not `browser_take_screenshot`.
 
 ## Interpret misleading values
@@ -48,5 +53,6 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 
 - Read the confirm dialog before an irreversible action (device/app delete, scene edit) and re-verify after.
 - Room Lighting re-captures the current physical state of every scene light on "Done with Room Lights" — an on light silently overwrites the scene. Add members, then set each device's captured state directly (Level cell → `dimLA` input; Switch cell → on/off toggles). Avoid "Re-Capture" unless the physical lights already hold the desired state.
+- Rule Machine's `button[id="settings[runAction]"]` ("Run Actions") executes the rule's actions immediately — a live side effect, not navigation. Target it as an attribute selector (the bracketed id is not a CSS id-selector) and read the button before clicking (`skills/_reference/playwright-ui.md` gotcha 35).
 - Some apps set `removeButton: false` (e.g. HubiThings Replica) and cannot be removed from the UI or a synthetic endpoint — record them as remove-not-automatable.
 - Backups are a proprietary encrypted H2 file, restore-to-hub only (full-hub, all-or-nothing) — a single app's settings cannot be extracted from one.

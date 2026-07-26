@@ -131,12 +131,14 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     // then: browser_click(target: '#claude-update-thermostatA')   <- real click, exact element
     ```
 
-12. **The picker's "Update" is `div.device-save`, and there are N of them.** Class
-    `mdl-button mdl-js-button mdl-button--raised device-save` — not a `<button>`. There is **one per
-    device input on the page**, so a bare `.device-save` selector hits the wrong picker. Scope by
-    walking up from that input's `input[name="settings[<name>]"]` and filter on
-    `offsetParent !== null` — only the open picker's Update is visible. Same for the picker's
-    *trigger*, the "Click to set" control.
+12. **The picker's "Update" carries class `device-save`, and there are N of them.** Class
+    `mdl-button mdl-js-button mdl-button--raised device-save`. **The tag is not stable** — the same
+    picker on the same hub rendered `<div class="… device-save">` on one rule and
+    `<button class="… device-save">` on the very next, so match by class or exact text `Update`,
+    **never by tag** (verified 2.5.1.134). There is **one per device input on the page**, so a bare
+    `.device-save` selector hits the wrong picker. Scope by walking up from that input's
+    `input[name="settings[<name>]"]` and filter on `offsetParent !== null` — only the open picker's
+    Update is visible. Same for the picker's *trigger*, the "Click to set" control.
 
 13. **The hidden input is the commit signal — check it after every Update.**
     `input[name="settings[<name>]"]` is `""` until the picker's Update commits, and holds a
@@ -191,7 +193,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     *install* (empty required input) is unreliable while *edits* are fine (verified 2.5.1.131). If you
     author the app, declaring the input `required: false` sidesteps this entirely (gotcha 24).
     **Picker/build-scoped:** this empty→filled failure is specific to the picker you are on — reproduced
-    on the 2.5.1.131 re-point picker and the inline-Vue picker (gotcha 26), but **not** on the classic
+    on the 2.5.1.131 re-point picker, the inline-Vue picker (gotcha 26), and the RM Custom Action
+    required device picker (2.5.1.134, gotcha 34), but **not** on the classic
     `.btn-device` picker RL's own inputs use (gotcha 27, RL v1.2.3), where a fresh *required* input
     commits cleanly and scripted RL installs are viable. Confirm the flip empirically per input rather
     than assuming the trap.
@@ -337,6 +340,88 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     and the app's configured schedule to judge whether it is enabled; treat null `prevRunTime` as a
     schedule-reset clue.
 
+30. **Rule Machine action dropdowns are SumoSelect — `browser_select_option` looks like success and
+    does nothing.** RM renders its action-type / action-subtype dropdowns with the **SumoSelect**
+    jQuery plugin (the same widget as RL's enum guards, gotchas 26/28): the native `<select>` is
+    present but hidden (`class="… SumoUnder"`), wrapped in `div.SumoSelect`. Playwright's
+    `browser_select_option` **sets `select.value` and reports success** — but the widget never sees
+    it, `submitOnChange` never fires, and the page never advances (the caption still reads "Select
+    Action Type to add" while `select.value` is `modeActs`). Same look-like-success family as gotcha
+    4's Vue-wrapped `<select>`; the tell here is that the select's only bound jQuery handler is
+    `sumo:closed`. Drive the widget instead — tag `p.CaptionCont`, real-click it to open (the wrapper
+    gains `open`), then tag and real-click the target `li` in `ul.options`:
+
+    ```js
+    // browser_evaluate — tag only, never click here
+    const w = document.querySelector('div.SumoSelect select[name="settings[actType.3]"]').closest('div.SumoSelect');
+    w.querySelector('p.CaptionCont').setAttribute('data-claude','cap');
+    // then: browser_click('p[data-claude="cap"]')  -> opens (w.classList contains 'open')
+    // then tag the matching li in w.querySelectorAll('ul.options li') and real-click it
+    ```
+    This is **not** swap- or RL-specific — SumoSelect is how RM (and likely other apps) renders every
+    dropdown, generalising the RL-scoped note in gotchas 26/28 (verified 2.5.1.134, RM 5.1).
+
+31. **A disabled rule renders a stub config page.** `GET /installedapp/configure/<id>/mainPage` on a
+    **disabled** rule returns only **Cancel / Remove / Enable** — no triggers, no actions, no
+    `settings[...]` inputs. Automation reading the config finds an empty `settings` set and may
+    wrongly conclude the rule is empty. Enable first —
+    `POST /installedapp/disable {"id":<id>,"disable":false}` → `{"result":false}` — then re-read
+    (verified 2.5.1.134).
+
+32. **An action's *type* is immutable in place — add-before-cut.** Clicking an existing action opens
+    an editor scoped to that action's type (a switch action offers only switches + on/off); there is
+    no "change type". To convert an action, create the new one and cut the old — **add the new action
+    before cutting the old** so the rule is never actionless (the same add-before-remove principle as
+    the device-swap trap, gotcha 17). The scissors (`✂`) control sits in the same `<tr>` as its
+    action, and a rule with N actions has N+1 scissors, so map by row text, never position:
+
+    ```js
+    [...document.querySelectorAll('div.submitOnChange')]
+      .filter(e => e.textContent.trim() === '✂')
+      .find(e => e.closest('tr').textContent.includes('Off: TNHOTGC'));
+    ```
+
+33. **Orphaned `.N` settings survive a cut — never verify an action by its settings keys.** After
+    cutting action 2, `configure/json` **still contains** `actType.2`, `onOffSwitch.2`, `onOff.2`,
+    `delayAct.2`, `trackSwitch.2`, `optSwitch.2`, `actSubType.2` — the action is genuinely gone from
+    the rule, but RM leaves the settings behind. So "setting X is present" does **not** mean "action X
+    exists" (the same verify-the-rendered-surface theme as gotchas 3, 22). Verify
+    against the rendered action rows (`div.submitOnChange`) or the rule's `Select Actions to Run`
+    summary, never the raw settings keys (verified 2.5.1.134).
+
+34. **Building a Custom Action ("Run Custom Action") end-to-end.** Verified re-pointing two rules onto
+    a driver command, 2.5.1.134 / RM 5.1.
+    - **Setting-name map** (action index N) — note `actSubType.N` persists as `getDefinedAction`,
+      which does not resemble the UI label "Run Custom Action", so **don't match on the display string**:
+
+    | Setting | Meaning |
+    |---|---|
+    | `actType.N` | `modeActs` — "Set Variable, Mode or File, Run Custom Action" |
+    | `actSubType.N` | `getDefinedAction` — "Run Custom Action" |
+    | `myCapab.N` | capability filter for the device picker, e.g. `Switch` |
+    | `devices.N` | selected device id(s) |
+    | `cCmd.N` | the command name |
+    | `cpType2.N` / `cpVal2.N` | parameter type and value |
+
+    - **ENUM command parameters map to `string`.** For a driver command declared
+      `"type":"ENUM","constraints":["true","false"]`, RM's parameter-type dropdown offers only
+      **string / number / decimal** — pick `string` and type the literal (`cpType2.3="string"`,
+      `cpVal2.3="false"`).
+    - **The device picker is required-empty** — this is exactly the gotcha 17 empty→filled trap
+      (`btn-device-required required`). Writing hidden `settings[devices.N]` alone leaves the button
+      `device-btn-empty` and Done rejects it; driving the real picker (open → click
+      `label.device-select-label` → Update) flips it to `device-btn-filled` and persists
+      `devices.3="1561"`. The picker path is the only one that works for a required-empty input
+      (re-confirms gotcha 17).
+
+35. **`Run Actions` executes the rule immediately — a live end-to-end test.** `button[id="settings[runAction]"]`
+    ("Run Actions", the bracketed id is not a CSS id-selector — gotcha 20) on a rule's actions page runs
+    the rule's actions right now, no trigger needed —
+    useful to verify a rebuilt action (it produced the expected
+    `Action: setAllNotifications('false') on TNHOTGC` log line and the full downstream fan-out). It is
+    a **live side effect**, same caution family as gotcha 20's RL activate/turn-off buttons — read
+    the button before clicking (verified 2.5.1.134).
+
 ## Room Lighting: the gotchas that travel together
 
 RL knowledge is spread across the numbered list above; in build/edit order it reads as one path:
@@ -425,12 +510,17 @@ Motion Watchdog (14 single-plug zones, hidden value + Done, no picker). Gotcha 2
 27–28 verified on RL v1.2.3 (2.5.1.x, 2026-07-21) building a Room Lighting instance end-to-end during
 an 8-rule RM→RL migration — the classic `.btn-device` picker (fresh required inputs commit), `createchild`
 instance creation, the SumoSelect enum set, and the `offConds` polarity trap. Gotcha 29 and the
-`modes:["0"]` sentinel were verified on 2.5.1.132. Gotchas 1, 2, 5,
-10, 17, 20 and 23 are the load-bearing ones — each was reached the expensive way in real usage; 5
+`modes:["0"]` sentinel were verified on 2.5.1.132. Gotchas 30–35 were verified on 2.5.1.134 (RM 5.1)
+building a Rule Machine "Run Custom Action" by automation — the SumoSelect action dropdowns, the
+disabled-rule stub page, action-type immutability with add-before-cut, the orphaned `.N` settings
+after a cut, the required-empty device-picker re-confirmation (gotcha 17), and `Run Actions` as a
+live test. Gotchas 1, 2, 5,
+10, 17, 20, 23 and 30 are the load-bearing ones — each was reached the expensive way in real usage; 5
 corrupted a live scene, 10 silently discarded a setting while the page looked correct, 17 blocks
 automated install where the required-input flip fails (picker/build-dependent — not the classic RL
-picker, gotcha 27), 20 switched real lights on, and 23 is the only reason the 19-zone migration was
-practical.
+picker, gotcha 27), 20 switched real lights on, 23 is the only reason the 19-zone migration was
+practical, and 30 sets a SumoSelect dropdown's value while the widget ignores it — indistinguishable
+from success.
 
 **Everything here fails silently, which is why 13 is the habit that pays**: a `ref` that clicks a
 container, an Update that never commits, and a working page are indistinguishable on screen. Read the
