@@ -414,8 +414,9 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
       `devices.3="1561"`. The picker path is the only one that works for a required-empty input
       (re-confirms gotcha 17).
 
-35. **`Run Actions` executes the rule immediately — a live end-to-end test.** `button#settings[runAction]`
-    ("Run Actions") on a rule's actions page runs the rule's actions right now, no trigger needed —
+35. **`Run Actions` executes the rule immediately — a live end-to-end test.** `button[id="settings[runAction]"]`
+    ("Run Actions", the bracketed id is not a CSS id-selector — gotcha 20) on a rule's actions page runs
+    the rule's actions right now, no trigger needed —
     useful to verify a rebuilt action (it produced the expected
     `Action: setAllNotifications('false') on TNHOTGC` log line and the full downstream fan-out). It is
     a **live side effect**, same caution family as gotcha 20's RL activate/turn-off buttons — read
