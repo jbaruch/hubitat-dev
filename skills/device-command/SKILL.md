@@ -25,7 +25,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_command.py
 
 Output is one JSON object listing each command's `name`, `parameters` (declared types, in order), `relatedAttribute`, and `capability` (false marks a driver custom command). Match the intended command and its argument types against this list — `setZoneWaterTime` takes a number, and a string fails oddly. The run in Step 3 rejects a name absent from this surface. Proceed to Step 3.
 
-## Step 3 — Run the command and verify
+## Step 3 — Run the command
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_command.py --ip <addr> --device <id> --command <name> [--arg <v> ...]
