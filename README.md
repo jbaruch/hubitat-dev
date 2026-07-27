@@ -31,6 +31,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [driver-lifecycle](rules/driver-lifecycle.md) | Driver callbacks, the capability contract (declare = must implement), and the `parse()` dispatch pattern. |
 | [logging-conventions](rules/logging-conventions.md) | The `logEnable`/`txtEnable` toggles and the `runIn(1800, logsOff)` auto-disable idiom. |
 | [state-vs-attributes](rules/state-vs-attributes.md) | Attributes via `sendEvent` (subscribable) vs. `state`/`atomicState` (private, JSON-serializable). Why a value's timestamp can't tell you the source is alive. |
+| [self-reported-vs-measured](rules/self-reported-vs-measured.md) | A cloud integration's attributes aren't all measurements — some are model output from hand-entered config. Tell measured from computed by timestamp, rank suspicion by observability, and map the model with `runmethod` refresh + diff. |
 | [groovy-gotchas](rules/groovy-gotchas.md) | Silent-failure traps the compiler misses: string handler names, `0`-is-falsy, null device inputs, reserved names. |
 | [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
 | [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, including `listening` vs `beaming`, hex routes, the two-scale `lwrRssi` split, and `lastActivity` vs misleading `active`. |
