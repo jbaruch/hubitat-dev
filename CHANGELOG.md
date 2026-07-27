@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **New rule `data-collection.md`, from onboarding a soil-probe fleet** (`rules/data-collection.md`, `skills/_reference/endpoints.md`, `README.md`, part of #78). The design-default lessons of putting nine sensors on a hub and wiring them to a cloud controller. **Naming:** name a device by function **and** position (`<function> - <position>`), qualifying even a single-sensor unit, so a second sensor later does not force a rename that re-checks every app reference, and a staleness alert can say which sensor went quiet. **Retention:** event-retention defaults are display-tuned — `maxEvents` is **11 per attribute** — 11 stored changes, not reports (`eventsJson` is change-filtered), so a few hours on a slow signal and under an hour on a fast one, rolled silently — plus `maxStates` 30 and `spammyThreshold` 300; raise `maxEvents` via `POST /device/update` (1000 buffers ~two weeks) to use the always-on hub as a short-horizon buffer instead of an external poller. **Harvest:** `GET /device/eventsJson/<id>` is the harvest endpoint and is change-filtered — a gap means the value held steady, not that the device went quiet, so derive liveness from `lastActivityTime` or battery, never from a value's presence in the log. **Driver-necessity:** only "the hub must act on this data live" justifies a driver; for analysis, fetch history from the vendor's API and join it offline (the weather integration served retroactive one-minute observations), and installing an unmaintained community driver to obtain data an API already serves buys a permanent maintenance liability for nothing. Endpoint reference gains the retention-field defaults on `/device/update`; rule auto-included via the `rules/` directory glob.
+
 ## 0.1.48 — 2026-07-27
 
 ### Added
