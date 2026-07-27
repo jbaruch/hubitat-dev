@@ -7,7 +7,7 @@ description: Onboard one or more Hubitat sensors with verification at each step 
 
 Process steps in order. Do not skip ahead.
 
-A fleet install fails quietly one sensor at a time — a generic-driver join, a name that can't be told from its neighbor, default retention that drops the data a day later, a mesh mirror that never formed. Each step below verifies before moving on. A hand-written runbook for this had two steps that did not survive contact (the reporting interval was not adjustable, and retention was missing entirely); this skill encodes what actually held.
+A fleet install fails quietly one sensor at a time — a generic-driver join, a name that can't be told from its neighbor, default retention that drops the data a day later, a mesh mirror that never formed. Each step below verifies before moving on.
 
 ## Step 1 — Snapshot the inventory before pairing
 
@@ -43,7 +43,7 @@ Add the sensor to the inactivity monitor keyed on `lastActivityTime` or battery,
 
 ## Step 9 — Acceptance-test the sensor
 
-Exercise the sensor and confirm it responds — `Skill(skill: "device-command")` runs a command (or `refresh`) and verifies by observation. **Exclude the settling window:** a freshly installed soil probe's first hours are garbage — readings of 6, 5, 4 percent climbing to 53 by evening are disturbed soil equilibrating, not a fault, and the vendor documents settling as several wet/dry cycles. Do not baseline or health-check inside that window. Proceed to Step 10.
+Exercise the sensor and confirm it responds — `Skill(skill: "device-command")` runs a command (or `refresh`) and verifies by observation. **Exclude the settling window:** a freshly installed sensor's first hours can read garbage while it physically equilibrates, not because it is faulty (a soil probe settles over several wet/dry cycles). Do not baseline or health-check inside that window. Proceed to Step 10.
 
 ## Step 10 — Reconcile the fleet
 
