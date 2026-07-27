@@ -22,6 +22,8 @@ Hubitat has two distinct persistence mechanisms. Choosing the wrong one is a des
 - An attribute *named* like a liveness signal is not one. An app's `lastPoll` whose value is a constant string like `Succeeded` is change-filtered like any value, and goes arbitrarily stale on a healthy integration.
 - `isStateChange: true` is the writer-side counterpart: set it when a consumer must see every report, not only changes.
 - `GET /device/eventsJson/<deviceId>` (`skills/_reference/endpoints.md`) is how you measure an attribute's real gap distribution before trusting it.
+- Over HTTP both stores live in `GET /device/fullJson/<id>` and are easy to read backwards: Groovy `state` is top-level **`deviceState`**, attributes are nested **`device.currentStates`** (`skills/_reference/endpoints.md`).
+- `currentStates[attr].date` in that payload is this trap made concrete — it sits beside `value`, reads like a freshness stamp, and is the last **change**, not the last report.
 
 ## state / atomicState (internal, private)
 

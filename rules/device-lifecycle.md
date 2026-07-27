@@ -41,6 +41,7 @@ them onto the new id.
 
 - Re-read usage after the delete — do not assume the hub auto-pruned every reference type. Auto-pruning of app subscriptions is not guaranteed for dashboards, device inputs, or parent/child links.
 - A reference that survives the delete is a dangling pointer to fix on the referencing app.
+- **Hub-mesh mirrors are asymmetric across operations.** A `POST /device/update` rename **propagates** to the mirror on the consuming hub automatically; a delete does **not** — the mirror survives the source's removal and needs separate cleanup on the other hub (`skills/_reference/endpoints.md`). Do not over-correct into renaming twice.
 
 ## Replacement re-wires nothing
 

@@ -122,6 +122,27 @@ Correlating an app's log line against an event across these two silently mis-ord
 `appsUsing` even though `state.trigDevs` points elsewhere. The inert reference still belongs in a
 delete warning.
 
+## Device command & state surfaces (`fullJson`, grounded 2.5.1.134–135)
+
+The same `GET /device/fullJson/<id>` that carries the blast radius also carries the device's command surface and both persistence stores — read them here instead of reading driver source or inferring from the declared capability.
+
+| Field | Holds |
+|-------|-------|
+| `commands[]` | The **authoritative command list**: each `{name, parameters:[{type, defaultValue}], arguments, relatedAttribute, capability:<bool>}`. `capability:true` is a capability-required command; `false` is a driver custom command — inferring commands from the declared capability via `skills/_reference/capabilities.json` **misses every custom command**. `parameters[].type` is what `runmethod`'s `args` must match (`setZoneWaterTime` takes a number; a string fails oddly) |
+| `deviceState` (top level) | Groovy `state` — the driver's **internal bookkeeping**. `{}` for drivers that keep none (`rules/state-vs-attributes.md`) |
+| `device.currentStates` (nested) | **Attributes / Current States**, a dict keyed by attribute name. Each entry: `value`, `date`, typed variants (`numberValue`, `floatValue`, `stringValue`, `jsonValue`), `dataType` — so a device's full attribute set is discoverable without driver source (useful for `lint-review`, `scaffold`) |
+
+`deviceState` and `device.currentStates` are **easy to reach for backwards** — Groovy `state` is top-level `deviceState`, attributes are nested under `device`. **`currentStates[attr].date` is the last _change_, not the last report** — it sits right beside `value` and reads like a freshness stamp but is not one (the `rules/state-vs-attributes.md` trap, embodied in a field). Measure a real gap distribution with `GET /device/eventsJson/<id>`.
+
+## Read-route response-shape traps (grounded 2.5.1.134)
+
+Defensive-parse these — each bit during the irrigation recon:
+
+- `GET /hub2/appsList` returns a **dict with an `apps` key**, not a list. Built-in app entries populate `name` and leave `label` null.
+- `GET /installedapp/statusJson/<id>` can return a bare `{}` — another instance of this route being unreliable for reading app config (below).
+- `GET /installedapp/configure/json/<appId>/mainPage` can return **non-JSON** — parse defensively, do not assume a JSON body.
+- `GET /device/edit/<id>` is a **6.8 KB SPA shell** — no state, no routes, nothing in the served HTML. It is the natural first thing to try for a device and it is a dead end; drive the page with Playwright and capture the request instead (`skills/_reference/playwright-ui.md`).
+
 ## Installed-app configuration and live-consumer surfaces (grounded through 2026-07-24)
 
 `GET /installedapp/statusJson/<appId>` carries several distinct surfaces:
@@ -161,7 +182,8 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 | `GET /hub/zwaveRepair2?resetStats=false&maxHealth=10` | UI defaults; other values untested | Starts a **full Z-Wave network rebuild** (zwaveJS) → 200. Poll with the two below (2026-07-22) |
 | `GET /hub/zwaveRepair2Status` | — | Rebuild progress `{stage, html}`; `html` lists `Pending` / `Skipped` node ids in **hex** (`57` = node 87) (2026-07-22) |
 | `GET /hub/checkZwaveRepairRunning` | — | `{"isZWaveNetworkHealRunning":"true"}` — whether a rebuild is in progress (2026-07-22) |
-| `POST /device/runmethod` | JSON `{"id":<deviceId>,"method":"<command>","args":[<secondaryValues>]}` | Sends a device command **without a Maker API app or token** → 200. `args` is the ordered command params (`setLevel` → `[level, duration]`) |
+| `POST /device/runmethod` | JSON `{"id":<deviceId>,"method":"<command>","args":[<secondaryValues>]}` | Sends a device command **without a Maker API app or token** → 200 `{"success":<bool>,"message":null}`. `args` is the ordered command params (`setLevel` → `[level, duration]`). `success:true` means the method was **dispatched**, not that anything changed — verify by observation (below) |
+| `POST /device/update` | form-urlencoded, **the full device field set** (see note) | Renames / edits a device → 200. **Omitting any field clears it.** Carries a `version` concurrency token; the mesh-boolean pair is destructive if mis-encoded (see note) |
 | `POST /installedapp/disable` | JSON `{"id":<appId>,"disable":<bool>}` | Enables (`false`) / disables (`true`) any app instance → 200 `{"result":<bool>}` (verified 2026-07-21) |
 | `GET /installedapp/createchild/hubitat/<ChildAppName>/parent/<parentAppId>` | path-encoded `<ChildAppName>` (e.g. `Room%20Lights`) | Creates a **parent/child** app instance → 302 to `/installedapp/configure/<newId>/mainPage` (2026-07-22) |
 | `GET /installedapp/create/<appTypeId>` | `<appTypeId>` from `/hub2/appsList` `userAppTypes[].id` | Creates a **standalone** user-app instance → 302 to the transient configure page (2026-07-22) |
@@ -177,6 +199,25 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 **`nodeRemove` is guarded to FAILED orphans only.** Verified 23× live on nodes with no bound `deviceId`, each confirmed by census diff against `/hub/zwaveDetails/json`. Behavior on a healthy/OK node (strict `removeFailedNode` vs. general remove) is **untested** — gate every call on `present + no deviceId + nodeState:FAILED`, and never POST a real device id.
 
 **`runmethod` is the "flash a stale device to wake it" primitive** — verified `{"id":389,"method":"on","args":[]}` turned a plug on and flipped its Z-Wave `nodeState` FAILED→OK.
+
+**A command return code is not evidence it executed.** `runmethod` returns `{"success":true}` when the Groovy method is *dispatched*, not when the device moved — a method that throws, or a command to the state the device is already in, returns the identical payload, and in the already-in-state case the platform's change filter suppresses the event too (`rules/state-vs-attributes.md`), so "no event" does not distinguish worked from failed. This is the same success-shaped-lie as `/device/delete` returning 302 for a nonexistent id. Confirm through the command's `relatedAttribute` moving in `currentStates`, or through `GET /device/eventsJson/<id>`. The command surface (`fullJson.commands[]`) is below.
+
+**`POST /device/update` (device rename/edit) — verified 9 devices, 2.5.1.135.** Same `/device/` namespace as `runmethod`, **entirely different conventions** — do not assume one shape from the other:
+
+| | `POST /device/update` | `POST /device/runmethod` |
+|--|--|--|
+| encoding | form-urlencoded | JSON |
+| payload | **full field set**, omissions clear values | minimal three keys |
+| concurrency | `version` token required | none |
+| response | HTML / redirect | `{"success":<bool>,"message":null}` |
+
+The full field set: `name, label, zigbeeId, maxEvents, maxStates, spammyThreshold, deviceNetworkId, deviceTypeId, deviceTypeReadableType, roomId, meshEnabled, retryEnabled, meshFullSync, homeKitEnabled, locationId, hubId, groupId, dashboardIds, tags, defaultIcon, notes, id, version, controllerType`. Three traps:
+
+- **`version` is an optimistic-concurrency token**, the same pattern as `/app/ajax/code` (`rules/multi-hub-topology.md`) — read it fresh from `fullJson` immediately before each POST; a successful update bumps it.
+- **The form mixes two boolean encodings.** `meshEnabled` / `meshFullSync` are **checkbox-semantic** — sent as `on` when true, **omitted entirely** when false. `retryEnabled` / `homeKitEnabled`, right beside them, are literal `true` / `false` strings. Mis-encoding the mesh pair is **destructive**: it disables hub-mesh sharing, removing the mirrored device on the consuming hub and breaking every app bound to the mirror. A naive "serialize all booleans the same way" replay triggers it.
+- **The label input hides on an inactive PrimeVue tab** — UI-capture mechanics in `skills/_reference/playwright-ui.md`.
+
+**Hub-mesh mirrors follow a rename automatically** — all nine mirror `name` values updated on the consuming hub with no action there. This is the **opposite** of delete, where mirrors survive the source's removal and need cleanup on both hubs (`rules/device-lifecycle.md`): **rename propagates, delete does not.**
 
 **Z-Wave rebuild is gated by node type.** The per-node "Rebuild route" action is offered only for **mains / always-listening** nodes (repeaters, plugs, lamps); **sleepy battery** nodes (e.g. a door lock) show only Refresh · State — no on-demand route rebuild. The global rebuild (`zwaveRepair2`) is the only lever that touches a sleepy node, and its route rebuilds **on its next wake** — it sits in the status `Pending` list and completes async. zwaveJS backend only (the "Rebuild network" label); legacy uses different wording. For a marginal battery node the durable fix is RF/topology — a repeater — not a repair click (`rules/zwave-zigbee-mesh.md`).
 
