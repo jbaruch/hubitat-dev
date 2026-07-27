@@ -29,9 +29,10 @@ def full_json(device_id=1639, name="Zone 8 Soil", commands=None):
 class FakeTransport:
     """Serves GET /device/fullJson/<id> and POST /device/runmethod. runmethod success is keyed by
     device id via `fail_ids`."""
-    def __init__(self, devices, fail_ids=()):
+    def __init__(self, devices, fail_ids=(), fail_methods=()):
         self.devices = devices  # {id: full_json}
         self.fail_ids = set(fail_ids)
+        self.fail_methods = set(fail_methods)  # command names that return success:false
         self.runmethod_calls = []
 
     def __call__(self, method, url, body, _content_type=None):
@@ -43,7 +44,7 @@ class FakeTransport:
         if method == "POST" and url.endswith("/device/runmethod"):
             payload = json.loads(body)
             self.runmethod_calls.append(payload)
-            ok = payload["id"] not in self.fail_ids
+            ok = payload["id"] not in self.fail_ids and payload["method"] not in self.fail_methods
             return 200, {}, json.dumps({"success": ok, "message": None if ok else "threw"})
         raise AssertionError(f"unexpected call {method} {url}")
 
@@ -122,6 +123,15 @@ class TestRunSequence(unittest.TestCase):
         self.assertEqual([(c["id"], c["method"]) for c in t.runmethod_calls],
                          [(10, "on"), (10, "off")])
 
+    def test_off_command_failure_recorded_and_counted(self):
+        t = FakeTransport({10: full_json(10, "A")}, fail_methods={"off"})
+        plan = m.build_plan([10], "on", [], 1.0, off_command="off")
+        results = m.run_sequence("http://h:8080", plan, t, self._sleeper, self._announce)
+        self.assertTrue(results[0]["dispatched"])          # on succeeded
+        self.assertFalse(results[0]["off_dispatched"])     # off returned success:false
+        self.assertIn("off_error", results[0])
+        self.assertEqual(m.summarize(results)["failed"], 1)
+
     def test_unknown_command_captured_per_device(self):
         t = FakeTransport({10: full_json(10, "A", commands=[
             {"name": "refresh", "parameters": [], "relatedAttribute": None, "capability": True}])})
@@ -164,6 +174,16 @@ class TestMain(unittest.TestCase):
                         transport=None, sleeper=lambda _s: None)
         self.assertEqual(rc, 2)
         self.assertIn("not an integer", err.getvalue())
+
+    def test_negative_duration_exits_two(self):
+        import contextlib
+        import io
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            rc = m.main(["--ip", "192.0.2.11", "--devices", "10", "--duration", "-5"],
+                        transport=None, sleeper=lambda _s: None)
+        self.assertEqual(rc, 2)
+        self.assertIn("must be >= 0", err.getvalue())
 
     def test_names_resolved_in_order(self):
         devices_list = {"devices": [{"data": {"id": 10, "name": "A"}}, {"data": {"id": 11, "name": "B"}}]}

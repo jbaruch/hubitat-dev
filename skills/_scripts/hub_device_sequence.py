@@ -77,9 +77,11 @@ def build_plan(device_ids: list, command: str, args: list, duration: float,
 
 
 def summarize(steps: list) -> dict:
-    """Pure. Roll step results into counts."""
+    """Pure. Roll step results into counts. A step counts as failed when its command did not dispatch
+    or its optional off command failed (off_dispatched is False)."""
     dispatched = sum(1 for s in steps if s.get("dispatched"))
-    failed = [s for s in steps if s.get("error") or s.get("dispatched") is False]
+    failed = [s for s in steps
+              if s.get("error") or s.get("dispatched") is False or s.get("off_dispatched") is False]
     return {"total": len(steps), "dispatched": dispatched, "failed": len(failed)}
 
 
@@ -118,8 +120,13 @@ def _run_off(base: str, step: dict, result: dict, transport, announce) -> None:
     try:
         full = fetch_full_json(base, device_id, transport)
         command = validate_command(commands_of(full), step["off_command"])
-        run_method(base, device_id, step["off_command"], coerce_args(command, []), transport)
-        result["off_dispatched"] = True
+        response = run_method(base, device_id, step["off_command"], coerce_args(command, []), transport)
+        result["off_dispatched"] = response["success"]
+        if not response["success"]:
+            result["off_error"] = (f"off '{step['off_command']}' returned success:false "
+                                   f"({response.get('message')})")
+            announce(f"[{step['index']}/{step['total']}] device {device_id}: off "
+                     f"'{step['off_command']}' returned success:false")
     except HubError as e:
         result["off_dispatched"] = False
         result["off_error"] = str(e)
@@ -175,6 +182,11 @@ def main(argv=None, transport=None, sleeper=None) -> int:
     p.add_argument("--hub", help="named hub from hubs.json (when no --ip)")
     p.add_argument("--hubs", help="path to hubs.json (default ./hubs.json when --hub is given)")
     args = p.parse_args(argv)
+
+    if args.duration < 0:
+        print(f"--duration must be >= 0 seconds (got {args.duration}) — a negative hold is not a "
+              f"valid sleep", file=sys.stderr)
+        return 2
 
     try:
         base = resolve_base_from_args(ip=args.ip, port=args.port, hub=args.hub, hubs_path=args.hubs)
