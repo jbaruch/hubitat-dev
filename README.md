@@ -55,6 +55,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [device-sequence](skills/device-sequence/SKILL.md) | Firing an ordered list of devices with a timed hold on each — walk the property and bind each photo or observation to a device id (which lamp/shade/valve/zone is which). |
 | [device-removal](skills/device-removal/SKILL.md) | Safely removing a device — enumerate usage, warn on blast radius, verify after, and restore references onto a replacement. |
 | [device-migration](skills/device-migration/SKILL.md) | Moving every app reference from an old device to a new one — Swap Device, a virtual bridge/parking slot, a Hub Mesh re-home across hubs, or a guided manual re-select, chosen by why the swap is blocked. |
+| [sensor-onboarding](skills/sensor-onboarding/SKILL.md) | Onboarding sensors (or a fleet) with a verified step per device — pair, confirm the driver, name by function+position, raise retention, read the real preferences, mirror to a peer hub, add to inactivity monitoring, acceptance-test past the settling window, and reconcile the inventory. |
 
 Typical loop: `scaffold` → `lint-review` → `deploy` → `debug`, with `hub-config` set up once and `test` for anything with real logic. `mesh-health` is orthogonal — reach for it when the problem is the radio network (a flaky device, a ghost node) rather than the code.
 
