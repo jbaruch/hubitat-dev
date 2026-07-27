@@ -2,6 +2,12 @@
 # never committed (see coding-policy rules/dependency-management.md "No Vendoring").
 .tessl/plugins/
 
+# Generated on `tessl install` from tessl.json + each plugin's plugin.json. Its
+# @plugins/... links point into the ignored tree above, so a committed copy is dead
+# on a fresh clone and only churns on every coding-policy bump (see coding-policy
+# rules/file-hygiene.md "Never commit generated files").
+.tessl/RULES.md
+
 # Local, machine-specific agent settings
 .claude/settings.local.json
 
