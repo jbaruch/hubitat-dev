@@ -13,12 +13,15 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 - The authoritative capability → attributes/commands mapping is `skills/_reference/capabilities.json`. A declared capability with a missing command method is a real defect the `lint-review` skill flags.
 - Marker capabilities (`Actuator`, `Sensor`) carry no commands — they only classify a device as controllable vs. reporting.
 - Custom `command`/`attribute` declarations go inside `definition`. Attributes surface as **Current States**; update them with `sendEvent` (see `rules/state-vs-attributes.md`).
+- `GET /device/fullJson/<id>` → `commands[]` is the authoritative **per-device** command list — each `{name, parameters:[{type, defaultValue}], relatedAttribute, capability:<bool>}`, with `capability:false` marking a driver custom command. Read it instead of inferring commands from the declared capability, which misses every custom command (`skills/_reference/endpoints.md`).
 
 ## Callbacks
 
 - `installed()` — device created. `updated()` — user clicks **Save Preferences**. `uninstalled()` — cleanup.
 - `initialize()` — on hub startup, only if the driver declares `capability "Initialize"`. Use it to re-establish telnet/websocket/socket connections.
 - `configure()` — required by `capability "Configuration"`. `refresh()` — required by `capability "Refresh"`. `poll()` — required by `capability "Polling"`.
+- `capability "Configuration"` declares that a `configure()` method **exists** — never what it configures. Whether it reaches Zigbee attribute reporting is not discoverable from the declaration.
+- A driver's real feature surface is its `preferences`, readable as `settings` in `fullJson`. A built-in driver is frequently **narrower than the hardware** — a sensor advertising a 1–240-minute reporting interval may expose only `logEnable` / `txtEnable`. Read `settings` before designing around any vendor-advertised configurable (`skills/_reference/endpoints.md`).
 
 ## parse() and sending
 
