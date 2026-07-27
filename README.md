@@ -52,6 +52,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [test](skills/test/SKILL.md) | Setting up offline unit tests (biocomp/hubitat_ci) so logic is exercised off-hub. |
 | [hub-config](skills/hub-config/SKILL.md) | Managing `hubs.json` — register, list, and set the default hub (action router). |
 | [device-command](skills/device-command/SKILL.md) | Running a command on a device over HTTP and confirming it landed — enumerate the real command surface, send it, and verify by re-reading the related attribute (dispatched ≠ executed). |
+| [device-sequence](skills/device-sequence/SKILL.md) | Firing an ordered list of devices with a timed hold on each — walk the property and bind each photo or observation to a device id (which lamp/shade/valve/zone is which). |
 | [device-removal](skills/device-removal/SKILL.md) | Safely removing a device — enumerate usage, warn on blast radius, verify after, and restore references onto a replacement. |
 | [device-migration](skills/device-migration/SKILL.md) | Moving every app reference from an old device to a new one — Swap Device, a virtual bridge/parking slot, a Hub Mesh re-home across hubs, or a guided manual re-select, chosen by why the swap is blocked. |
 

@@ -42,4 +42,4 @@ Read the output object, not the exit code alone:
 - `verification.changed: false` — unchanged, and **not** a failure. Commanding a device to the state it is already in produces no event (the change filter, `rules/state-vs-attributes.md`). Re-run against a different target state, or confirm the command was issued via `GET /device/eventsJson/<id>` with `Skill(skill: "debug")`.
 - `verification.changed: null` — the command declares no `relatedAttribute`, or the attribute is absent from the surface. Confirm through the event log rather than the command response.
 
-Report what was commanded, whether it dispatched, and whether the attribute moved. Finish here.
+Report what was commanded, whether it dispatched, and whether the attribute moved. To fire an ordered list of devices with a timed hold on each — mapping which physical thing each controls — use `Skill(skill: "device-sequence")`. Finish here.
