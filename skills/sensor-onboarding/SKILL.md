@@ -5,9 +5,7 @@ description: Onboard one or more Hubitat sensors with verification at each step 
 
 # Sensor-Onboarding Skill
 
-Process steps in order. Do not skip ahead.
-
-A fleet install fails quietly one sensor at a time — a generic-driver join, a name that can't be told from its neighbor, default retention that drops the data a day later, a mesh mirror that never formed. Each step below verifies before moving on.
+Process steps in order. Do not skip ahead. Each step verifies before the next.
 
 ## Step 1 — Snapshot the inventory before pairing
 
@@ -43,7 +41,7 @@ Add the sensor to the inactivity monitor keyed on `lastActivityTime` or battery,
 
 ## Step 9 — Acceptance-test the sensor
 
-Exercise the sensor and confirm it responds — `Skill(skill: "device-command")` runs a command (or `refresh`) and verifies by observation. **Exclude the settling window:** a freshly installed sensor's first hours can read garbage while it physically equilibrates, not because it is faulty (a soil probe settles over several wet/dry cycles). Do not baseline or health-check inside that window. Proceed to Step 10.
+Exercise the sensor and confirm it responds — `Skill(skill: "device-command")` runs a command (or `refresh`) and verifies by observation. **Exclude the settling window:** a freshly installed sensor's first hours can read garbage while it physically equilibrates (a soil probe settles over several wet/dry cycles). Do not baseline or health-check inside that window. Proceed to Step 10.
 
 ## Step 10 — Reconcile the fleet
 
