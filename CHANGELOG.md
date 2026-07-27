@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.53 — 2026-07-27
+
 ### Changed
 
 - **Make the local-hub scope and secret handling explicit (install-policy security scoping)** (`rules/ui-automation.md`, `skills/_reference/playwright-ui.md`, `skills/_reference/endpoints.md`). At 0.1.52 the registry install policy flipped the plugin's security rating from Advisory to "Risky", citing third-party-content exposure (W011), credentials-verbatim (W007), and runtime external code (W012). None describe what the plugin does — it drives the operator's **own hub on the local network**, reads the hub's **first-party** admin UI (not arbitrary/third-party web), and treats any Maker API token as a secret. This change states that scope explicitly where a scanner reads it: the `ui-automation` rule and the Playwright reference now scope every navigation/DOM read to `http://<hub-ip>:8080` on the local network with no external-URL or prompt-injection surface; the Maker API endpoint note says the `<token>` is a secret read from the environment, never hardcoded, echoed, or logged, and points at the token-free local endpoints as the preferred path; and the `browser_run_code_unsafe` note clarifies its `page.*` code is authored locally and runs against the local hub page, with nothing fetched from an external URL. No behavior change — documentation/scoping only.
