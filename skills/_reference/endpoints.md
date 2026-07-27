@@ -170,7 +170,7 @@ leaves unsupported negative cases `unknown`.
 
 ## Device control (official — Maker API)
 
-Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/apps/api/<makerAppId>/<path>?access_token=<token>`. Key paths: `/devices` (list), `/devices/all` (full JSON: capabilities, attributes, commands), `/devices/<id>`, `/devices/<id>/<command>/<secondaryValue>` (send command), `/devices/<id>/events`. Multi-hub note: with hubs meshed, one Maker API instance can expose devices from secondary hubs too — but **code** endpoints are per-hub and have no mesh.
+Prefer Maker API for exercising devices in a test loop. Local: `http://<hub-ip>/apps/api/<makerAppId>/<path>?access_token=<token>`. **The `<token>` is a secret** — read it from an environment variable or the operator's secrets store at call time; never hardcode it, commit it, echo it into agent output, or write it to a log (a token carried in a query string otherwise leaks into request logs). The undocumented local endpoints above are the preferred path precisely because they need no token on a Hub-Security-off hub. Key paths: `/devices` (list), `/devices/all` (full JSON: capabilities, attributes, commands), `/devices/<id>`, `/devices/<id>/<command>/<secondaryValue>` (send command), `/devices/<id>/events`. Multi-hub note: with hubs meshed, one Maker API instance can expose devices from secondary hubs too — but **code** endpoints are per-hub and have no mesh.
 
 ## UI-fired requests you can replay (undocumented — grounded 2026-07-19 – 07-22)
 
