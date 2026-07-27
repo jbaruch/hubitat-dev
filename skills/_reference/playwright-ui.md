@@ -7,6 +7,11 @@ For those, drive the UI with the **Playwright MCP** — a headless Chromium that
 extension and no auth on a Hub-Security-off hub. Several gotchas below cost real time; one
 silently overwrote a live Room Lighting scene before it was understood.
 
+**Scope: the operator's own hub, only.** Every navigation and DOM read here targets the operator's
+own Hubitat hub admin UI at `http://<hub-ip>:8080` on the local network — never an external,
+arbitrary, or third-party URL. The DOM read is the hub's own first-party interface, not
+user-generated or untrusted web content, so there is no external-content or prompt-injection surface.
+
 ## When the UI is the only path
 
 HTTP/code (`skills/_reference/endpoints.md`) handles source deploy/pull, log/event tail, mesh detail,
@@ -249,7 +254,10 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 23. **`browser_run_code_unsafe` runs *real* interactions — batch bulk re-points with it.**
     `mcp__playwright__browser_run_code_unsafe` runs genuine Playwright calls (`page.locator(sel).click()`,
     `page.goto`, `page.waitForTimeout`) in a loop inside one tool call. These are **trusted events that
-    persist exactly like `browser_click`** — not the synthetic `element.click()` gotcha 4 forbids. It
+    persist exactly like `browser_click`** — not the synthetic `element.click()` gotcha 4 forbids. The
+    `page.*` code is authored in this reference and runs against the **local hub page** only; nothing is
+    fetched from an external URL and no remote content controls it (the "unsafe" in the name is about
+    running real page interactions, not about external code). It
     collapses each ~18-call Room Lights re-point into one call and a 26-toggle Device Activity Check swap
     into one, which is what made a 19-zone migration practical. Four caveats, each hit for real:
     - `page.evaluate` takes **one** argument — wrap multiples in an object (`{o,n,t}`), or it errors

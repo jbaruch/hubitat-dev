@@ -9,6 +9,10 @@ The `hubitat-dev` toolset is HTTP/code only. A class of operations has no docume
 is reachable only through the hub web UI at `http://<hub-ip>:8080`, driven with the Playwright MCP.
 The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_reference/playwright-ui.md`.
 
+This automation targets **only the operator's own hub on the local network**, never an external or
+arbitrary URL. The DOM it reads is the hub's first-party admin UI, not third-party or user-generated
+web content. Any Maker API token is a secret read from the environment, never echoed into output or a log.
+
 ## Reach for HTTP first
 
 - Source deploy/pull, log/event tail, mesh detail, and device control (Maker API) have grounded HTTP endpoints — use them (`skills/_reference/endpoints.md`).
