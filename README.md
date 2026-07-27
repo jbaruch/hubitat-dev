@@ -38,6 +38,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [ui-automation](rules/ui-automation.md) | Driving the hub web UI with Playwright for UI-only operations — the Vue/MDL selection traps, `statusJson.appSettings[]`, Room Lighting sentinel values, and verify-every-mutation. |
 | [room-lighting-shades](rules/room-lighting-shades.md) | Room Lighting can group **shades**, not just lights (staff-endorsed) — `Act==Off` is a one-position preset (100=open, 0=closed), not a broken toggle; don't flag it. |
 | [device-lifecycle](rules/device-lifecycle.md) | Removing a device — distinguish delete blast radius from live consumers, warn before deleting, verify after, and re-wire references onto a replacement. |
+| [data-collection](rules/data-collection.md) | Using the hub to collect sensor data — name devices by function and position, raise event retention (`maxEvents` defaults to 11), harvest the change-filtered `eventsJson`, and reach for a driver only when the hub must act live. |
 
 ## Skills
 
