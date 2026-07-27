@@ -11,7 +11,7 @@ A cloud integration's child-device attributes arrive through one `sendEvent` pat
 
 - Before trusting any attribute from a cloud integration, ask whether the upstream service **measures** it or **computes** it. Both look identical from Hubitat.
 - A computed attribute is model output; its inputs are hand-entered config (crop type, nozzle, slope, area), each entered once with no validation.
-- Plausibility is not evidence. Ten zones reporting an identical value despite differing inputs is evidence — that the model echoes config rather than tracks the ground.
+- Plausibility is not evidence. An identical value across many units with differing inputs is evidence the model echoes config, not the ground.
 - When an app writes a derived attribute a rule might subscribe to, name it so a future reader can tell it is derived.
 
 ## Detect it by timestamp
@@ -22,8 +22,8 @@ A cloud integration's child-device attributes arrive through one `sendEvent` pat
 ## Rank suspicion by observability
 
 - The error rate tracks how hard the underlying fact is to **observe**, not whether a human typed it.
-- Look-and-see fields (nozzle type, soil type) stay reliable even when hand-entered. Instrument-required fields (slope, area) do not, and their errors are **directional** — an understated grade reads as level when you stand on it.
-- The person who entered the data is itself a source — ask which fields they measured, which they eyeballed, and which they left at the default. That ranks the whole set in one question.
+- Look-and-see fields (nozzle type, soil type) stay reliable even when hand-entered. Instrument-required fields (slope, area) do not, and their errors are **directional**, not random.
+- The person who entered the data is itself a source. Ask which fields they measured, which they eyeballed, and which they left at the default. That ranks the whole set in one question.
 
 ## Never impeach one guess with another
 
@@ -32,12 +32,15 @@ A cloud integration's child-device attributes arrive through one `sendEvent` pat
 
 ## Map the model empirically
 
-- The integration publishes both the inputs and the outputs — the input→output wiring is measurable from the hub without vendor docs.
-- Change exactly one field in the vendor's own app, then `POST /device/runmethod {"method":"refresh"}` and diff `fullJson.currentStates` before and after (`skills/_reference/endpoints.md`). `refresh` collapses the integration's poll wait to seconds and makes the loop deterministic.
-- Establish which inputs matter **before** correcting any — field names do not state the wiring (`zoneSquareFeet` drove a usage report, not water volume).
+- The integration publishes both the inputs and the outputs. The input→output wiring is measurable from the hub without vendor docs.
+- Change exactly one field in the vendor's own app.
+- `POST /device/runmethod {"method":"refresh"}` to force the integration's read immediately (`skills/_reference/endpoints.md`).
+- Diff `fullJson.currentStates` before and after to see which outputs that field drove.
+- Establish which inputs matter **before** correcting any. Field names do not state the wiring; `zoneSquareFeet` drove a usage report, not water volume.
 - Two units with matching inputs producing matching outputs confirms the model is deterministic and the full input set is identified; a mismatch means a hidden input.
 
 ## Publishing gaps
 
 - A cloud integration publishes the subset its author chose, not the subset that matters.
-- Enumerate what it actually publishes against the vendor's own app before designing around it — the two most consequential fields may be the absent ones.
+- Enumerate what it actually publishes against the vendor's own app before designing around it.
+- The absent fields may be the consequential ones.
