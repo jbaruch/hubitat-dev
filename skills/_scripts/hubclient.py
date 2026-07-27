@@ -98,12 +98,16 @@ def load_hubs(path) -> dict:
     return cfg
 
 
-def _urllib_transport(method: str, url: str, body: Optional[str]):
+def _urllib_transport(method: str, url: str, body: Optional[str], content_type: Optional[str] = None):
     """Default transport. Returns (status, headers_dict, text). The create POST 302-redirects
     to the new entry's editor URL (/app|driver/editor/<id>); urllib follows it, so the new id
-    is read from the final URL, surfaced here as a synthetic 'Location' header."""
+    is read from the final URL, surfaced here as a synthetic 'Location' header.
+
+    `content_type` overrides the request Content-Type for a body; it defaults to
+    form-urlencoded (the code endpoints), and callers that POST JSON (e.g. /device/runmethod)
+    pass "application/json"."""
     data = body.encode() if body is not None else None
-    headers = {"Content-Type": "application/x-www-form-urlencoded"} if data else {}
+    headers = {"Content-Type": content_type or "application/x-www-form-urlencoded"} if data else {}
     req = urllib.request.Request(url, data=data, headers=headers, method=method)
     try:
         resp = urllib.request.urlopen(req, timeout=15)
