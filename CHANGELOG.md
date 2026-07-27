@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.51 — 2026-07-27
+
 ### Added
 
 - **New skill `device-sequence` — fire an ordered list of devices with a timed hold on each** (`skills/device-sequence/SKILL.md`, `skills/_scripts/hub_device_sequence.py` + tests, `skills/device-command/SKILL.md`, `README.md`, part of #78). The "which physical thing does this device control?" primitive: walk the property while zones (or lamps, shades, valves) activate in a known order, so every photo or observation binds to a device id instead of a guess. Built on `device-command` — each command is validated against that device's real surface and dispatched over `/device/runmethod` — adding the ordered walk, the per-device timed hold (so the operator can reach and observe), live per-step narration to stderr, and an optional `--off-command` run after each hold. A device that fails to dispatch is skipped without a hold, and the walk continues rather than aborting. Confirmation is the operator observing during the hold, not a return code (`rules/state-vs-attributes.md`). Deterministic core (id parsing, plan building, aggregation) is unit-tested with an injected transport, a no-op sleeper, and a capturing narrator (14 tests, no live hub or real clock). `device-command` Step 4 now cross-references this skill; both auto-included via the `skills/` glob.
