@@ -36,7 +36,7 @@ A cloud integration's child-device attributes arrive through one `sendEvent` pat
 - Change exactly one field in the vendor's own app.
 - `POST /device/runmethod {"method":"refresh"}` to force the integration's read immediately (`skills/_reference/endpoints.md`).
 - Diff `fullJson.currentStates` before and after to see which outputs that field drove.
-- Establish which inputs matter **before** correcting any. Field names do not state the wiring; `zoneSquareFeet` drove a usage report, not water volume.
+- Establish which inputs matter **before** correcting any. Field names do not state the wiring.
 - Two units with matching inputs producing matching outputs confirms the model is deterministic and the full input set is identified; a mismatch means a hidden input.
 
 ## Publishing gaps
