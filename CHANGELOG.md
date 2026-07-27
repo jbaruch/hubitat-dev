@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **New skill `sensor-onboarding` — fleet install with a verified step per device** (`skills/sensor-onboarding/SKILL.md`, `README.md`, closes #78). The last piece of #78, from onboarding nine soil probes: a guide skill that walks each sensor through pair → confirm the built-in driver auto-selected (not the generic `Device`/`Device` unfinished-join signature) → name by function-and-position → raise event retention (`maxEvents` defaults to 11 changes/attribute — the step that decides whether the data survives) → read the **real** adjustable preferences from `fullJson.settings` rather than the datasheet (a sensor advertising a 1–240-minute interval may expose only `logEnable`/`txtEnable`) → mirror to a consuming hub and confirm the mirror formed → add to inactivity monitoring keyed on `lastActivityTime`/battery never a value's presence → acceptance-test past the settling window (a fresh soil probe's first hours read garbage — 6, 5, 4% climbing to 53 by evening is soil equilibrating, not a fault) → reconcile the post-pairing inventory against a pre-flight `/hub2/devicesList` snapshot so a stray or duplicate join surfaces. Encodes the two runbook steps that did not survive contact (the reporting interval was not adjustable; retention was missing). Cross-references `device-command` (acceptance test), `mesh-health` (mirror), and the `data-collection` / `driver-lifecycle` / `state-vs-attributes` rules; the rename/retention `/device/update` mutations carry the full-field-set and destructive mesh-boolean cautions from the endpoint reference. Skill auto-included via the `skills/` glob.
+
 ## 0.1.51 — 2026-07-27
 
 ### Added
