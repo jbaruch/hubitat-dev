@@ -15,6 +15,9 @@ Checks:
   missing-command     a declared `capability "X"` whose required command has no method
   install-trap        updated() wires subscriptions/schedules but installed() neither
                       calls updated() nor wires them itself (first-run does nothing)
+  missing-menu        an app definition() with no `menu:` key — it defaults to "Apps"
+                      and misfiles the app in the left nav (warns on absence only; the
+                      valid value set is version-unverified, so it never rejects a value)
 
 Reference data (paths resolved relative to this script by default):
   ../_reference/allowed-imports.txt   one FQ class per line, '#' comments ignored
@@ -222,6 +225,27 @@ def lint_source(source: str, allowed_imports: set, required_commands: dict) -> l
         if wires.search(upd_body) and "updated" not in inst_body and not wires.search(inst_body):
             add("install-trap", "warn", inst.start(), "installed",
                 "installed() neither calls updated() nor wires subscriptions/schedules — on first install the app does nothing until the second Done.")
+
+    # missing-menu (apps only). An app's definition() metadata sorts the left nav by its
+    # `menu` field; omitting it defaults to "Apps" and silently misfiles the app. Drivers
+    # wrap definition() inside a `metadata {` block and have no menu field — the absence of
+    # that block is the app gate. Warn on an absent key only, never on the value: the valid
+    # set (Apps/Automations/Integrations) is grounded on one platform version and unverified
+    # across releases, so hard-coding a rejection list would over-flag.
+    if not re.search(r'\bmetadata\s*\{', clean):
+        dm = re.search(r'\bdefinition\s*\(', clean)
+        if dm:
+            depth, j = 1, dm.end()
+            while j < len(clean) and depth:
+                if clean[j] == "(":
+                    depth += 1
+                elif clean[j] == ")":
+                    depth -= 1
+                j += 1
+            if not re.search(r'\bmenu\s*:', clean[dm.end():j - 1]):
+                add("missing-menu", "warn", dm.start(), "menu",
+                    'app definition() sets no menu: — it defaults to "Apps" and misfiles the app '
+                    'in the left nav; set menu: to "Apps", "Automations", or "Integrations".')
 
     findings.sort(key=lambda f: (f["line"], f["check"]))
     return findings

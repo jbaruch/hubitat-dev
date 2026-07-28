@@ -24,6 +24,7 @@ For each finding, decide real vs. false positive:
 - `forbidden-construct` (**error**) — real: the sandbox blocks it. Apply the named fix (`pauseExecution` for `sleep`, `log.debug` for `println`, `getObjectClassName` for `getClass`).
 - `disallowed-import` (**warn**) — a candidate only: the documented allow-list is incomplete, so judge whether the class is genuinely unavailable. Platform (`hubitat.*`) imports are already excluded by the linter.
 - `install-trap` (**warn**) — real when the app's subscriptions live only in `updated()`; confirm `installed()` calls `updated()`.
+- `missing-menu` (**warn**) — an app with no `menu:` in `definition()`. Real: it defaults to `Apps` and misfiles the app in the left nav (`rules/app-lifecycle.md`). The fix is one line — set `menu:` to `Apps`, `Automations`, or `Integrations` per the app's job. Only dismiss if the app is genuinely a utility/manager that belongs under `Apps` *and* you want to accept the default; even then, prefer setting it explicitly.
 
 Proceed to Step 3.
 
