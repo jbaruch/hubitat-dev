@@ -370,11 +370,17 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     dropdown, generalising the RL-scoped note in gotchas 26/28 (verified 2.5.1.134, RM 5.1).
 
 31. **A disabled rule renders a stub config page.** `GET /installedapp/configure/<id>/mainPage` on a
-    **disabled** rule returns only **Cancel / Remove / Enable** — no triggers, no actions, no
-    `settings[...]` inputs. Automation reading the config finds an empty `settings` set and may
-    wrongly conclude the rule is empty. Enable first —
+    **disabled** rule returns a stub — no triggers, no actions, no `settings[...]` inputs, and
+    `removeButton: false` with `configPage.sections: []`. Automation reading the config finds an empty
+    `settings` set and may wrongly conclude the rule is empty. Enable first —
     `POST /installedapp/disable {"id":<id>,"disable":false}` → `{"result":false}` — then re-read
-    (verified 2.5.1.134).
+    (verified 2.5.1.134). **The stub's rendered controls vary by build:** 2.5.1.134 showed
+    **Cancel / Remove / Enable**; on 2.5.1.x / RM 5.1.8 the disabled page offered **Enable alone** — no
+    Remove, no Cancel. Either way `removeButton: false` describes only the rendered UI: **removal over
+    HTTP works regardless** — `POST /installedapp/update/json` removed a disabled `removeButton:false`
+    Rule Machine child cleanly (`skills/_reference/endpoints.md`, app-removal note). So do not read the
+    hidden Remove button as "cannot be removed"; the exception is an app that sets `removeButton:false`
+    *by design* (gotcha 7), which is untested.
 
 32. **An action's *type* is immutable in place — add-before-cut.** Clicking an existing action opens
     an editor scoped to that action's type (a switch action offers only switches + on/off); there is
