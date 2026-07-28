@@ -141,9 +141,19 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     picker on the same hub rendered `<div class="… device-save">` on one rule and
     `<button class="… device-save">` on the very next, so match by class or exact text `Update`,
     **never by tag** (verified 2.5.1.134). There is **one per device input on the page**, so a bare
-    `.device-save` selector hits the wrong picker. Scope by walking up from that input's
-    `input[name="settings[<name>]"]` and filter on `offsetParent !== null` — only the open picker's
-    Update is visible. Same for the picker's *trigger*, the "Click to set" control.
+    `.device-save` selector *unfiltered by visibility* can hit the wrong picker. **Its DOM position
+    varies too, not only its tag:** it does not always sit inside the input's `#<name>-options`
+    container — on the RL `onMeansPage`, `#motions-options .device-save` returned nothing while the
+    Update was mounted **outside** the options box, so container-scoping is unsafe as well. Because
+    closed pickers leave **hidden** `.device-save` nodes and only the open picker's is visible, the
+    robust query is **document-wide + `offsetParent`** — it yields the single open picker's Update:
+
+    ```js
+    const save = Array.from(document.querySelectorAll('.device-save')).filter(e => e.offsetParent)[0];
+    ```
+
+    Match by **class + visibility**, never by tag and never by container. Same for the picker's
+    *trigger*, the "Click to set" control (position variance verified 2.5.1.x, 2026-07-27).
 
 13. **The hidden input is the commit signal — check it after every Update.**
     `input[name="settings[<name>]"]` is `""` until the picker's Update commits, and holds a
@@ -435,6 +445,48 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     `Action: setAllNotifications('false') on TNHOTGC` log line and the full downstream fan-out). It is
     a **live side effect**, same caution family as gotcha 20's RL activate/turn-off buttons — read
     the button before clicking (verified 2.5.1.134).
+
+36. **SumoSelect `li` display text ≠ the `option` value — map by index, verify via `selectedOptions`.**
+    Gotchas 26/28/30 drive SumoSelect by real-clicking the `li` rather than `browser_select_option`.
+    But **the `li` text you match on is not the value you want**, in two ways. **Case:** `option.value`
+    is lowercase, the `li` is sentence-cased — `lis.find(li => li.innerText.trim() === 'motion becomes active')`
+    returns undefined; fold with `.toLowerCase()`. **Rewording:** some labels are not the value at all,
+    even case-folded:
+
+    | `option.value` | `li` display text |
+    |---|---|
+    | `between two times` | To only between two times |
+    | `motion inactive` | Any Motion inactive |
+    | `motion stays inactive` | All Motions stays inactive |
+    | `contact stays closed` | All Contacts stays closed |
+
+    So a case-insensitive exact match is right for most options but **still misses the reworded ones**.
+    Safest scripted approach: read `select.options` first, map value → `li` **by index** (the `li` order
+    matches the `option` order), and fall back to text matching only as a sanity check. Always confirm
+    the commit against `Array.from(select.selectedOptions).map(o => o.value)`, **never** the caption text
+    (verified 2.5.1.x, 2026-07-27). The `Any`/`All` prefixes in the reworded labels are RL stating its
+    multi-sensor semantics — see gotcha 39.
+
+37. **A `submitOnChange` commit invalidates injected element ids — re-tag after every blur.** The
+    tag-then-click technique (gotchas 10–12) breaks across a `submitOnChange` commit. Filling a text or
+    number input and blurring it triggers a partial re-render that **replaces** the element — every `id`
+    you injected in a prior `browser_evaluate` is gone, and the next `browser_click` fails with "does not
+    match any elements". This is the **same underlying behaviour** as the `_action_href_name|<page>|N`
+    index shifting (gotcha 19), hitting element ids instead of button names — one principle: **treat a
+    blur on a `submitOnChange` input as a page reload; re-query and re-tag everything afterward, never
+    carry a tag across one.** Hit twice in one session on plain inputs: `settings[origLabel]` (instance
+    name) dropped the tag on the next control (`roomDevsL`), and `settings[startSunsetOffsetD]` (sunset
+    offset) dropped it on the `endingXD` SumoSelect caption. Cheap guard — re-read the value to confirm
+    it committed *and* re-tag in the same evaluate:
+
+    ```js
+    () => {
+      const off = document.querySelector('input[name="settings[startSunsetOffsetD]"]');
+      const s   = document.querySelector('select[name="settings[endingXD]"]');
+      if (s) { s.closest('.SumoSelect').querySelector('p.CaptionCont').id = 'my-cap'; }
+      return { committed: off ? off.value : 'MISSING' };
+    }
+    ```
 
 ## Room Lighting: the gotchas that travel together
 

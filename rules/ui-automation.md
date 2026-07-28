@@ -33,7 +33,7 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Commit device inputs **before** filling the sections a `submitOnChange` gates — the dependent controls do not exist until the picker's Update commits.
 - Not every device picker is the MDL `device-save` picker. Newer **inline Vue** pickers (Room Lighting *activation-options* switch guards, `switchesD`/`switchesOE`) mount inline under the button, **not** in `#deviceListModal` (a dead shell): filter with real keystrokes (`locator.fill()` doesn't trigger the Vue filter) and click the checkbox and its `div.mdl-button` **Update** by coordinate — a label-locator click collapses the dropdown (`skills/_reference/playwright-ui.md` gotcha 26).
 - Rule Machine action dropdowns are **SumoSelect**. `browser_select_option` sets the native `select.value` and reports success, but the widget never fires `submitOnChange` and the page never advances — drive the widget (real-click `p.CaptionCont` to open, then the `li`), same as RL's enum guards (`skills/_reference/playwright-ui.md` gotcha 30).
-- The device picker's **Update** control is `class="… device-save"` but its **tag varies** — `<div>` on one rule, `<button>` on the next, same hub. Match by class or exact text, never by tag (`skills/_reference/playwright-ui.md` gotcha 12).
+- The device picker's **Update** control is `class="… device-save"` but its **tag and DOM position both vary** — `<div>` vs `<button>`, and sometimes mounted outside the input's `#<name>-options` container. Query document-wide and filter to the visible one (`offsetParent`); match by class + visibility, never by tag and never by container (`skills/_reference/playwright-ui.md` gotcha 12).
 
 ## Verify every mutation
 
