@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- **`hub_mesh.py` read every zwaveJS route as unparseable, so route fan-in reported "no repeaters" on a mesh that had four** (`skills/_scripts/hub_mesh.py`, `skills/_scripts/tests/test_hub_mesh.py`). zwaveJS appends the negotiated link speed to the last hop of a route string — `01 -> 1B -> 71 40kbps`, `01 -> DA 100kbps`, `01 -> 1B -> 81 -> 60 9.6kbps`. `parse_route()` split on `->` and fed the final segment straight to `int(part, 16)`, which raised on the trailing `40kbps` and returned `None`. Grounded 2026-07-29 on 2.5.1.134: **all 34 routes** on the hub carry the suffix, so `analyze_route_fan_in()` emitted `repeater_count: 0` with all 34 routes in `anomalies[]` — the fan-in axis read as *"this mesh has no repeaters"* when the honest answer was *"fan-in was not measured"*. The failure mode is the one `rules/zwave-zigbee-mesh.md` warns about in the other direction: a load-bearing repeater carrying twelve nodes would have been invisible, and `load_bearing_concerns[]` could never fire. `parse_route()` now strips a recognized `<n>kbps` suffix before parsing and documents why; anything *else* trailing still returns `None`, so an unknown shape keeps surfacing as an anomaly instead of being guessed at.
+
 ## 0.1.53 — 2026-07-27
 
 ### Changed

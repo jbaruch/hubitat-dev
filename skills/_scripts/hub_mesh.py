@@ -77,6 +77,7 @@ result alongside a fetch_warning is not an all-clear.
 """
 import argparse
 import json
+import re
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -91,6 +92,10 @@ ZWAVE_PATH = "/hub/zwaveDetails/json"
 ZIGBEE_PATH = "/hub/zigbeeDetails/json"
 HUBMESH_PATH = "/hub2/hubMeshJson"
 DETAILS_PATH = "/hub/details/json"
+
+# The link speed zwaveJS tacks onto the end of a route string ('01 -> DA 100kbps'). Route
+# metadata, not a hop — stripped by parse_route(), which documents what leaving it in cost.
+ROUTE_SPEED_SUFFIX = re.compile(r"\s+\d+(?:\.\d+)?\s*kbps\s*$", re.IGNORECASE)
 
 # Silicon Labs published receiver sensitivity floor, by Z-Wave series (dBm). Used only for
 # the backend-aware RSSI heuristic on the zwaveJS (absolute-dBm) scale. Source: silabs.com.
@@ -125,11 +130,20 @@ def parse_route(raw) -> Optional[list]:
     The route is the full path the hub uses to reach the node: the hub first, the node itself
     last, and every repeater in between. The LR star's direct route is the two-hop case
     '01 -> <node>' (rules/zwave-zigbee-mesh.md), and a classic-mesh node reached directly has
-    the same two-hop shape."""
+    the same two-hop shape.
+
+    zwaveJS appends the route's negotiated LINK SPEED to the last hop — '01 -> 1B -> 71 40kbps',
+    '01 -> DA 100kbps', '01 -> 1B -> 81 -> 60 9.6kbps' (grounded 2026-07-29 on 2.5.1.134, and on
+    every one of that hub's 34 routes). It is a property of the route, not a hop, so it is
+    stripped before parsing. Left unstripped it made 'int("71 40kbps", 16)' raise, which returned
+    None for EVERY route on the hub — analyze_route_fan_in() then reported repeater_count: 0 with
+    all 34 routes in anomalies[], i.e. the fan-in axis read as "this mesh has no repeaters"
+    rather than as "unmeasured". Anything else trailing still returns None, so a shape this
+    parser does not know still surfaces as an anomaly instead of being guessed at."""
     if not raw:
         return None
     hops = []
-    for part in str(raw).split("->"):
+    for part in ROUTE_SPEED_SUFFIX.sub("", str(raw).strip()).split("->"):
         part = part.strip()
         if not part:
             return None

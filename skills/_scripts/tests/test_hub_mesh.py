@@ -586,10 +586,22 @@ class TestParseRoute(unittest.TestCase):
         for raw in ("", None):
             self.assertIsNone(m.parse_route(raw))
 
+    def test_link_speed_suffix_is_stripped(self):
+        # zwaveJS appends the negotiated link speed to the last hop. Grounded 2026-07-29 on
+        # 2.5.1.134: every route on the hub carried one, so failing to strip it returned None
+        # for all 34 and fan-in reported "no repeaters" instead of "unmeasured".
+        self.assertEqual(m.parse_route("01 -> DA 100kbps"), [1, 218])
+        self.assertEqual(m.parse_route("01 -> 1B -> 71 40kbps"), [1, 27, 113])
+        self.assertEqual(m.parse_route("01 -> 1B -> 81 -> 60 9.6kbps"), [1, 27, 129, 96])
+
+    def test_link_speed_suffix_is_case_insensitive(self):
+        self.assertEqual(m.parse_route("01 -> 0A 100Kbps"), [1, 10])
+
     def test_unparseable_route_is_none(self):
         # 'ZZ' is not hex. None means "no route information", never an empty hop list that would
-        # read as a direct route.
-        for raw in ("01 -> ZZ", "not a route", "01 -> -> 0A"):
+        # read as a direct route. Trailing junk that is NOT the known link-speed suffix stays
+        # unparseable — an unknown shape must surface as an anomaly, not be guessed at.
+        for raw in ("01 -> ZZ", "not a route", "01 -> -> 0A", "01 -> 0A 40kb", "01 -> 0A fast"):
             self.assertIsNone(m.parse_route(raw))
 
 
