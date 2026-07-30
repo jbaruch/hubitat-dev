@@ -27,6 +27,15 @@ that only a real round-trip would have caught (see the CHANGELOG entry for PR #2
   - Every node carried the same `route` `'01 -> 0A'` regardless of its own id, which claims
     most nodes' paths terminate at a different node.
 
+A FOURTH drift of the same family, found 2026-07-29 and fixed here (PR #94): routes carried no
+link-speed suffix, which a zwaveJS hub never emits — every one of a live hub's 34 routes had
+one. That was worse than a cosmetic shape bug, because `parse_route()` could not read a
+suffixed route at all. On real data this scenario's fan-in would have been `repeater_count: 0`
+with all 14 mesh routes in `anomalies[]`, so the "every axis is measured and every axis is
+green" premise below was FALSE on the fan-in axis, and the one fixture that could have caught
+that asserted the bug away instead. With the suffix present the fixture fails on pre-fix code
+and passes on post-fix, which is what makes it the regression test.
+
 WHAT THE FIXTURE ENCODES (the scenario's ground truth — `criteria.json` grades against it)
 
 Every axis is measured and every axis is green: no FAILED nodes, no packet errors, no
@@ -120,6 +129,28 @@ ZWAVE_LR_NODES = [
     (301, "Sensor Well Level", "2026-07-16 09:09:31", 38, -58, 731, "01 -> 12D"),
 ]
 
+# zwaveJS appends the route's negotiated LINK SPEED to the last hop — '01 -> 07 -> 0A 40kbps'
+# (grounded 2026-07-29 on 2.5.1.134; see the fourth drift in the module docstring). Applied here
+# rather than written into the route column above, so the tables stay readable and the one fact
+# lives in one place. The mix mirrors a live hub, where the 40k Springs shades dominate, modern
+# mains gear negotiates 100k, and one straggler sits at 9.6k — which is also the only shape that
+# exercises the decimal in the suffix.
+SLOW_LINK_NODE = 27  # Dimmer Alcove, the fixture's 9.6 kbps straggler
+
+
+def route_with_speed(node_id: int, name: str, route: str) -> str:
+    """Classic-mesh routes only. LR is deliberately left bare: this hub has no LR nodes to
+    ground the shape against, and `analyze_route_fan_in()` skips non-mesh topology BEFORE
+    calling `parse_route()`, so an LR route never reaches the parser either way."""
+    if node_id == SLOW_LINK_NODE:
+        speed = "9.6kbps"
+    elif name.startswith("Extender"):
+        speed = "100kbps"
+    else:
+        speed = "40kbps"
+    return f"{route} {speed}"
+
+
 ZIGBEE_DEVICES = [
     # The outlet is the cross-radio evidence: frozen inside the SAME window as the Z-Wave
     # actuators, while every other Zigbee device is fresh. lastActivity carries an explicit
@@ -156,7 +187,7 @@ def zwave_raw() -> dict:
             # The zwaveJS backend does not report route changes — the hub emits the literal
             # 'N/A' (rules/zwave-zigbee-mesh.md), which parse_num maps to None.
             "routeChanges": "N/A",
-            "route": route,
+            "route": route_with_speed(node_id, name, route),
             "security": "S2",
             "listening": name.startswith(
                 ("Extender", "Outlet", "Lamp", "Switch", "Dimmer", "Relay")),
