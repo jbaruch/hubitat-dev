@@ -95,7 +95,10 @@ DETAILS_PATH = "/hub/details/json"
 
 # The link speed zwaveJS tacks onto the end of a route string ('01 -> DA 100kbps'). Route
 # metadata, not a hop — stripped by parse_route(), which documents what leaving it in cost.
-ROUTE_SPEED_SUFFIX = re.compile(r"\s+\d+(?:\.\d+)?\s*kbps\s*$", re.IGNORECASE)
+# Quantifiers are BOUNDED rather than open `\s+`/`\d+`: unbounded runs backtrack quadratically,
+# and this runs once per node per invocation on input the hub controls. Real speeds are 9.6k /
+# 40k / 100k, so the bounds are orders of magnitude clear of anything genuine.
+ROUTE_SPEED_SUFFIX = re.compile(r"\s{1,8}\d{1,7}(?:\.\d{1,3})?\s{0,8}kbps\s{0,8}$", re.IGNORECASE)
 
 # Silicon Labs published receiver sensitivity floor, by Z-Wave series (dBm). Used only for
 # the backend-aware RSSI heuristic on the zwaveJS (absolute-dBm) scale. Source: silabs.com.
@@ -139,11 +142,19 @@ def parse_route(raw) -> Optional[list]:
     None for EVERY route on the hub — analyze_route_fan_in() then reported repeater_count: 0 with
     all 34 routes in anomalies[], i.e. the fan-in axis read as "this mesh has no repeaters"
     rather than as "unmeasured". Anything else trailing still returns None, so a shape this
-    parser does not know still surfaces as an anomaly instead of being guessed at."""
+    parser does not know still surfaces as an anomaly instead of being guessed at.
+
+    The suffix is stripped only from something already shaped like a route (it contains '->').
+    Without that guard '01 100kbps' would parse to [1] — a degenerate one-hop list that reads as
+    a route rather than as "no route information", which is exactly what returning None exists to
+    prevent."""
     if not raw:
         return None
+    text = str(raw).strip()
+    if "->" in text:
+        text = ROUTE_SPEED_SUFFIX.sub("", text)
     hops = []
-    for part in ROUTE_SPEED_SUFFIX.sub("", str(raw).strip()).split("->"):
+    for part in text.split("->"):
         part = part.strip()
         if not part:
             return None

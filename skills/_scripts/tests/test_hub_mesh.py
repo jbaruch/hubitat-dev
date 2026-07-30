@@ -601,8 +601,14 @@ class TestParseRoute(unittest.TestCase):
         # 'ZZ' is not hex. None means "no route information", never an empty hop list that would
         # read as a direct route. Trailing junk that is NOT the known link-speed suffix stays
         # unparseable — an unknown shape must surface as an anomaly, not be guessed at.
-        for raw in ("01 -> ZZ", "not a route", "01 -> -> 0A", "01 -> 0A 40kb", "01 -> 0A fast"):
+        for raw in ("01 -> ZZ", "not a route", "01 -> -> 0A", "01 -> 0A 40kb", "01 -> 0A fast",
+                    "01 -> 0A100kbps",      # no separator before the speed
+                    "01 -> 1B 100kbps -> 71 40kbps"):  # per-hop speeds: half-parsing would lie
             self.assertIsNone(m.parse_route(raw))
+
+    def test_speed_suffix_is_stripped_only_from_something_route_shaped(self):
+        # Without the '->' guard this parses to [1] — a one-hop list that reads as a route.
+        self.assertIsNone(m.parse_route("01 100kbps"))
 
 
 class TestRouteFanIn(unittest.TestCase):
@@ -626,6 +632,22 @@ class TestRouteFanIn(unittest.TestCase):
         r = self.fan_in(nodes)
         self.assertEqual(r["repeater_count"], 0)
         self.assertEqual(r["load_bearing_concerns"], [])
+
+    def test_zwavejs_link_speed_suffix_does_not_blank_the_fan_in_axis(self):
+        # The regression this whole path exists for, asserted where it was REPORTED rather than
+        # only at the parser: every zwaveJS route carries a link-speed suffix, and when
+        # parse_route() choked on it analyze_route_fan_in() answered "this mesh has no
+        # repeaters" (repeater_count 0, every route in anomalies[]) instead of "fan-in was not
+        # measured". A parser-only test would stay green if the strip moved and the wiring broke.
+        nodes = [zw_node(nodeId=7, deviceName="Extender", route="01 -> 07 100kbps"),
+                 zw_node(nodeId=10, route="01 -> 07 -> 0A 40kbps"),
+                 zw_node(nodeId=11, route="01 -> 07 -> 0B 9.6kbps"),
+                 zw_node(nodeId=12, route="01 -> 0C 40kbps")]
+        r = self.fan_in(nodes)
+        self.assertEqual(r["anomalies"], [])
+        self.assertEqual(r["repeater_count"], 1)
+        self.assertEqual(r["repeaters"][0]["nodeId"], 7)
+        self.assertEqual(r["repeaters"][0]["dependents"], [10, 11])
 
     def test_multi_hop_counts_every_intermediate(self):
         # Both 07 and 08 carry node 10; neither the hub nor the node itself is a repeater.
