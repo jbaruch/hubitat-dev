@@ -90,8 +90,15 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
    clicking "Done with Room Lights" **re-captures the current physical state of every light in the
    scene** — if the lights happen to be on, it silently overwrites the scene. Instead: add members,
    then set each device's captured state directly (click the Level cell → the `dimLA` number input;
-   click the Switch cell → the on/off toggles). Capture is optional. Avoid "Re-Capture" unless the
-   physical lights are already in the exact desired state.
+   click the Switch cell → the on/off toggles; or edit any cell via gotcha 40). Capture is optional.
+   Avoid "Re-Capture" unless the physical lights are already in the exact desired state.
+   **Scope of the hazard:** it fires for *level/CT* values on an **already-captured** instance. It did
+   **not** fire for a newly added device on a *fresh* instance — on two 2026-07-27 builds the target
+   light was physically **off** at Done and RL still stored `swVal:"on"` (RL 1276
+   `capDevs0[237]={swVal:"on",…}`; RL 1277 `capDevs0[283]={swVal:"on",dimVal:10,tempVal:2700,…}`). So
+   `swVal` defaulted to on rather than re-capturing the physical off — which is exactly why editing the
+   capture cell directly (gotcha 40) matters. Read the capture table before Done either way: `on(off)`
+   is correct, `off(off)` would not be.
 
 6. **`mainPage` and sub-pages have different table column layouts.** Do not compare a device table
    read on `mainPage` against one on `.../onDevicesPage` by column index — the misalignment produces
@@ -141,9 +148,19 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     picker on the same hub rendered `<div class="… device-save">` on one rule and
     `<button class="… device-save">` on the very next, so match by class or exact text `Update`,
     **never by tag** (verified 2.5.1.134). There is **one per device input on the page**, so a bare
-    `.device-save` selector hits the wrong picker. Scope by walking up from that input's
-    `input[name="settings[<name>]"]` and filter on `offsetParent !== null` — only the open picker's
-    Update is visible. Same for the picker's *trigger*, the "Click to set" control.
+    `.device-save` selector *unfiltered by visibility* can hit the wrong picker. **Its DOM position
+    varies too, not only its tag:** it does not always sit inside the input's `#<name>-options`
+    container — on the RL `onMeansPage`, `#motions-options .device-save` returned nothing while the
+    Update was mounted **outside** the options box, so container-scoping is unsafe as well. Because
+    closed pickers leave **hidden** `.device-save` nodes and only the open picker's is visible, the
+    robust query is **document-wide + `offsetParent`** — it yields the single open picker's Update:
+
+    ```js
+    const save = Array.from(document.querySelectorAll('.device-save')).filter(e => e.offsetParent)[0];
+    ```
+
+    Match by **class + visibility**, never by tag and never by container. Same for the picker's
+    *trigger*, the "Click to set" control (position variance verified 2.5.1.x, 2026-07-27).
 
 13. **The hidden input is the commit signal — check it after every Update.**
     `input[name="settings[<name>]"]` is `""` until the picker's Update commits, and holds a
@@ -341,7 +358,12 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
       off" is backwards** — it blocks turn-off while the switch is off, the normal state. Same shape on
       activate: `onConds` = "Mode is" reveals `modeXD` labeled *"Don't Activate when mode is"*. **Always
       read the rendered `_action_href` summary text before Done** — it states the guard in plain English
-      and catches an inverted condition.
+      and catches an inverted condition. This is the polarity check for the **whole** condition set, not
+      just `offConds`: every restriction renders as a sentence — `Don't Activate when Switches are on: …`,
+      `Don't Activate when Illuminance Sensors are above 100: …`, `Don't Activate when mode is: Away,
+      Night` — and a positive window renders positively: `onConds` "To only between two times" becomes
+      *"Activate only between …"*, not a "don't". Reading the sentence is faster and safer than reasoning
+      about setting names (extended RL 1276/1277, 2026-07-27).
 
 29. **`scheduledJobs[].prevRunTime: null` means not-yet-fired, not disabled.** A newly created or
     reset schedule has no previous run until its next natural firing. Use the job's scheduled time
@@ -370,11 +392,17 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     dropdown, generalising the RL-scoped note in gotchas 26/28 (verified 2.5.1.134, RM 5.1).
 
 31. **A disabled rule renders a stub config page.** `GET /installedapp/configure/<id>/mainPage` on a
-    **disabled** rule returns only **Cancel / Remove / Enable** — no triggers, no actions, no
-    `settings[...]` inputs. Automation reading the config finds an empty `settings` set and may
-    wrongly conclude the rule is empty. Enable first —
+    **disabled** rule returns a stub — no triggers, no actions, no `settings[...]` inputs, and
+    `removeButton: false` with `configPage.sections: []`. Automation reading the config finds an empty
+    `settings` set and may wrongly conclude the rule is empty. Enable first —
     `POST /installedapp/disable {"id":<id>,"disable":false}` → `{"result":false}` — then re-read
-    (verified 2.5.1.134).
+    (verified 2.5.1.134). **The stub's rendered controls vary by build:** 2.5.1.134 showed
+    **Cancel / Remove / Enable**; on 2.5.1.x / RM 5.1.8 the disabled page offered **Enable alone** — no
+    Remove, no Cancel. Either way `removeButton: false` describes only the rendered UI: **removal over
+    HTTP works regardless** — `POST /installedapp/update/json` removed a disabled `removeButton:false`
+    Rule Machine child cleanly (`skills/_reference/endpoints.md`, app-removal note). So do not read the
+    hidden Remove button as "cannot be removed"; the exception is an app that sets `removeButton:false`
+    *by design* (gotcha 7), which is untested.
 
 32. **An action's *type* is immutable in place — add-before-cut.** Clicking an existing action opens
     an editor scoped to that action's type (a switch action offers only switches + on/off); there is
@@ -430,6 +458,92 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     a **live side effect**, same caution family as gotcha 20's RL activate/turn-off buttons — read
     the button before clicking (verified 2.5.1.134).
 
+36. **SumoSelect `li` display text ≠ the `option` value — map by index, verify via `selectedOptions`.**
+    Gotchas 26/28/30 drive SumoSelect by real-clicking the `li` rather than `browser_select_option`.
+    But **the `li` text you match on is not the value you want**, in two ways. **Case:** `option.value`
+    is lowercase, the `li` is sentence-cased — `lis.find(li => li.innerText.trim() === 'motion becomes active')`
+    returns undefined; fold with `.toLowerCase()`. **Rewording:** some labels are not the value at all,
+    even case-folded:
+
+    | `option.value` | `li` display text |
+    |---|---|
+    | `between two times` | To only between two times |
+    | `motion inactive` | Any Motion inactive |
+    | `motion stays inactive` | All Motions stays inactive |
+    | `contact stays closed` | All Contacts stays closed |
+
+    So a case-insensitive exact match is right for most options but **still misses the reworded ones**.
+    Safest scripted approach: read `select.options` first, map value → `li` **by index** (the `li` order
+    matches the `option` order), and fall back to text matching only as a sanity check. Always confirm
+    the commit against `Array.from(select.selectedOptions).map(o => o.value)`, **never** the caption text
+    (verified 2.5.1.x, 2026-07-27). The `Any`/`All` prefixes in the reworded labels are RL stating its
+    multi-sensor semantics — see gotcha 39.
+
+37. **A `submitOnChange` commit invalidates injected element ids — re-tag after every blur.** The
+    tag-then-click technique (gotchas 10–12) breaks across a `submitOnChange` commit. Filling a text or
+    number input and blurring it triggers a partial re-render that **replaces** the element — every `id`
+    you injected in a prior `browser_evaluate` is gone, and the next `browser_click` fails with "does not
+    match any elements". This is the **same underlying behaviour** as the `_action_href_name|<page>|N`
+    index shifting (gotcha 19), hitting element ids instead of button names — one principle: **treat a
+    blur on a `submitOnChange` input as a page reload; re-query and re-tag everything afterward, never
+    carry a tag across one.** Hit twice in one session on plain inputs: `settings[origLabel]` (instance
+    name) dropped the tag on the next control (`roomDevsL`), and `settings[startSunsetOffsetD]` (sunset
+    offset) dropped it on the `endingXD` SumoSelect caption. Cheap guard — re-read the value to confirm
+    it committed *and* re-tag in the same evaluate:
+
+    ```js
+    () => {
+      const off = document.querySelector('input[name="settings[startSunsetOffsetD]"]');
+      const s   = document.querySelector('select[name="settings[endingXD]"]');
+      if (s) { s.closest('.SumoSelect').querySelector('p.CaptionCont').id = 'my-cap'; }
+      return { committed: off ? off.value : 'MISSING' };
+    }
+    ```
+
+38. **RL's two "motion off" means use DIFFERENT device inputs — and only one auto-populates.** On the
+    *Means to Turn Off* page, `offMeans` offers two motion options that look interchangeable and are not:
+
+    | `offMeans` value | rendered as | device input | RL pre-fills it? |
+    |---|---|---|---|
+    | `motion stays inactive` | "All Motions stays inactive" | `motionsOff` | **yes** — copied from `motions`, plus `motionTime` defaulted to 1 |
+    | `motion inactive` | "Any Motion inactive" | **`motionsInactive`** | **no** — renders empty *and* `btn-device-required` |
+
+    Switching from the default "stays inactive" to plain "motion inactive" silently **swaps which input
+    the page needs**, and the new one starts empty and required — so if you assume the auto-fill carried
+    over, Done rejects the page (or you commit an instance with no off-side sensor). Picking the right one
+    when translating an RM rule: read the RM wait's `stays-<n>` setting — **empty/false** → the wait fires
+    the instant motion goes inactive → `motion inactive`; **set, with an `hhmmss-<n>` duration** →
+    `motion stays inactive` + `motionTime`. **A leftover `motionTime` is inert** when `offMeans` is plain
+    `motion inactive` — RL never reads it; RL 1277 still carries `motionTime: 1` from the default and
+    turns off immediately as intended, so don't read a stray `motionTime` as evidence of a hold
+    (verified RL 1.2.3, 2026-07-27). This is the load-bearing finding — #59's instances all used the
+    auto-populated stays-inactive path and never exercised it.
+
+39. **`Any` / `All` in the off-side labels is RL stating its multi-sensor semantics.** The labels prefix
+    the quantifier — "**Any** Motion inactive" (`motion inactive`) vs "**All** Motions stays inactive"
+    (`motion stays inactive`) — and the rendered summary echoes it ("Motion Sensors that **All** become
+    and stay inactive for 2 minutes"). This matters translating RM, which encodes the same thing as two
+    separate booleans: `AlltDev1` (trigger: any/all) and `AlltDev-1` (wait: any/all). RM 820 had
+    `AlltDev1` false (any sensor active → on) and `AlltDev-1` true (all sensors inactive → off); RL's
+    "motion becomes active" + "All Motions stays inactive" is exactly that pair, with **no setting to
+    toggle** — two RM booleans collapse into RL's fixed convention. This is why gotcha 36's reworded `li`
+    labels carry the `Any`/`All` prefix.
+
+40. **Reading and editing the RL capture table.** The mainPage device table renders each capture cell as
+    **`captured(live)`** — `on(off)`, `10(10)`, `2700(2703)`. The **first** value is what the instance
+    sends on activation; the parenthetical is the device's current physical state, decoration. Column
+    layout for a CT bulb: `Device | State | Type | Act | Off | Switch | Level | Temp`, with hidden
+    per-cell inputs `on~<id>~0`, `cx~<id>~0`, `sw~<id>~0`, `xo~<id>~0`, `sx~<id>~0`, `dm~<id>~0`,
+    `ct~<id>~0`. **To edit a captured value, real-click the cell's
+    `div.submitOnChange[onclick="buttonClick(this)"]`** (the same `div.submitOnChange` control family as
+    the scissors in gotcha 32) — the visible cell is not the hidden input. RL reveals a plain editor input for that
+    attribute: clicking **Temp** revealed `input[name="settings[ctL]"]` — **page-scoped `ctL`, not
+    `ctL~<id>~0`** — and fill + blur re-renders the cell (`2703(2703)` → `2700(2703)`). This is the
+    scripted equivalent of "set each device's captured state directly" (gotcha 5) and is what lets you
+    avoid Re-Capture entirely. **`luxD` defaults to 100:** selecting `onConds` "illuminance is above"
+    reveals `illumsD` (required picker) with `luxD` pre-filled at 100 — don't assume it's empty, and
+    verify it (verified RL 1.2.3, 2026-07-27).
+
 ## Room Lighting: the gotchas that travel together
 
 RL knowledge is spread across the numbered list above; in build/edit order it reads as one path:
@@ -440,10 +554,16 @@ RL knowledge is spread across the numbered list above; in build/edit order it re
    `.btn-device` picker, where fresh required inputs commit (gotcha 27); **only** the activation-options
    switch guards (`switchesD`/`switchesOE`) use the inline-Vue picker (gotcha 26).
 3. **Set conditions** — SumoSelect enums commit on dropdown close (gotchas 26, 28); treat mode `"0"`
-   as All Modes, watch the `offConds`/`onConds` polarity, and read the rendered summary before Done
-   (gotcha 28).
-4. **Don't trip the live buttons** — `settings[activate]`/`settings[turnOff]` physically switch the room (gotcha 20).
-5. **Don't auto-recapture** — "Done with Room Lights" re-captures physical state and can overwrite a live scene (gotcha 5).
+   as All Modes, watch the `offConds`/`onConds` polarity, and read the rendered summary as the polarity
+   check for the whole condition set (gotcha 28). The `li` text is not the option value — map by index
+   (gotcha 36).
+4. **Turn-off side** — `offMeans` "motion inactive" (`motionsInactive`, required-empty) vs "motion stays
+   inactive" (`motionsOff`, auto-filled) need different inputs and only one pre-fills; the `Any`/`All`
+   labels are RL's multi-sensor semantics (gotchas 38, 39).
+5. **Don't trip the live buttons** — `settings[activate]`/`settings[turnOff]` physically switch the room (gotcha 20).
+6. **Captures** — read cells as `captured(live)` and edit them via `buttonClick(this)` to avoid
+   Re-Capture (gotcha 40); "Done with Room Lights" can re-capture physical state on an already-captured
+   instance, though a fresh device defaults `swVal:"on"` (gotcha 5).
 
 ## HPM (Hubitat Package Manager) uninstall
 
@@ -522,7 +642,11 @@ instance creation, the SumoSelect enum set, and the `offConds` polarity trap. Go
 building a Rule Machine "Run Custom Action" by automation — the SumoSelect action dropdowns, the
 disabled-rule stub page, action-type immutability with add-before-cut, the orphaned `.N` settings
 after a cut, the required-empty device-picker re-confirmation (gotcha 17), and `Run Actions` as a
-live test. Gotchas 1, 2, 5,
+live test. Gotchas 36–40 were verified building two Room Lighting instances end-to-end (RL v1.2.3,
+RM 820→RL 1276 "Patio Lights", RM 819→RL 1277 "Master Bed Light", 2026-07-27) — the SumoSelect
+display-text-vs-value mismatch, the `submitOnChange` element-id invalidation, the `.device-save`
+position variance, the `motionsInactive`/`motionsOff` turn-off split (only `motionsOff` auto-fills),
+and the `captured(live)` table with `buttonClick(this)` cell editing. Gotchas 1, 2, 5,
 10, 17, 20, 23 and 30 are the load-bearing ones — each was reached the expensive way in real usage; 5
 corrupted a live scene, 10 silently discarded a setting while the page looked correct, 17 blocks
 automated install where the required-input flip fails (picker/build-dependent — not the classic RL

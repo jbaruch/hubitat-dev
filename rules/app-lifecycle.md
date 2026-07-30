@@ -7,6 +7,29 @@ description: Hubitat app lifecycle callbacks and the subscribe/reinitialize idio
 
 An app is not a long-running process. The hub wakes it on an event, a schedule, a UI render, install/update/uninstall, or an HTTP endpoint hit, runs one method, and sleeps.
 
+## `definition()` metadata — how the app is filed and instantiated
+
+`definition()` carries more than `name`/`namespace`/`author`. These metadata keys change where the app appears and how it is created, and the platform supplies a default for any you omit — so leaving one off is a silent decision, not a no-op:
+
+- **`menu`** — which left-nav menu the app sorts into. Measured values on a C-8 Pro (2.5.1.135): `Apps`, `Automations`, `Integrations`. **Omitting it defaults to `Apps`**, which quietly misfiles a presence/event-driven automation next to package managers. A rough rule matching the observed split: talks to a third party over the network → `Integrations`; reacts to device events / time / presence and drives devices → `Automations`; utility, manager, or dashboard → `Apps`. Always set it explicitly.
+- **`category`** — separate metadata (`Convenience`, `Safety & Security`, `Utility`, `My Apps`, `Hidden`), and **not** the same field as `menu`; neither implies the other. `Vacation Lighting Director` is `category: "Safety & Security"` but `menu: "Apps"`. Setting `category` alone — the field whose name reads like it controls placement — still leaves the app in `Apps`.
+- **`singleInstance: true`** — the app can be installed once, not repeatedly (parent apps are the usual case).
+- **`installOnOpen: true`** — the instance is created as soon as its page opens rather than on the first Done.
+- **`parent`** — declares this a child app under a named parent (`namespace:name`); a parent/child pair uses it on the child.
+
+```groovy
+definition(
+    name:      "Lock Arming",
+    namespace: "jbaruch",
+    author:    "…",
+    category:  "Safety & Security",
+    menu:      "Automations",   // where it files in the left nav — set it, don't inherit the Apps default
+    // singleInstance / installOnOpen / parent as the app requires
+)
+```
+
+The three observed `menu` values are grounded on one hub/one platform version; whether the set is fixed across versions or what an invalid string does is unverified, so `lint-review` warns only on an **absent** `menu`, never on an unrecognized value.
+
 ## Callbacks
 
 - `installed()` — first install only.

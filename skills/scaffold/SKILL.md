@@ -15,7 +15,7 @@ Establish, asking the user only for what is not already clear:
 - app or driver
 - `name`, `namespace` (unique — typically the user's handle), `author`
 - for a driver: the device protocol (Zigbee, Z-Wave, LAN/cloud, virtual) and the capabilities it exposes
-- for an app: what it watches and what it controls
+- for an app: what it watches and what it controls, and **which left-nav menu it belongs in** — Hubitat sorts the nav by `definition()`'s `menu` field, and omitting it silently defaults to `Apps`, misfiling the app. Infer from the app's job, asking only if unclear: talks to a third party over the network → `Integrations`; reacts to device events / time / presence and drives devices → `Automations`; utility, manager, or dashboard → `Apps`. `menu` is **not** `category` — see `rules/app-lifecycle.md`.
 
 Proceed to Step 2.
 
@@ -31,7 +31,7 @@ Proceed to Step 3.
 
 Emit one Groovy file wiring in, per the rules:
 - **Driver**: `metadata { definition(...) { capability lines, custom command/attribute } preferences { logEnable/txtEnable } }`; `installed()`, `updated()` (with `runIn(1800, logsOff)` when logging), `logsOff()`; a method for **every** required command; `configure()`/`refresh()` if those capabilities are declared; a `parse(String description)` with the protocol-appropriate decode and a `log.debug` of raw input when a protocol is involved.
-- **App**: `definition(...)`, `preferences { page { section { inputs } } }`, `installed() { updated() }`, `updated() { unsubscribe(); initialize() }`, `initialize()` with the subscriptions, and a handler method for each subscription. Guard chatty logs on `logEnable`/`txtEnable`.
+- **App**: `definition(...)` with an **explicit `menu:`** (`Apps` | `Automations` | `Integrations`, per Step 1 — never let it default), `preferences { page { section { inputs } } }`, `installed() { updated() }`, `updated() { unsubscribe(); initialize() }`, `initialize()` with the subscriptions, and a handler method for each subscription. Guard chatty logs on `logEnable`/`txtEnable`.
 
 Write the file to the path the user wants (default `<name>.groovy`). Proceed to Step 4.
 

@@ -148,6 +148,33 @@ class TestInstallTrap(unittest.TestCase):
         self.assertEqual(by_check(hub_lint.lint_source(src, ALLOWED, REQUIRED), "install-trap"), [])
 
 
+class TestMissingMenu(unittest.TestCase):
+    def test_app_definition_without_menu_warns(self):
+        src = (
+            'definition(name: "Lock Arming", namespace: "j", author: "a",\n'
+            '           category: "Safety & Security")\n'
+            'preferences { page(name: "mainPage") { } }\n'
+        )
+        f = by_check(hub_lint.lint_source(src, ALLOWED, REQUIRED), "missing-menu")
+        self.assertEqual(len(f), 1)
+        self.assertEqual(f[0]["severity"], "warn")
+        self.assertEqual(f[0]["symbol"], "menu")
+        self.assertEqual(f[0]["line"], 1)
+
+    def test_app_definition_with_menu_is_clean(self):
+        src = (
+            'definition(name: "Lock Arming", namespace: "j", author: "a",\n'
+            '           menu: "Automations")\n'
+            'preferences { page(name: "mainPage") { } }\n'
+        )
+        self.assertEqual(by_check(hub_lint.lint_source(src, ALLOWED, REQUIRED), "missing-menu"), [])
+
+    def test_driver_definition_never_flags_missing_menu(self):
+        # Drivers wrap definition() in metadata {} and have no menu field.
+        src = 'metadata { definition(name:"X",namespace:"n",author:"a") { capability "Actuator" } }\n'
+        self.assertEqual(by_check(hub_lint.lint_source(src, ALLOWED, REQUIRED), "missing-menu"), [])
+
+
 class TestStripping(unittest.TestCase):
     def test_forbidden_words_in_comments_and_strings_are_ignored(self):
         src = (
