@@ -474,12 +474,13 @@ def main(argv=None, transport=None) -> int:
                 "tools": [_tool_summary(t, args.schemas) for t in tools],
             }, indent=2, default=str))
             return 0
-        # call
+        # call — never echo `arguments`: an arbitrary tool's args can carry a lock PIN, access code,
+        # or other secret the caller is setting, and stdout must not leak it (`rules/no-secrets.md`).
+        # The caller already knows what they passed via --args.
         outcome = client.call_tool(args.tool, arguments)
         print(json.dumps({
             "url": url,
             "tool": args.tool,
-            "arguments": arguments,
             "isError": outcome["isError"],
             "result": outcome["data"],
         }, indent=2, default=str))
