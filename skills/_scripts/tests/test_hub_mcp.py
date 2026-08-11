@@ -272,6 +272,16 @@ class TestLocalUrlGuard(unittest.TestCase):
             hub_mcp.resolve_mcp_url(url="http://attacker.example.com/mcp")
 
 
+class TestNoRedirect(unittest.TestCase):
+    def test_authenticated_transport_refuses_external_redirect(self):
+        # urllib would otherwise copy the Authorization header to the redirect target; the handler
+        # must return None (do not follow) so the bearer token never reaches an external URL.
+        handler = hub_mcp._NoRedirect()
+        self.assertIsNone(handler.redirect_request(
+            req=None, fp=None, code=302, msg="Found", headers={},
+            newurl="http://evil.example.com/mcp"))
+
+
 # ------------------------- client -------------------------
 
 class TestClientHandshake(unittest.TestCase):

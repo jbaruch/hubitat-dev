@@ -258,15 +258,33 @@ def resolve_mcp_url(url: Optional[str] = None, ip: Optional[str] = None,
     raise HubError("provide --url http://<ip>/mcp, --ip <addr>, or --hub <name> (with a hubs.json)")
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse to follow HTTP redirects. urllib follows 3xx automatically and copies the request
+    headers — including `Authorization: Bearer <token>` — to the redirect target, so a local MCP
+    endpoint that 302s to a public URL would leak the bearer token past the pre-request local-address
+    validation (`rules/no-secrets.md`). Returning None here means "do not redirect"; the 3xx surfaces
+    to the caller as a non-200 status instead, and the token never reaches the redirect target."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
+# Opener with the default redirect handler REPLACED by the no-follow one; reused across requests.
+_OPENER = urllib.request.build_opener(_NoRedirect)
+
+
 def _mcp_transport(method: str, url: str, body: Optional[str], headers: dict):
-    """Default transport. Returns (status, headers_dict, text). Raises HubError only on a transport
-    failure (unreachable host); HTTP error statuses are returned for the caller to classify."""
+    """Default transport. Returns (status, headers_dict, text). Uses the no-redirect opener so an
+    authenticated request never forwards the token to a redirect target. Raises HubError only on a
+    transport failure (unreachable host); HTTP error statuses (including a blocked 3xx) are returned
+    for the caller to classify."""
     data = body.encode() if body is not None else None
     req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
     try:
-        resp = urllib.request.urlopen(req, timeout=20)
+        resp = _OPENER.open(req, timeout=20)
         return resp.status, dict(resp.headers), resp.read().decode("utf-8", "replace")
     except urllib.error.HTTPError as e:
+        # A blocked redirect arrives here as a 3xx HTTPError — a non-200 the caller rejects.
         return e.code, dict(e.headers or {}), (e.read().decode("utf-8", "replace") if e.fp else "")
     except urllib.error.URLError as e:
         raise HubError(f"cannot reach {url}: {e.reason}") from e
