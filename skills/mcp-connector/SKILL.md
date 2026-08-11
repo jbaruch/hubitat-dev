@@ -27,7 +27,7 @@ Do not assume the tool set from the reference snapshot. List it live:
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py list-tools --hub <name>
 ```
 
-Argument/output contract: `skills/_scripts/hub_mcp.py` module docstring. Add `--schemas` for input
+Argument/output contract: `.tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py` module docstring. Add `--schemas` for input
 schemas, `--ip <addr>` or `--url http://<ip>/mcp` instead of `--hub`. If the call returns `401`, the
 token was rejected — fix the token before continuing. Proceed to Step 3.
 
@@ -56,31 +56,35 @@ guessing:
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py call hubitat_search_devices --args '{"query":"patio"}' --hub <name>
 ```
 
-Confirm the match against the returned id/label. Then read the selected tool's **live description and
-schema** (from Step 2, `list-tools --schemas`) to decide sensitivity; never judge from a memorized
-list. If the tool requires `allowSensitive`, proceed to Step 6; otherwise proceed to Step 7.
+Confirm the match against the returned id/label, then proceed to Step 6.
 
-## Step 6 — Gate a sensitive action
+## Step 6 — Classify the tool's sensitivity
+
+Read the selected tool's **live description and schema** (from Step 2, `list-tools --schemas`) to
+decide whether it is sensitive; never judge from a memorized list. If the tool requires
+`allowSensitive`, proceed to Step 7; otherwise proceed to Step 8.
+
+## Step 7 — Gate a sensitive action
 
 A sensitive action is a physical side effect, so it needs authorization before firing. An explicit
-request that names the action (lock this door, set this thermostat) **is** that authorization — do not
-pause to re-confirm; it takes `--allow-sensitive`, and you proceed immediately to Step 7. Ask one
-clarifying question only when the intent is genuinely ambiguous (which device, on or off, act at all),
-then proceed to Step 7.
+request that names the action (lock this door, set this thermostat) **is** that authorization. Do not
+pause to re-confirm; add `--allow-sensitive` and proceed immediately to Step 8. Ask one clarifying
+question only when the intent is genuinely ambiguous (which device, on or off, act at all), then
+proceed to Step 8.
 
-## Step 7 — Fire the control action
+## Step 8 — Fire the control action
 
 Send the control tool with the resolved id/name (adding `--allow-sensitive` for a sensitive action
-confirmed in Step 6):
+confirmed in Step 7):
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py call hubitat_lock --args '{"device":"Front Door"}' --allow-sensitive --hub <name>
 ```
 
 `isError:true` in the result is the tool reporting a failure (bad args, guard, device miss) — surface
-it, do not treat a printed result as success. Proceed to Step 8.
+it, do not treat a printed result as success. Proceed to Step 9.
 
-## Step 8 — Verify the mutation
+## Step 9 — Verify the mutation
 
 A returned result is dispatch, not proof the device moved — the same trap as `/device/runmethod`
 (`rules/state-vs-attributes.md`). Re-read the affected device with `get_device_state` (or

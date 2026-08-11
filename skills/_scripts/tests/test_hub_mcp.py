@@ -118,11 +118,12 @@ class TestJsonrpcResult(unittest.TestCase):
     def test_returns_result(self):
         self.assertEqual(hub_mcp.jsonrpc_result({"result": {"a": 1}}), {"a": 1})
 
-    def test_error_object_raises_with_code(self):
+    def test_error_object_raises_with_code_but_withholds_message(self):
+        # The server message can reflect a submitted PIN/code, so only the code is surfaced.
         with self.assertRaises(HubError) as ctx:
-            hub_mcp.jsonrpc_result({"error": {"code": -32602, "message": "bad args"}})
+            hub_mcp.jsonrpc_result({"error": {"code": -32602, "message": "invalid PIN 4321"}})
         self.assertIn("-32602", str(ctx.exception))
-        self.assertIn("bad args", str(ctx.exception))
+        self.assertNotIn("4321", str(ctx.exception))
 
     def test_neither_result_nor_error_raises(self):
         with self.assertRaises(HubError):

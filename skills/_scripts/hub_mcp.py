@@ -82,7 +82,8 @@ def parse_message_body(text: str) -> dict:
         try:
             return json.loads(text)
         except json.JSONDecodeError as e:
-            raise HubError(f"MCP endpoint returned a non-JSON body: {text[:120]!r}") from e
+            raise HubError("MCP endpoint returned a non-JSON body (withheld — it may reflect submitted "
+                           "arguments); check the token, host, and that /mcp is the right endpoint.") from e
     payloads = []
     for line in text.splitlines():
         line = line.strip()
@@ -91,25 +92,28 @@ def parse_message_body(text: str) -> dict:
             if frag and frag != "[DONE]":
                 payloads.append(frag)
     if not payloads:
-        raise HubError(f"MCP SSE response carried no data frames: {text[:120]!r}")
+        raise HubError("MCP SSE response carried no data frames.")
     try:
         return json.loads(payloads[-1])  # one message per response here; the last data frame is it
     except json.JSONDecodeError as e:
-        raise HubError(f"MCP SSE data frame was not JSON: {payloads[-1][:120]!r}") from e
+        raise HubError("an MCP SSE data frame was not JSON (withheld — it may reflect submitted "
+                       "arguments).") from e
 
 
 def jsonrpc_result(msg):
     """Pure. Return the JSON-RPC `result`, or raise HubError on an `error` object or a malformed one.
     `msg` is whatever `json.loads` produced — a top-level array or scalar is caught by the guard."""
     if not isinstance(msg, dict):
-        raise HubError(f"MCP response was not a JSON object: {msg!r}")
+        raise HubError("MCP response was not a JSON object.")
     if "error" in msg:
         err = msg.get("error") or {}
         code = err.get("code") if isinstance(err, dict) else None
-        message = (err.get("message") if isinstance(err, dict) else None) or str(err)
-        raise HubError(f"MCP returned error {code}: {message}")
+        # The error `message` is withheld: a gateway validation error can reflect submitted
+        # arguments (a lock PIN, an access code), and no-secrets forbids echoing it.
+        raise HubError(f"MCP returned JSON-RPC error code {code} (message withheld — it may reflect "
+                       f"submitted arguments).")
     if "result" not in msg:
-        raise HubError(f"MCP response had neither result nor error: {str(msg)[:120]}")
+        raise HubError("MCP response had neither result nor error.")
     return msg["result"]
 
 
@@ -361,13 +365,16 @@ class MCPClient:
         if not expect_response:
             # A notification carries no JSON-RPC response body; the gateway answers 200/202 empty.
             if status not in (200, 202):
-                raise HubError(f"MCP notification returned HTTP {status}: {text[:120]!r}")
+                raise HubError(f"MCP notification returned HTTP {status}.")
             return {}
         if status != 200:
-            raise HubError(f"MCP endpoint returned HTTP {status}: {text[:120]!r}")
+            # The body is withheld: a server error can reflect submitted arguments (a lock PIN, an
+            # access code), and no-secrets forbids echoing it (a 3xx blocked redirect also lands here).
+            raise HubError(f"MCP endpoint returned HTTP {status} (body withheld — it may reflect "
+                           f"submitted arguments).")
         result = jsonrpc_result(parse_message_body(text))
         if not isinstance(result, dict):
-            raise HubError(f"MCP result was not a JSON object: {str(result)[:120]}")
+            raise HubError("MCP result was not a JSON object.")
         return result
 
     def initialize(self) -> dict:
