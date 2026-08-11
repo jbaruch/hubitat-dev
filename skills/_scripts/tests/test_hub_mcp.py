@@ -183,7 +183,7 @@ class TestResolveToken(unittest.TestCase):
 
 class TestResolveMcpUrl(unittest.TestCase):
     def test_explicit_url_wins(self):
-        self.assertEqual(hub_mcp.resolve_mcp_url(url="http://h/mcp", ip="1.2.3.4"), "http://h/mcp")
+        self.assertEqual(hub_mcp.resolve_mcp_url(url="http://127.0.0.1/mcp", ip="1.2.3.4"), "http://127.0.0.1/mcp")
 
     def test_ip_forces_port_80_and_path(self):
         self.assertEqual(hub_mcp.resolve_mcp_url(ip="192.0.2.15"), "http://192.0.2.15/mcp")
@@ -202,27 +202,57 @@ class TestResolveMcpUrl(unittest.TestCase):
 
 
 class TestLocalUrlGuard(unittest.TestCase):
-    def test_local_hosts_accepted(self):
-        for h in ["192.168.1.10", "10.0.0.1", "172.16.0.1", "127.0.0.1", "169.254.1.1",
-                  "localhost", "hubitat-abc.local", "hubitat"]:
-            self.assertTrue(hub_mcp._is_local_host(h), h)
+    def setUp(self):
+        self._orig_resolver = hub_mcp.resolve_host
 
-    def test_public_hosts_rejected(self):
-        for h in ["8.8.8.8", "1.2.3.4", "evil.example.com", "hub.attacker.io", ""]:
-            self.assertFalse(hub_mcp._is_local_host(h), h)
+    def tearDown(self):
+        setattr(hub_mcp, 'resolve_host', self._orig_resolver)
 
-    def test_validate_accepts_local_mcp(self):
+    def test_addr_is_local_true_for_private_ranges(self):
+        for a in ["192.168.1.10", "10.0.0.1", "172.16.0.1", "127.0.0.1", "169.254.1.1"]:
+            self.assertTrue(hub_mcp._addr_is_local(a), a)
+
+    def test_addr_is_local_false_for_public_or_nonip(self):
+        for a in ["8.8.8.8", "1.1.1.1", "93.184.216.34", "not-an-ip"]:
+            self.assertFalse(hub_mcp._addr_is_local(a), a)
+
+    def test_local_ip_url_accepted_unchanged(self):
         self.assertEqual(hub_mcp.validate_local_mcp_url("http://192.168.1.5/mcp"),
                          "http://192.168.1.5/mcp")
 
-    def test_validate_rejects_non_local_host(self):
+    def test_public_ip_url_rejected(self):
         with self.assertRaises(HubError) as ctx:
             hub_mcp.validate_local_mcp_url("http://8.8.8.8/mcp")
         self.assertIn("non-local", str(ctx.exception))
 
-    def test_validate_rejects_external_domain(self):
+    def test_hostname_resolving_local_is_pinned_to_ip(self):
+        setattr(hub_mcp, "resolve_host", lambda _h: ["192.168.1.7"])
+        self.assertEqual(hub_mcp.validate_local_mcp_url("http://hubitat.local/mcp"),
+                         "http://192.168.1.7/mcp")
+
+    def test_hostname_pin_preserves_port(self):
+        setattr(hub_mcp, "resolve_host", lambda _h: ["192.168.1.7"])
+        self.assertEqual(hub_mcp.validate_local_mcp_url("http://hub.local:8080/mcp"),
+                         "http://192.168.1.7:8080/mcp")
+
+    def test_bare_singlelabel_resolving_public_is_rejected(self):
+        # A single-label name that DNS search config expands to a public address must be refused.
+        setattr(hub_mcp, "resolve_host", lambda _h: ["8.8.8.8"])
+        with self.assertRaises(HubError) as ctx:
+            hub_mcp.validate_local_mcp_url("http://sneaky/mcp")
+        self.assertIn("non-local", str(ctx.exception))
+
+    def test_hostname_with_any_public_address_is_rejected(self):
+        setattr(hub_mcp, "resolve_host", lambda _h: ["192.168.1.7", "8.8.8.8"])
         with self.assertRaises(HubError):
-            hub_mcp.validate_local_mcp_url("http://evil.example.com/mcp")
+            hub_mcp.validate_local_mcp_url("http://dualstack.local/mcp")
+
+    def test_hostname_resolution_failure_is_rejected(self):
+        def boom(_h):
+            raise OSError("nxdomain")
+        setattr(hub_mcp, "resolve_host", boom)
+        with self.assertRaises(HubError):
+            hub_mcp.validate_local_mcp_url("http://nope.local/mcp")
 
     def test_validate_rejects_wrong_path(self):
         with self.assertRaises(HubError):
@@ -237,6 +267,7 @@ class TestLocalUrlGuard(unittest.TestCase):
             hub_mcp.resolve_mcp_url(ip="8.8.8.8")
 
     def test_resolve_url_external_is_rejected(self):
+        setattr(hub_mcp, "resolve_host", lambda _h: ["93.184.216.34"])
         with self.assertRaises(HubError):
             hub_mcp.resolve_mcp_url(url="http://attacker.example.com/mcp")
 
@@ -246,7 +277,7 @@ class TestLocalUrlGuard(unittest.TestCase):
 class TestClientHandshake(unittest.TestCase):
     def test_initialize_captures_session_and_sends_initialized(self):
         t = FakeTransport(healthy)
-        client = hub_mcp.MCPClient("http://h/mcp", "tok", t)
+        client = hub_mcp.MCPClient("http://127.0.0.1/mcp", "tok", t)
         info = client.initialize()
         self.assertEqual(client.session_id, "sess-1")
         self.assertEqual(client.server_info, {"name": "hubitat-mcp-gateway", "version": "0.1.0"})
@@ -255,7 +286,7 @@ class TestClientHandshake(unittest.TestCase):
 
     def test_session_and_auth_headers_on_followups(self):
         t = FakeTransport(healthy)
-        client = hub_mcp.MCPClient("http://h/mcp", "sekret", t)
+        client = hub_mcp.MCPClient("http://127.0.0.1/mcp", "sekret", t)
         client.initialize()
         client.list_tools()
         followup = [c for c in t.calls if (c["message"] or {}).get("method") == "tools/list"][0]
@@ -264,14 +295,14 @@ class TestClientHandshake(unittest.TestCase):
 
     def test_list_tools_follows_pagination(self):
         t = FakeTransport(healthy)
-        client = hub_mcp.MCPClient("http://h/mcp", "tok", t)
+        client = hub_mcp.MCPClient("http://127.0.0.1/mcp", "tok", t)
         client.initialize()
         names = [x["name"] for x in client.list_tools()]
         self.assertEqual(names, ["list_modes", "get_device"])
 
     def test_call_tool_unwraps_double_encoded_text(self):
         t = FakeTransport(healthy)
-        client = hub_mcp.MCPClient("http://h/mcp", "tok", t)
+        client = hub_mcp.MCPClient("http://127.0.0.1/mcp", "tok", t)
         client.initialize()
         out = client.call_tool("list_modes", {})
         self.assertEqual(out["data"], {"currentMode": {"id": 2, "name": "Evening"}})
@@ -280,7 +311,7 @@ class TestClientHandshake(unittest.TestCase):
     def test_401_raises_actionable_error(self):
         def unauth(_message, _headers):
             return (401, {"WWW-Authenticate": "Bearer"}, '{"error":"unauthorized"}')
-        client = hub_mcp.MCPClient("http://h/mcp", "tok", FakeTransport(unauth))
+        client = hub_mcp.MCPClient("http://127.0.0.1/mcp", "tok", FakeTransport(unauth))
         with self.assertRaises(HubError) as ctx:
             client.initialize()
         self.assertIn("401", str(ctx.exception))
@@ -299,7 +330,7 @@ class TestMain(unittest.TestCase):
     def test_list_tools_ok(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, _ = self._run(
-                ["list-tools", "--url", "http://h/mcp", "--token-file", token_file(d)],
+                ["list-tools", "--url", "http://127.0.0.1/mcp", "--token-file", token_file(d)],
                 FakeTransport(healthy))
             self.assertEqual(rc, 0)
             payload = json.loads(out)
@@ -317,7 +348,7 @@ class TestMain(unittest.TestCase):
     def test_call_ok_returns_zero(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, _ = self._run(
-                ["call", "list_modes", "--url", "http://h/mcp", "--token-file", token_file(d)],
+                ["call", "list_modes", "--url", "http://127.0.0.1/mcp", "--token-file", token_file(d)],
                 FakeTransport(healthy))
             self.assertEqual(rc, 0)
             self.assertEqual(json.loads(out)["result"], {"currentMode": {"id": 2, "name": "Evening"}})
@@ -325,7 +356,7 @@ class TestMain(unittest.TestCase):
     def test_call_tool_error_returns_one(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, _ = self._run(
-                ["call", "boom", "--url", "http://h/mcp", "--token-file", token_file(d)],
+                ["call", "boom", "--url", "http://127.0.0.1/mcp", "--token-file", token_file(d)],
                 FakeTransport(healthy))
             self.assertEqual(rc, 1)
             self.assertTrue(json.loads(out)["isError"])
@@ -335,7 +366,7 @@ class TestMain(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             rc, _, _ = self._run(
                 ["call", "hubitat_lock", "--args", '{"device":"Front Door"}',
-                 "--allow-sensitive", "--url", "http://h/mcp", "--token-file", token_file(d)], t)
+                 "--allow-sensitive", "--url", "http://127.0.0.1/mcp", "--token-file", token_file(d)], t)
             self.assertEqual(rc, 0)
             sent = t.messages("tools/call")[0]["params"]["arguments"]
             self.assertEqual(sent, {"device": "Front Door", "allowSensitive": True})
@@ -343,7 +374,7 @@ class TestMain(unittest.TestCase):
     def test_bad_args_json_is_usage_error(self):
         with tempfile.TemporaryDirectory() as d:
             rc, _, err = self._run(
-                ["call", "list_modes", "--args", "{not json", "--url", "http://h/mcp",
+                ["call", "list_modes", "--args", "{not json", "--url", "http://127.0.0.1/mcp",
                  "--token-file", token_file(d)], FakeTransport(healthy))
             self.assertEqual(rc, 2)
             self.assertIn("not valid JSON", err)
@@ -351,7 +382,7 @@ class TestMain(unittest.TestCase):
     def test_missing_token_is_config_error(self):
         saved = os.environ.pop("HUBITAT_MCP_TOKEN", None)
         try:
-            rc, _, err = self._run(["list-tools", "--url", "http://h/mcp"], FakeTransport(healthy))
+            rc, _, err = self._run(["list-tools", "--url", "http://127.0.0.1/mcp"], FakeTransport(healthy))
             self.assertEqual(rc, 2)
             self.assertIn("HUBITAT_MCP_TOKEN", err)
         finally:

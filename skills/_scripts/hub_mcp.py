@@ -16,8 +16,9 @@ Grounded live 2026-08-10 on 2.5.1.140 (C-8 Pro, local network) at http://<hub-ip
     $HUBITAT_MCP_TOKEN or a --token-file and NEVER prints it, echoes it, or names its value in an
     error; only the *source* is named. Never pass a token as a CLI literal (it lands in process
     listings and shell history). Reset it in the app if compromised. The endpoint URL is validated
-    local-only before any token is loaded or sent (private/loopback/link-local IP or a .local/local
-    hostname, path /mcp) — the token is never sent to an external or mistyped host.
+    local-only before any token is loaded or sent: an IP literal must be private/loopback/link-local,
+    a hostname is resolved with every address required local, and the request is pinned to the
+    validated IP — the token never leaves for an external, mistyped, or DNS-rebinding host.
   - A tools/call `result.content[].text` is itself a **JSON document string** (double-encoded); this
     client unwraps it so the caller gets structured data, not a string to re-parse.
   - Sensitive tools (locks, covers open/close, thermostats, hub mode, enable/disable device/app,
@@ -43,6 +44,7 @@ import argparse
 import ipaddress
 import json
 import os
+import socket
 import sys
 import urllib.error
 import urllib.request
@@ -173,36 +175,72 @@ def resolve_token(env=None, token_file: Optional[str] = None) -> str:
         "it in that app if it may be compromised.")
 
 
-def _is_local_host(host: str) -> bool:
-    """Pure. True when `host` is a local-network target the bearer token may be sent to: a private,
-    loopback, or link-local IP (v4 or v6), or a local hostname (`localhost`, a bare single-label
-    name, or an mDNS `.local` name). A public IP or an external FQDN returns False."""
-    if not host:
-        return False
-    h = host.strip("[]").lower()
+def _addr_is_local(ipstr: str) -> bool:
+    """Pure. True when an IP string is private, loopback, or link-local (v4 or v6)."""
     try:
-        addr = ipaddress.ip_address(h)
-        return addr.is_private or addr.is_loopback or addr.is_link_local
+        addr = ipaddress.ip_address(ipstr.strip("[]"))
     except ValueError:
-        return h == "localhost" or h.endswith(".local") or "." not in h
+        return False
+    return addr.is_private or addr.is_loopback or addr.is_link_local
+
+
+def _resolve_host(host: str) -> list:
+    """Resolve a hostname to its distinct IP strings via getaddrinfo. Indirected through the
+    module-level `resolve_host` seam so tests substitute a resolver and never touch real DNS."""
+    return sorted({info[4][0] for info in socket.getaddrinfo(host, None)})
+
+
+resolve_host = _resolve_host  # test seam; validate_local_mcp_url calls this name
 
 
 def validate_local_mcp_url(url: str) -> str:
-    """Reject any URL the bearer token must not be sent to. The AI (MCP) Connector is local-only by
-    its own contract, and the token is password-grade — sending it to an external or mistyped host
-    would disclose the secret (`rules/no-secrets.md`). Enforce http(s), a local host, and the /mcp
-    path here, before any token is loaded or any request is made. Raises HubError otherwise."""
+    """Reject any URL the bearer token must not be sent to, and pin the connection to a validated
+    local address. The AI (MCP) Connector is local-only by contract and the token is password-grade,
+    so a mistyped/external host — or a single-label name that DNS search config expands to a public
+    address — would disclose the secret (`rules/no-secrets.md`). An IP literal is checked directly; a
+    hostname is RESOLVED and EVERY resolved address must be private/loopback/link-local, after which
+    the URL is rewritten to the validated IP so the request connects to the address just checked
+    (defeating a DNS-rebinding swap between check and connect). Enforces http(s) and the /mcp path
+    too, before any token is loaded or sent. Raises HubError otherwise."""
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise HubError(f"MCP URL must be http or https, got {url!r}")
     host = parsed.hostname or ""
-    if not _is_local_host(host):
-        raise HubError(
-            f"refusing to send the bearer token to non-local host {host!r} — the AI (MCP) Connector "
-            f"is local-only. Use the hub's private/loopback address or its .local hostname.")
+    if not host:
+        raise HubError(f"MCP URL has no host: {url!r}")
     if parsed.path.rstrip("/") != "/mcp":
         raise HubError(f"unexpected MCP path {parsed.path!r} on {host!r} — the connector endpoint is /mcp.")
-    return url
+
+    # An IP literal is validated directly — no resolution.
+    try:
+        ipaddress.ip_address(host.strip("[]"))
+        if not _addr_is_local(host):
+            raise HubError(
+                f"refusing to send the bearer token to non-local host {host!r} — the AI (MCP) "
+                f"Connector is local-only. Use the hub's private/loopback address.")
+        return url
+    except ValueError:
+        pass  # not an IP literal — resolve the hostname below
+
+    # A hostname (localhost, an mDNS *.local name, or a bare single-label name) is resolved; every
+    # resolved address must be local, then the URL is pinned to a validated address.
+    try:
+        addrs = resolve_host(host)
+    except OSError as e:
+        raise HubError(
+            f"cannot resolve MCP host {host!r}: {e}. Pass the hub's IP directly with --ip instead.") from e
+    if not addrs:
+        raise HubError(f"MCP host {host!r} resolved to no addresses — pass the hub's IP directly with --ip.")
+    nonlocal_hits = [a for a in addrs if not _addr_is_local(a)]
+    if nonlocal_hits:
+        raise HubError(
+            f"refusing to send the bearer token: host {host!r} resolves to non-local address(es) "
+            f"{nonlocal_hits} — the AI (MCP) Connector is local-only.")
+    pinned = addrs[0]
+    netloc = f"[{pinned}]" if ":" in pinned else pinned
+    if parsed.port:
+        netloc = f"{netloc}:{parsed.port}"
+    return parsed._replace(netloc=netloc).geturl()
 
 
 def resolve_mcp_url(url: Optional[str] = None, ip: Optional[str] = None,
