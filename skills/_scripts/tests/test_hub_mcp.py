@@ -281,6 +281,23 @@ class TestNoRedirect(unittest.TestCase):
             req=None, fp=None, code=302, msg="Found", headers={},
             newurl="http://evil.example.com/mcp"))
 
+    def test_opener_ignores_env_proxy(self):
+        # A local-only endpoint must not route the authenticated request through an env-configured
+        # proxy. The empty ProxyHandler displaces urllib's default env-reading one; prove it by
+        # constructing both openers under a set http_proxy and comparing.
+        import urllib.request as u
+        from unittest import mock
+
+        def active_proxies(opener):
+            return [h.proxies for h in opener.handlers
+                    if type(h).__name__ == "ProxyHandler" and getattr(h, "proxies", None)]
+
+        with mock.patch.dict(os.environ, {"http_proxy": "http://evil.example.com:3128"}, clear=False):
+            ours = u.build_opener(hub_mcp._NoRedirect, u.ProxyHandler({}))
+            default = u.build_opener()
+        self.assertEqual(active_proxies(ours), [], "connector opener must ignore env proxies")
+        self.assertNotEqual(active_proxies(default), [], "sanity: default opener reads env proxies")
+
 
 # ------------------------- client -------------------------
 

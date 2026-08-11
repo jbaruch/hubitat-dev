@@ -269,8 +269,11 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None
 
 
-# Opener with the default redirect handler REPLACED by the no-follow one; reused across requests.
-_OPENER = urllib.request.build_opener(_NoRedirect)
+# Opener with the default redirect handler REPLACED by the no-follow one, and proxies DISABLED (an
+# empty ProxyHandler). A local-only endpoint must never route through a proxy: urllib otherwise honors
+# http_proxy/https_proxy and would send `Authorization: Bearer <token>` to that (possibly external)
+# proxy, leaking the secret past the pinned-local-IP check (`rules/no-secrets.md`). Reused per request.
+_OPENER = urllib.request.build_opener(_NoRedirect, urllib.request.ProxyHandler({}))
 
 
 def _mcp_transport(method: str, url: str, body: Optional[str], headers: dict):
