@@ -175,13 +175,25 @@ def resolve_token(env=None, token_file: Optional[str] = None) -> str:
         "it in that app if it may be compromised.")
 
 
+# Explicit LAN ranges the bearer token may be sent to. `ipaddress.is_private` is too broad — it also
+# returns True for unspecified (0.0.0.0, ::) and reserved/documentation ranges (192.0.2.0/24,
+# 2001:db8::/32, 100.64.0.0/10, …), none of which are local hub addresses (`rules/no-secrets.md`).
+_LOCAL_NETS = tuple(ipaddress.ip_network(n) for n in (
+    "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",  # RFC1918
+    "169.254.0.0/16", "127.0.0.0/8",                   # IPv4 link-local, loopback
+    "fc00::/7", "fe80::/10", "::1/128",                # IPv6 ULA, link-local, loopback
+))
+
+
 def _addr_is_local(ipstr: str) -> bool:
-    """Pure. True when an IP string is private, loopback, or link-local (v4 or v6)."""
+    """Pure. True only when an IP string falls in an explicit LAN range — RFC1918/ULA, loopback, or
+    link-local. Unspecified and reserved/documentation ranges (which `is_private` also accepts) are
+    rejected so the token is never sent to an unintended route."""
     try:
         addr = ipaddress.ip_address(ipstr.strip("[]"))
     except ValueError:
         return False
-    return addr.is_private or addr.is_loopback or addr.is_link_local
+    return any(addr in net for net in _LOCAL_NETS)
 
 
 def _resolve_host(host: str) -> list:

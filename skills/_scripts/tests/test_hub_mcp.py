@@ -186,15 +186,15 @@ class TestResolveMcpUrl(unittest.TestCase):
         self.assertEqual(hub_mcp.resolve_mcp_url(url="http://127.0.0.1/mcp", ip="1.2.3.4"), "http://127.0.0.1/mcp")
 
     def test_ip_forces_port_80_and_path(self):
-        self.assertEqual(hub_mcp.resolve_mcp_url(ip="192.0.2.15"), "http://192.0.2.15/mcp")
+        self.assertEqual(hub_mcp.resolve_mcp_url(ip="192.168.0.15"), "http://192.168.0.15/mcp")
 
     def test_hub_resolves_via_hubs_json_at_port_80(self):
         with tempfile.TemporaryDirectory() as d:
             hubs = Path(d) / "hubs.json"
             hubs.write_text(json.dumps({"schema_version": 1, "default": "main",
-                                        "hubs": {"main": {"ip": "192.0.2.9", "port": 8080}}}))
+                                        "hubs": {"main": {"ip": "192.168.0.9", "port": 8080}}}))
             self.assertEqual(hub_mcp.resolve_mcp_url(hub="main", hubs_path=str(hubs)),
-                             "http://192.0.2.9/mcp")
+                             "http://192.168.0.9/mcp")
 
     def test_no_target_raises(self):
         with self.assertRaises(HubError):
@@ -213,7 +213,8 @@ class TestLocalUrlGuard(unittest.TestCase):
             self.assertTrue(hub_mcp._addr_is_local(a), a)
 
     def test_addr_is_local_false_for_public_or_nonip(self):
-        for a in ["8.8.8.8", "1.1.1.1", "93.184.216.34", "not-an-ip"]:
+        for a in ["8.8.8.8", "1.1.1.1", "93.184.216.34", "0.0.0.0", "192.0.2.1",
+                  "198.51.100.7", "203.0.113.5", "100.64.0.1", "2001:db8::1", "::", "not-an-ip"]:
             self.assertFalse(hub_mcp._addr_is_local(a), a)
 
     def test_local_ip_url_accepted_unchanged(self):
@@ -372,7 +373,7 @@ class TestMain(unittest.TestCase):
     def test_initialize_prints_instructions(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, _ = self._run(
-                ["initialize", "--ip", "192.0.2.15", "--token-file", token_file(d)],
+                ["initialize", "--ip", "192.168.0.15", "--token-file", token_file(d)],
                 FakeTransport(healthy))
             self.assertEqual(rc, 0)
             self.assertEqual(json.loads(out)["instructions"], "Prefer read-only tools.")
