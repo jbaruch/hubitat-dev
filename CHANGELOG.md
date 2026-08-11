@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **Grounded four RM→RL migration-session findings into rules, skills, lint, and reference** (`skills/scaffold/SKILL.md`, `skills/lint-review/SKILL.md`, `skills/_scripts/hub_lint.py` + tests, `rules/app-lifecycle.md`, `rules/ui-automation.md`, `skills/_reference/endpoints.md`, `skills/_reference/playwright-ui.md`, `README.md`; closes #87, #88, #89, #90). **#90 app `menu`:** Hubitat sorts the left nav by `definition().menu`; omitting it defaults to `Apps` and misfiles an automation. `scaffold` now infers/emits an explicit `menu:`, `app-lifecycle` documents the `definition()` metadata fields (`menu` vs `category`), and `hub_lint` gained a `missing-menu` warn (absence-only — the valid set is version-unverified) with tests, judged by `lint-review`. **#89 app removal:** recorded `POST /installedapp/update/json` (`_action_remove`) as a replayable HTTP endpoint with the `version` source, the works-on-a-disabled-`removeButton:false`-app fact, and the `removeDeviceAndCallback()` device-removal decoy; gotcha 31 and `ui-automation` amended. **#88 Playwright:** `.device-save` position varies (query document-wide + `offsetParent`), SumoSelect `li` text ≠ option value (map by index, verify via `selectedOptions`), and a `submitOnChange` commit invalidates injected element ids (re-tag after every blur) — gotchas 36–37. **#87 Room Lighting:** the `motionsInactive` vs `motionsOff` turn-off split (only one auto-fills), the `captured(live)` capture-table convention with `buttonClick(this)` cell editing, and reading the rendered summary as the whole-condition-set polarity check — gotchas 38–40, with the re-capture warning scoped to already-captured instances. Rules/skills/reference auto-included via the globs.
+
 ## 0.1.55 — 2026-08-09
 
 ### Fixed

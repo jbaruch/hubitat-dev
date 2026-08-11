@@ -15,7 +15,9 @@ Establish, asking the user only for what is not already clear:
 - app or driver
 - `name`, `namespace` (unique — typically the user's handle), `author`
 - for a driver: the device protocol (Zigbee, Z-Wave, LAN/cloud, virtual) and the capabilities it exposes
-- for an app: what it watches and what it controls, and **which left-nav menu it belongs in** — Hubitat sorts the nav by `definition()`'s `menu` field, and omitting it silently defaults to `Apps`, misfiling the app. Infer from the app's job, asking only if unclear: talks to a third party over the network → `Integrations`; reacts to device events / time / presence and drives devices → `Automations`; utility, manager, or dashboard → `Apps`. `menu` is **not** `category` — see `rules/app-lifecycle.md`.
+- for an app: what it watches and what it controls
+- for an app, the **left-nav `menu`** to file it under. Emit `definition().menu` explicitly (it is not `category`, and omitting it defaults to `Apps` and misfiles the app — `rules/app-lifecycle.md`)
+- infer the menu from the app's job when unclear: third-party network → `Integrations`; device / time / presence automation → `Automations`; utility, manager, or dashboard → `Apps`
 
 Proceed to Step 2.
 
