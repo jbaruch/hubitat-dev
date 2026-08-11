@@ -13,6 +13,8 @@ Hubitat has no debugger — diagnosis is `log.debug` plus the live stream (`logg
 
 Read `skills/_reference/endpoints.md` before probing for any endpoint.
 
+First, check the failure domain. A HomeKit integration that stopped working, or a bridge that never appears in Apple Home, after a network or VLAN change is a **network-path failure**, not a hub-code failure — no log tail will show it. Cross a segmented network (hub on an isolated VLAN, controllers on another) and mDNS discovery plus the HAP TCP session each need their own firewall exception: `skills/_reference/homekit-mdns-network.md`. Rule that out before reaching for the log stream.
+
 Establish what is wrong and which app/driver it concerns, and pick the socket:
 - `logsocket` — the debug/info/warn/error log lines (default; use for "my code does X wrong").
 - `eventsocket` — device attribute events (use for "the attribute isn't updating / the event isn't firing").
