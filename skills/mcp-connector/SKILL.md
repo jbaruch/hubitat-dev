@@ -62,10 +62,9 @@ Otherwise proceed to Step 7.
 
 ## Step 6 — Gate a sensitive action
 
-A sensitive action is a physical side effect. Confirm intent with the user before executing anything,
-exactly as the destructive-op discipline elsewhere, and note that the client's `--allow-sensitive` is
-required for these tools (it merges `allowSensitive: true`). Do not send the action in this step —
-only on the user's confirmation proceed to Step 7.
+A sensitive action is a physical side effect. Confirm intent with the user before executing anything.
+The client's `--allow-sensitive` is required for these tools (it merges `allowSensitive: true`). Do
+not send the action in this step — only on the user's confirmation proceed to Step 7.
 
 ## Step 7 — Fire the control action
 
