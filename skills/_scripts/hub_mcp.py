@@ -205,6 +205,10 @@ def validate_local_mcp_url(url: str) -> str:
     parsed = urlparse(url)
     if parsed.scheme not in ("http", "https"):
         raise HubError(f"MCP URL must be http or https, got {url!r}")
+    try:
+        port = parsed.port  # urlparse defers port parsing; a malformed port raises ValueError here
+    except ValueError as e:
+        raise HubError(f"MCP URL has an invalid port in {url!r}: {e}. Pass a valid --url or --ip.") from e
     host = parsed.hostname or ""
     if not host:
         raise HubError(f"MCP URL has no host: {url!r}")
@@ -238,8 +242,8 @@ def validate_local_mcp_url(url: str) -> str:
             f"{nonlocal_hits} — the AI (MCP) Connector is local-only.")
     pinned = addrs[0]
     netloc = f"[{pinned}]" if ":" in pinned else pinned
-    if parsed.port:
-        netloc = f"{netloc}:{parsed.port}"
+    if port:
+        netloc = f"{netloc}:{port}"
     return parsed._replace(netloc=netloc).geturl()
 
 

@@ -262,6 +262,11 @@ class TestLocalUrlGuard(unittest.TestCase):
         with self.assertRaises(HubError):
             hub_mcp.validate_local_mcp_url("file:///etc/passwd")
 
+    def test_malformed_port_raises_huberror(self):
+        # urlparse defers port parsing; a bad port must surface as HubError, not a raw ValueError.
+        with self.assertRaises(HubError):
+            hub_mcp.validate_local_mcp_url("http://192.168.1.5:notaport/mcp")
+
     def test_resolve_ip_public_is_rejected(self):
         with self.assertRaises(HubError):
             hub_mcp.resolve_mcp_url(ip="8.8.8.8")
