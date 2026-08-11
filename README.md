@@ -19,7 +19,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform builds through 2.5.1.1
 - **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`skills/_reference/playwright-ui.md`).
 - **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`) and warn with the concrete reference blast radius (enabled/disabled app switch state, dashboards, parent/child). Audit actual consumers separately through subscriptions or type-specific live state.
 - **Device replacement** — capture old memberships before replacement and re-wire them onto the new device id.
-- **MCP control** — drive the hub through its first-party **AI (MCP) Connector Integration** (a local MCP server the hub hosts): connect with the bearer token, discover the live tool surface, and prefer read-only tools while gating locks/covers/thermostats/modes behind `allowSensitive` (`skills/_reference/mcp-connector.md`).
+- **MCP control** — drive the hub through its first-party **AI (MCP) Connector Integration** (a local MCP server the hub hosts): connect with the bearer token, discover the live tool surface, and prefer read-only tools while gating sensitive actions behind `allowSensitive` (`skills/_reference/mcp-connector.md`).
 
 ## Rules
 

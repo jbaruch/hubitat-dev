@@ -21,21 +21,20 @@ Grounded live 2026-08-10 on 2.5.1.140 (C-8 Pro, local network) at http://<hub-ip
     validated IP — the token never leaves for an external, mistyped, or DNS-rebinding host.
   - A tools/call `result.content[].text` is itself a **JSON document string** (double-encoded); this
     client unwraps it so the caller gets structured data, not a string to re-parse.
-  - Sensitive tools (locks, covers open/close, thermostats, hub mode, enable/disable device/app,
-    sensitive run_device_command) require `allowSensitive: true` in the arguments — pass
-    --allow-sensitive to merge it. The authoritative per-tool list is the gateway's own tool
-    descriptions (`list-tools`) / the reference doc, not hard-coded here (it drifts with the app).
+  - Some tools require `allowSensitive: true` in the arguments; --allow-sensitive merges it. Which
+    tools require it is owned by the gateway and drifts with the app — read each tool's live
+    description/schema (`list-tools --schemas`), never a hard-coded list.
 
 The deterministic pieces (request building, JSON/SSE body parsing, JSON-RPC error handling, the
 content-unwrap, session-id extraction, token/URL resolution) are pure functions unit-tested with an
 injectable `transport`; only the network call touches urllib.
 
 Usage:
-    hub_mcp.py list-tools --ip 192.0.2.15
-    hub_mcp.py list-tools --url http://192.0.2.15/mcp --schemas
+    hub_mcp.py list-tools --ip 192.168.1.15
+    hub_mcp.py list-tools --url http://192.168.1.15/mcp --schemas
     hub_mcp.py initialize --hub main                      # handshake only: serverInfo + instructions
-    hub_mcp.py call hubitat_search_devices --args '{"query":"patio"}' --ip 192.0.2.15
-    hub_mcp.py call hubitat_lock --args '{"device":"Front Door"}' --allow-sensitive --ip 192.0.2.15
+    hub_mcp.py call hubitat_search_devices --args '{"query":"patio"}' --ip 192.168.1.15
+    hub_mcp.py call hubitat_lock --args '{"device":"Front Door"}' --allow-sensitive --ip 192.168.1.15
     hub_mcp.py call list_modes --hub main                 # ip from ./hubs.json, forced to port 80 /mcp
 Token: `export HUBITAT_MCP_TOKEN=...` (preferred) or `--token-file ~/.hubitat/mcp_token`.
 Output: one JSON object on stdout. Exit 2 on a config/usage error, 1 on a hub/tool error, 0 otherwise.
@@ -413,7 +412,7 @@ def _tool_summary(tool: dict, schemas: bool = False) -> dict:
 
 
 def _add_target_args(sp):
-    sp.add_argument("--url", help="full MCP URL, e.g. http://192.0.2.15/mcp")
+    sp.add_argument("--url", help="full MCP URL, e.g. http://192.168.1.15/mcp")
     sp.add_argument("--ip", help="hub IP -> http://<ip>/mcp (port 80)")
     sp.add_argument("--hub", help="named hub from hubs.json (uses its ip, forced to port 80 /mcp)")
     sp.add_argument("--hubs", help="path to hubs.json (default ./hubs.json when --hub is given)")
@@ -436,7 +435,8 @@ def main(argv=None, transport=None) -> int:
     cl.add_argument("tool", help="tool name (see list-tools)")
     cl.add_argument("--args", default="{}", help="tool arguments as a JSON object")
     cl.add_argument("--allow-sensitive", action="store_true",
-                    help="merge allowSensitive=true (locks, covers, thermostats, modes, enable/disable)")
+                    help="merge allowSensitive=true, required by tools whose live description marks "
+                         "them sensitive (see list-tools --schemas)")
 
     args = p.parse_args(argv)
 
