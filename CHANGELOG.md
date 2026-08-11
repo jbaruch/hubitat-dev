@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.58 — 2026-08-11
+
 ### Fixed
 
 - **The `mcp-connector` skill/client cited `rules/no-secrets.md` and `rules/script-as-black-box.md` as bare paths, but those are `jbaruch/coding-policy` rules, not `hubitat-dev` rules** (`skills/_scripts/hub_mcp.py`, `skills/_reference/mcp-connector.md`, `skills/mcp-connector/SKILL.md`). A bare `rules/…` reference resolves against the consuming plugin's own `rules/`, where these do not exist — a dangling reference that fails quietly, the same class the `groovy-gotchas` handler-name trap warns about, and ironically the missing one is the secrets rule on the release flagged for secret handling. All 10 sites (9 `no-secrets`, 1 `script-as-black-box`) now qualify the citation as `coding-policy rules/…`, matching the existing `hub_lint.py` convention, so the reference reads as external-policy provenance rather than a broken in-plugin link. Behavior was never at risk — `hub_mcp.py` enforces the secret handling in code, not by an agent reading the rule — and no `hubitat-dev` rule was missing from the manifest glob; the citations were simply mis-qualified.
