@@ -215,6 +215,10 @@ def validate_local_mcp_url(url: str) -> str:
     (defeating a DNS-rebinding swap between check and connect). Enforces http(s) and the /mcp path
     too, before any token is loaded or sent. Raises HubError otherwise."""
     parsed = urlparse(url)
+    if parsed.username or parsed.password:
+        # Never echo the credentials — reject before any output prints the URL (`rules/no-secrets.md`).
+        raise HubError("MCP URL must not embed credentials (user:pass@…) — the bearer token is the "
+                       "only auth; pass a plain http://<hub-ip>/mcp.")
     if parsed.scheme not in ("http", "https"):
         raise HubError(f"MCP URL must be http or https, got {url!r}")
     try:
@@ -259,6 +263,17 @@ def validate_local_mcp_url(url: str) -> str:
     return parsed._replace(netloc=netloc).geturl()
 
 
+def _ip_to_netloc(ip: str) -> str:
+    """Bracket an IPv6 literal for use in a URL netloc (`::1` → `[::1]`); leave IPv4 and hostnames
+    unchanged. Without the brackets an IPv6 address's colons are misparsed as a port."""
+    try:
+        if ipaddress.ip_address(ip).version == 6:
+            return f"[{ip}]"
+    except ValueError:
+        pass
+    return ip
+
+
 def resolve_mcp_url(url: Optional[str] = None, ip: Optional[str] = None,
                     hub: Optional[str] = None, hubs_path: Optional[str] = None) -> str:
     """Resolve and validate the MCP endpoint URL. An explicit --url wins; --ip and --hub both force
@@ -267,10 +282,10 @@ def resolve_mcp_url(url: Optional[str] = None, ip: Optional[str] = None,
     if url:
         return validate_local_mcp_url(url)
     if ip:
-        return validate_local_mcp_url(f"http://{ip}{DEFAULT_PATH}")
+        return validate_local_mcp_url(f"http://{_ip_to_netloc(ip)}{DEFAULT_PATH}")
     if hub:
         resolved = resolve_hub(load_hubs(hubs_path or "hubs.json"), hub)
-        return validate_local_mcp_url(f"http://{resolved['ip']}{DEFAULT_PATH}")
+        return validate_local_mcp_url(f"http://{_ip_to_netloc(resolved['ip'])}{DEFAULT_PATH}")
     raise HubError("provide --url http://<ip>/mcp, --ip <addr>, or --hub <name> (with a hubs.json)")
 
 

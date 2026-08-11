@@ -268,6 +268,16 @@ class TestLocalUrlGuard(unittest.TestCase):
         with self.assertRaises(HubError):
             hub_mcp.validate_local_mcp_url("http://192.168.1.5:notaport/mcp")
 
+    def test_url_with_credentials_rejected_without_leaking(self):
+        with self.assertRaises(HubError) as ctx:
+            hub_mcp.validate_local_mcp_url("http://user:s3cr3tpw@192.168.1.5/mcp")
+        self.assertIn("credentials", str(ctx.exception))
+        self.assertNotIn("s3cr3tpw", str(ctx.exception))  # the password must never appear in output
+
+    def test_ipv6_ip_is_bracketed(self):
+        # ::1 is loopback (local); the CLI path must bracket it into a valid URL netloc.
+        self.assertEqual(hub_mcp.resolve_mcp_url(ip="::1"), "http://[::1]/mcp")
+
     def test_resolve_ip_public_is_rejected(self):
         with self.assertRaises(HubError):
             hub_mcp.resolve_mcp_url(ip="8.8.8.8")
