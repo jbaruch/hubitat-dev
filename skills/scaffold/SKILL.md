@@ -16,6 +16,8 @@ Establish, asking the user only for what is not already clear:
 - `name`, `namespace` (unique — typically the user's handle), `author`
 - for a driver: the device protocol (Zigbee, Z-Wave, LAN/cloud, virtual) and the capabilities it exposes
 - for an app: what it watches and what it controls
+- for an app, the **left-nav `menu`** to file it under. Emit `definition().menu` explicitly (it is not `category`, and omitting it defaults to `Apps` and misfiles the app — `rules/app-lifecycle.md`)
+- infer the menu from the app's job when unclear: third-party network → `Integrations`; device / time / presence automation → `Automations`; utility, manager, or dashboard → `Apps`
 
 Proceed to Step 2.
 
@@ -31,7 +33,7 @@ Proceed to Step 3.
 
 Emit one Groovy file wiring in, per the rules:
 - **Driver**: `metadata { definition(...) { capability lines, custom command/attribute } preferences { logEnable/txtEnable } }`; `installed()`, `updated()` (with `runIn(1800, logsOff)` when logging), `logsOff()`; a method for **every** required command; `configure()`/`refresh()` if those capabilities are declared; a `parse(String description)` with the protocol-appropriate decode and a `log.debug` of raw input when a protocol is involved.
-- **App**: `definition(...)`, `preferences { page { section { inputs } } }`, `installed() { updated() }`, `updated() { unsubscribe(); initialize() }`, `initialize()` with the subscriptions, and a handler method for each subscription. Guard chatty logs on `logEnable`/`txtEnable`.
+- **App**: `definition(...)` with an **explicit `menu:`** (`Apps` | `Automations` | `Integrations`, per Step 1 — never let it default), `preferences { page { section { inputs } } }`, `installed() { updated() }`, `updated() { unsubscribe(); initialize() }`, `initialize()` with the subscriptions, and a handler method for each subscription. Guard chatty logs on `logEnable`/`txtEnable`.
 
 Write the file to the path the user wants (default `<name>.groovy`). Proceed to Step 4.
 

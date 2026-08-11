@@ -7,6 +7,21 @@ description: Hubitat app lifecycle callbacks and the subscribe/reinitialize idio
 
 An app is not a long-running process. The hub wakes it on an event, a schedule, a UI render, install/update/uninstall, or an HTTP endpoint hit, runs one method, and sleeps.
 
+## `definition()` metadata — how the app is filed and instantiated
+
+`definition()` carries more than `name`/`namespace`/`author`. These metadata keys change where the app appears and how it is created, and the platform supplies a default for any you omit — so leaving one off is a silent decision, not a no-op:
+
+- **`menu`** — the left-nav menu the app sorts into. Set it explicitly on every app.
+  - Omitting it defaults to `Apps`, misfiling an event/presence-driven automation.
+  - Measured values (C-8 Pro, 2.5.1.135): `Apps`, `Automations`, `Integrations`.
+  - Placement: third-party network integration → `Integrations`; device / time / presence automation → `Automations`; utility, manager, or dashboard → `Apps`.
+- **`menu` is not `category`** — neither implies the other. `Vacation Lighting Director` is `category: "Safety & Security"` but `menu: "Apps"`. Setting only `category` still leaves the app in `Apps`.
+- **`category`** — separate metadata: `Convenience`, `Safety & Security`, `Utility`, `My Apps`, `Hidden`.
+- **`singleInstance: true`** — the app installs once, not repeatedly (the usual parent-app case).
+- **`installOnOpen: true`** — the instance is created when its page opens, not on the first Done.
+- **`parent`** — declares this a child app under a named parent (`namespace:name`), set on the child.
+- The three observed `menu` values are grounded on one hub/one platform version. Whether the set is fixed across versions, or what an invalid string does, is unverified, so `lint-review` warns only on an **absent** `menu`, never on an unrecognized value.
+
 ## Callbacks
 
 - `installed()` — first install only.
