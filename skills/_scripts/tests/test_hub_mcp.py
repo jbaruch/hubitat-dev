@@ -42,7 +42,7 @@ class FakeTransport:
         return [c["message"] for c in self.calls if (c["message"] or {}).get("method") == rpc_method]
 
 
-def healthy(message, headers):
+def healthy(message, _headers):
     """A well-behaved gateway: initialize (with a session header), the initialized notification,
     a paginated tools/list, and a tools/call that double-encodes its text payload."""
     method = message.get("method")
@@ -201,6 +201,46 @@ class TestResolveMcpUrl(unittest.TestCase):
             hub_mcp.resolve_mcp_url()
 
 
+class TestLocalUrlGuard(unittest.TestCase):
+    def test_local_hosts_accepted(self):
+        for h in ["192.168.1.10", "10.0.0.1", "172.16.0.1", "127.0.0.1", "169.254.1.1",
+                  "localhost", "hubitat-abc.local", "hubitat"]:
+            self.assertTrue(hub_mcp._is_local_host(h), h)
+
+    def test_public_hosts_rejected(self):
+        for h in ["8.8.8.8", "1.2.3.4", "evil.example.com", "hub.attacker.io", ""]:
+            self.assertFalse(hub_mcp._is_local_host(h), h)
+
+    def test_validate_accepts_local_mcp(self):
+        self.assertEqual(hub_mcp.validate_local_mcp_url("http://192.168.1.5/mcp"),
+                         "http://192.168.1.5/mcp")
+
+    def test_validate_rejects_non_local_host(self):
+        with self.assertRaises(HubError) as ctx:
+            hub_mcp.validate_local_mcp_url("http://8.8.8.8/mcp")
+        self.assertIn("non-local", str(ctx.exception))
+
+    def test_validate_rejects_external_domain(self):
+        with self.assertRaises(HubError):
+            hub_mcp.validate_local_mcp_url("http://evil.example.com/mcp")
+
+    def test_validate_rejects_wrong_path(self):
+        with self.assertRaises(HubError):
+            hub_mcp.validate_local_mcp_url("http://192.168.1.5/collect")
+
+    def test_validate_rejects_non_http_scheme(self):
+        with self.assertRaises(HubError):
+            hub_mcp.validate_local_mcp_url("file:///etc/passwd")
+
+    def test_resolve_ip_public_is_rejected(self):
+        with self.assertRaises(HubError):
+            hub_mcp.resolve_mcp_url(ip="8.8.8.8")
+
+    def test_resolve_url_external_is_rejected(self):
+        with self.assertRaises(HubError):
+            hub_mcp.resolve_mcp_url(url="http://attacker.example.com/mcp")
+
+
 # ------------------------- client -------------------------
 
 class TestClientHandshake(unittest.TestCase):
@@ -238,7 +278,7 @@ class TestClientHandshake(unittest.TestCase):
         self.assertFalse(out["isError"])
 
     def test_401_raises_actionable_error(self):
-        def unauth(message, headers):
+        def unauth(_message, _headers):
             return (401, {"WWW-Authenticate": "Bearer"}, '{"error":"unauthorized"}')
         client = hub_mcp.MCPClient("http://h/mcp", "tok", FakeTransport(unauth))
         with self.assertRaises(HubError) as ctx:
@@ -293,7 +333,7 @@ class TestMain(unittest.TestCase):
     def test_allow_sensitive_merges_flag_into_arguments(self):
         t = FakeTransport(healthy)
         with tempfile.TemporaryDirectory() as d:
-            rc, out, _ = self._run(
+            rc, _, _ = self._run(
                 ["call", "hubitat_lock", "--args", '{"device":"Front Door"}',
                  "--allow-sensitive", "--url", "http://h/mcp", "--token-file", token_file(d)], t)
             self.assertEqual(rc, 0)

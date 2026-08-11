@@ -15,7 +15,9 @@ Grounded live 2026-08-10 on 2.5.1.140 (C-8 Pro, local network) at http://<hub-ip
     `WWW-Authenticate: Bearer`. **The token is a secret** — this client reads it from
     $HUBITAT_MCP_TOKEN or a --token-file and NEVER prints it, echoes it, or names its value in an
     error; only the *source* is named. Never pass a token as a CLI literal (it lands in process
-    listings and shell history). Reset it in the app if compromised.
+    listings and shell history). Reset it in the app if compromised. The endpoint URL is validated
+    local-only before any token is loaded or sent (private/loopback/link-local IP or a .local/local
+    hostname, path /mcp) — the token is never sent to an external or mistyped host.
   - A tools/call `result.content[].text` is itself a **JSON document string** (double-encoded); this
     client unwraps it so the caller gets structured data, not a string to re-parse.
   - Sensitive tools (locks, covers open/close, thermostats, hub mode, enable/disable device/app,
@@ -38,6 +40,7 @@ Token: `export HUBITAT_MCP_TOKEN=...` (preferred) or `--token-file ~/.hubitat/mc
 Output: one JSON object on stdout. Exit 2 on a config/usage error, 1 on a hub/tool error, 0 otherwise.
 """
 import argparse
+import ipaddress
 import json
 import os
 import sys
@@ -45,6 +48,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 from typing import Optional
+from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 # E402: this import must follow the sys.path insert above so hubclient resolves when run as a script.
@@ -169,17 +173,50 @@ def resolve_token(env=None, token_file: Optional[str] = None) -> str:
         "it in that app if it may be compromised.")
 
 
+def _is_local_host(host: str) -> bool:
+    """Pure. True when `host` is a local-network target the bearer token may be sent to: a private,
+    loopback, or link-local IP (v4 or v6), or a local hostname (`localhost`, a bare single-label
+    name, or an mDNS `.local` name). A public IP or an external FQDN returns False."""
+    if not host:
+        return False
+    h = host.strip("[]").lower()
+    try:
+        addr = ipaddress.ip_address(h)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        return h == "localhost" or h.endswith(".local") or "." not in h
+
+
+def validate_local_mcp_url(url: str) -> str:
+    """Reject any URL the bearer token must not be sent to. The AI (MCP) Connector is local-only by
+    its own contract, and the token is password-grade — sending it to an external or mistyped host
+    would disclose the secret (`rules/no-secrets.md`). Enforce http(s), a local host, and the /mcp
+    path here, before any token is loaded or any request is made. Raises HubError otherwise."""
+    parsed = urlparse(url)
+    if parsed.scheme not in ("http", "https"):
+        raise HubError(f"MCP URL must be http or https, got {url!r}")
+    host = parsed.hostname or ""
+    if not _is_local_host(host):
+        raise HubError(
+            f"refusing to send the bearer token to non-local host {host!r} — the AI (MCP) Connector "
+            f"is local-only. Use the hub's private/loopback address or its .local hostname.")
+    if parsed.path.rstrip("/") != "/mcp":
+        raise HubError(f"unexpected MCP path {parsed.path!r} on {host!r} — the connector endpoint is /mcp.")
+    return url
+
+
 def resolve_mcp_url(url: Optional[str] = None, ip: Optional[str] = None,
                     hub: Optional[str] = None, hubs_path: Optional[str] = None) -> str:
-    """Resolve the MCP endpoint URL. An explicit --url wins; --ip and --hub both force port 80 and the
-    /mcp path (the connector is NOT on the 8080 admin port that hubs.json records)."""
+    """Resolve and validate the MCP endpoint URL. An explicit --url wins; --ip and --hub both force
+    port 80 and the /mcp path (the connector is NOT on the 8080 admin port that hubs.json records).
+    Every path runs through validate_local_mcp_url so the token never leaves for a non-local host."""
     if url:
-        return url
+        return validate_local_mcp_url(url)
     if ip:
-        return f"http://{ip}{DEFAULT_PATH}"
+        return validate_local_mcp_url(f"http://{ip}{DEFAULT_PATH}")
     if hub:
         resolved = resolve_hub(load_hubs(hubs_path or "hubs.json"), hub)
-        return f"http://{resolved['ip']}{DEFAULT_PATH}"
+        return validate_local_mcp_url(f"http://{resolved['ip']}{DEFAULT_PATH}")
     raise HubError("provide --url http://<ip>/mcp, --ip <addr>, or --hub <name> (with a hubs.json)")
 
 

@@ -21,7 +21,7 @@ logged (`rules/no-secrets.md`). Proceed to Step 2.
 
 ## Step 2 — Discover the live tool surface
 
-Do not assume the tool set from the reference snapshot — the app versions it. List it:
+Do not assume the tool set from the reference snapshot. List it live:
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py list-tools --hub <name>
@@ -41,33 +41,45 @@ Decide per task (full rule in the reference, When to prefer MCP vs the grounded 
 
 If the task belongs to a hub_* skill, hand off now and finish here. Otherwise proceed to Step 4.
 
-## Step 4 — Read first, and resolve names before acting
+## Step 4 — Prefer read-only tools
 
-Prefer read-only tools. When the user named a device or scene ambiguously, resolve it first
-(`hubitat_search_devices`, `list_scenes`) rather than guessing an id:
+Reach for read-only tools first. The client unwraps the double-encoded `content[].text` into
+structured data. If the whole task is a read, report the result and finish here. If it needs a
+control action, proceed to Step 5.
+
+## Step 5 — Resolve the target device or scene
+
+When the user named a device or scene ambiguously, resolve it to an id before acting rather than
+guessing:
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py call hubitat_search_devices --args '{"query":"patio"}' --hub <name>
 ```
 
-The client unwraps the double-encoded `content[].text` into structured data. If the run is purely a
-read, report the result and finish here. For a control action, proceed to Step 5.
+Confirm the match against the returned id/label. If the control action is **sensitive** (lock, cover
+open/close, thermostat, hub mode, enable/disable, sensitive `run_device_command`), proceed to Step 6.
+Otherwise proceed to Step 7.
 
-## Step 5 — Gate and fire a control action
+## Step 6 — Gate a sensitive action
 
-Send the control tool with the resolved id/name. A **sensitive** action (lock, cover open/close,
-thermostat, hub mode, enable/disable, sensitive `run_device_command`) refuses unless `allowSensitive`
-is set — the client's `--allow-sensitive` merges it. Sensitive actions are physical side effects:
-confirm intent with the user first, exactly as the destructive-op discipline elsewhere.
+A sensitive action is a physical side effect. Confirm intent with the user before executing anything,
+exactly as the destructive-op discipline elsewhere, and note that the client's `--allow-sensitive` is
+required for these tools (it merges `allowSensitive: true`). Do not send the action in this step —
+only on the user's confirmation proceed to Step 7.
+
+## Step 7 — Fire the control action
+
+Send the control tool with the resolved id/name (adding `--allow-sensitive` for a sensitive action
+confirmed in Step 6):
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py call hubitat_lock --args '{"device":"Front Door"}' --allow-sensitive --hub <name>
 ```
 
 `isError:true` in the result is the tool reporting a failure (bad args, guard, device miss) — surface
-it, do not treat a printed result as success. Proceed to Step 6.
+it, do not treat a printed result as success. Proceed to Step 8.
 
-## Step 6 — Verify the mutation
+## Step 8 — Verify the mutation
 
 A returned result is dispatch, not proof the device moved — the same trap as `/device/runmethod`
 (`rules/state-vs-attributes.md`). Re-read the affected device with `get_device_state` (or
