@@ -41,7 +41,7 @@ parse for both shapes.
 - `Authorization: Bearer <token>`. Unauthenticated → **`401`** `{"error":"unauthorized"}` with
   `WWW-Authenticate: Bearer` (both GET and POST).
 - The token is **password-grade** — it grants full hub access. Read it from `$HUBITAT_MCP_TOKEN` or a
-  gitignored file; never a CLI literal, never committed, echoed, or logged (`rules/no-secrets.md`).
+  gitignored file; never a CLI literal, never committed, echoed, or logged (coding-policy `rules/no-secrets.md`).
 - Rotate via the app's **reset authorization token** link; every configured agent must be updated
   after a reset.
 
@@ -63,7 +63,7 @@ the **tool** reporting a failure (bad args, a guard, a device miss) — distinct
 Some tools refuse unless the arguments carry `allowSensitive: true`. **Which tools require it is owned
 by the gateway and drifts with the app** — read each tool's own live description/schema
 (`hub_mcp.py list-tools --schemas`) to see whether it needs the guard, rather than any hard-coded list
-here or in the skill (`rules/script-as-black-box.md`). `hub_mcp.py --allow-sensitive` merges the flag.
+here or in the skill (coding-policy `rules/script-as-black-box.md`). `hub_mcp.py --allow-sensitive` merges the flag.
 
 ## Reads paginate
 
