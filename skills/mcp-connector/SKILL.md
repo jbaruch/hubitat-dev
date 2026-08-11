@@ -63,9 +63,11 @@ list. If the tool requires `allowSensitive`, proceed to Step 6; otherwise procee
 
 ## Step 6 — Gate a sensitive action
 
-A sensitive action is a physical side effect. Confirm intent with the user before executing anything.
-The client's `--allow-sensitive` is required for these tools (it merges `allowSensitive: true`). Do
-not send the action in this step — only on the user's confirmation proceed to Step 7.
+A sensitive action is a physical side effect, so it needs authorization before firing. An explicit
+request that names the action (lock this door, set this thermostat) **is** that authorization — do not
+pause to re-confirm; it takes `--allow-sensitive`, and you proceed immediately to Step 7. Ask one
+clarifying question only when the intent is genuinely ambiguous (which device, on or off, act at all),
+then proceed to Step 7.
 
 ## Step 7 — Fire the control action
 
