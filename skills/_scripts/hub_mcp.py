@@ -485,11 +485,15 @@ def main(argv=None, transport=None) -> int:
         # or other secret the caller is setting, and stdout must not leak it (`rules/no-secrets.md`).
         # The caller already knows what they passed via --args.
         outcome = client.call_tool(args.tool, arguments)
+        # On a tool error the response can reflect submitted arguments (a lock PIN, an access code),
+        # so withhold it (`rules/no-secrets.md`); a successful result is the caller's requested data.
+        result = ("<error result withheld — it may reflect submitted arguments>"
+                  if outcome["isError"] else outcome["data"])
         print(json.dumps({
             "url": url,
             "tool": args.tool,
             "isError": outcome["isError"],
-            "result": outcome["data"],
+            "result": result,
         }, indent=2, default=str))
         # isError:true means the tool itself reported a failure (bad args, guard, device miss).
         return 1 if outcome["isError"] else 0

@@ -66,7 +66,8 @@ def healthy(message, _headers):
     if method == "tools/call":
         name = message["params"]["name"]
         if name == "boom":
-            return (200, {}, rpc(message["id"], {"content": [{"type": "text", "text": "device not found"}],
+            # An error result that reflects a submitted secret — the CLI must not print it.
+            return (200, {}, rpc(message["id"], {"content": [{"type": "text", "text": "rejected: invalid PIN 7777"}],
                                                  "isError": True}))
         payload = json.dumps({"currentMode": {"id": 2, "name": "Evening"}})
         return (200, {}, rpc(message["id"], {"content": [{"type": "text", "text": payload}],
@@ -397,13 +398,14 @@ class TestMain(unittest.TestCase):
             self.assertEqual(rc, 0)
             self.assertEqual(json.loads(out)["result"], {"currentMode": {"id": 2, "name": "Evening"}})
 
-    def test_call_tool_error_returns_one(self):
+    def test_call_tool_error_returns_one_and_withholds_reflected_secret(self):
         with tempfile.TemporaryDirectory() as d:
             rc, out, _ = self._run(
                 ["call", "boom", "--url", "http://127.0.0.1/mcp", "--token-file", token_file(d)],
                 FakeTransport(healthy))
             self.assertEqual(rc, 1)
             self.assertTrue(json.loads(out)["isError"])
+            self.assertNotIn("7777", out)  # an error result reflecting a secret must not reach stdout
 
     def test_allow_sensitive_merges_flag_into_arguments(self):
         t = FakeTransport(healthy)
