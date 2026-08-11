@@ -60,11 +60,10 @@ the **tool** reporting a failure (bad args, a guard, a device miss) — distinct
 
 ## The sensitive-action guard — `allowSensitive: true`
 
-Sensitive tools refuse unless the arguments carry `allowSensitive: true`: **locks, covers
-open/close, thermostats, hub mode, enable/disable device or app**, and `run_device_command` for a
-sensitive command. The per-tool requirement is stated in each tool's own description (read
-`list-tools`); it is **not** restated as a hard-coded list here or in the skill, because the app owns
-it and it drifts (`rules/script-as-black-box.md`). `hub_mcp.py --allow-sensitive` merges the flag.
+Some tools refuse unless the arguments carry `allowSensitive: true`. **Which tools require it is owned
+by the gateway and drifts with the app** — read each tool's own live description/schema
+(`hub_mcp.py list-tools --schemas`) to see whether it needs the guard, rather than any hard-coded list
+here or in the skill (`rules/script-as-black-box.md`). `hub_mcp.py --allow-sensitive` merges the flag.
 
 ## Reads paginate
 
@@ -76,8 +75,8 @@ verify you passed one.
 
 ## Tool surface — 44 tools (grounded 2.5.1.140, `hubitat-mcp-gateway 0.1.0`)
 
-Read the live list with `hub_mcp.py list-tools --schemas`; this is the 2026-08-10 snapshot. **⚠ = needs
-`allowSensitive: true`.**
+Read the live list — including which tools require `allowSensitive` — with
+`hub_mcp.py list-tools --schemas`. This is the 2026-08-10 snapshot of the tool names and categories only.
 
 **Context & search**
 - `hubitat_get_context_summary` — plain-text live hub summary for broad questions
@@ -87,12 +86,12 @@ Read the live list with `hub_mcp.py list-tools --schemas`; this is the 2026-08-1
 **High-level control (Hass-style)**
 - `hubitat_turn_on` · `hubitat_turn_off` · `hubitat_toggle`
 - `hubitat_light_set` (on/off, level, CT, hue, sat, color) · `hubitat_room_turn_on` · `hubitat_room_turn_off` · `hubitat_room_light_set`
-- `hubitat_cover_set_position` · `hubitat_cover_open` ⚠ · `hubitat_cover_close` ⚠ · `hubitat_cover_stop`
-- `hubitat_lock` ⚠ · `hubitat_unlock` ⚠
-- `hubitat_thermostat_set_temperature` ⚠ · `hubitat_thermostat_set_mode` ⚠ · `hubitat_thermostat_set_fan_mode` ⚠
+- `hubitat_cover_set_position` · `hubitat_cover_open` · `hubitat_cover_close` · `hubitat_cover_stop`
+- `hubitat_lock` · `hubitat_unlock`
+- `hubitat_thermostat_set_temperature` · `hubitat_thermostat_set_mode` · `hubitat_thermostat_set_fan_mode`
 - `hubitat_fan_set_speed` · `hubitat_room_fan_on` · `hubitat_room_fan_off` · `hubitat_room_fan_set_speed`
 - `hubitat_press_button`
-- `hubitat_set_device_disabled` ⚠ · `hubitat_set_app_disabled` ⚠ · `hubitat_set_mode` ⚠
+- `hubitat_set_device_disabled` · `hubitat_set_app_disabled` · `hubitat_set_mode`
 
 **Inventory & state (read-only)**
 - `list_devices` · `list_devices_by_capability` · `get_device` · `get_device_state`
@@ -107,7 +106,7 @@ Read the live list with `hub_mcp.py list-tools --schemas`; this is the 2026-08-1
 
 **Diagnostics & escape hatch**
 - `get_hub_diagnostics` — gateway + hub **health** (`freeOSMemoryKb`, `cpu5MinuteAverage`, Java heap); **no network / mDNS / IP** data
-- `run_device_command` — run any advertised device command (sensitive commands ⚠)
+- `run_device_command` — run any advertised device command (a sensitive command needs `allowSensitive`)
 
 ## What it does NOT cover — reach for the `hub_*` scripts instead
 

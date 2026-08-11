@@ -57,8 +57,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py call hubit
 ```
 
 Confirm the match against the returned id/label. Then read the selected tool's **live description and
-schema** (from Step 2, `list-tools --schemas`) to decide sensitivity — the gateway's own metadata is
-the authority, and the set of sensitive tools drifts with the app, so never judge from a memorized
+schema** (from Step 2, `list-tools --schemas`) to decide sensitivity; never judge from a memorized
 list. If the tool requires `allowSensitive`, proceed to Step 6; otherwise proceed to Step 7.
 
 ## Step 6 — Gate a sensitive action
