@@ -17,7 +17,7 @@ tooling. Endpoint, transport, auth, the full tool catalog, and the when-to-prefe
 The connector listens on `http://<hub-ip>/mcp` (port **80**, not `:8080`) and needs a **bearer token**
 (enable the built-in app and read the URL/token from its UI — see the reference). The token is a
 secret: it comes from `$HUBITAT_MCP_TOKEN` or a gitignored `--token-file`, never a CLI literal, never
-logged (`rules/no-secrets.md`). Proceed to Step 2.
+logged (coding-policy `rules/no-secrets.md`). Proceed to Step 2.
 
 ## Step 2 — Discover the live tool surface
 

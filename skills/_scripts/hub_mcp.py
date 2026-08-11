@@ -180,7 +180,7 @@ def resolve_token(env=None, token_file: Optional[str] = None) -> str:
 
 # Explicit LAN ranges the bearer token may be sent to. `ipaddress.is_private` is too broad — it also
 # returns True for unspecified (0.0.0.0, ::) and reserved/documentation ranges (192.0.2.0/24,
-# 2001:db8::/32, 100.64.0.0/10, …), none of which are local hub addresses (`rules/no-secrets.md`).
+# 2001:db8::/32, 100.64.0.0/10, …), none of which are local hub addresses (coding-policy `rules/no-secrets.md`).
 _LOCAL_NETS = tuple(ipaddress.ip_network(n) for n in (
     "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16",  # RFC1918
     "169.254.0.0/16", "127.0.0.0/8",                   # IPv4 link-local, loopback
@@ -212,14 +212,14 @@ def validate_local_mcp_url(url: str) -> str:
     """Reject any URL the bearer token must not be sent to, and pin the connection to a validated
     local address. The AI (MCP) Connector is local-only by contract and the token is password-grade,
     so a mistyped/external host — or a single-label name that DNS search config expands to a public
-    address — would disclose the secret (`rules/no-secrets.md`). An IP literal is checked directly; a
+    address — would disclose the secret (coding-policy `rules/no-secrets.md`). An IP literal is checked directly; a
     hostname is RESOLVED and EVERY resolved address must be private/loopback/link-local, after which
     the URL is rewritten to the validated IP so the request connects to the address just checked
     (defeating a DNS-rebinding swap between check and connect). Enforces http(s) and the /mcp path
     too, before any token is loaded or sent. Raises HubError otherwise."""
     parsed = urlparse(url)
     if parsed.username or parsed.password:
-        # Never echo the credentials — reject before any output prints the URL (`rules/no-secrets.md`).
+        # Never echo the credentials — reject before any output prints the URL (coding-policy `rules/no-secrets.md`).
         raise HubError("MCP URL must not embed credentials (user:pass@…) — the bearer token is the "
                        "only auth; pass a plain http://<hub-ip>/mcp.")
     if parsed.scheme not in ("http", "https"):
@@ -296,7 +296,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
     """Refuse to follow HTTP redirects. urllib follows 3xx automatically and copies the request
     headers — including `Authorization: Bearer <token>` — to the redirect target, so a local MCP
     endpoint that 302s to a public URL would leak the bearer token past the pre-request local-address
-    validation (`rules/no-secrets.md`). Returning None here means "do not redirect"; the 3xx surfaces
+    validation (coding-policy `rules/no-secrets.md`). Returning None here means "do not redirect"; the 3xx surfaces
     to the caller as a non-200 status instead, and the token never reaches the redirect target."""
 
     def redirect_request(self, req, fp, code, msg, headers, newurl):
@@ -306,7 +306,7 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
 # Opener with the default redirect handler REPLACED by the no-follow one, and proxies DISABLED (an
 # empty ProxyHandler). A local-only endpoint must never route through a proxy: urllib otherwise honors
 # http_proxy/https_proxy and would send `Authorization: Bearer <token>` to that (possibly external)
-# proxy, leaking the secret past the pinned-local-IP check (`rules/no-secrets.md`). Reused per request.
+# proxy, leaking the secret past the pinned-local-IP check (coding-policy `rules/no-secrets.md`). Reused per request.
 _OPENER = urllib.request.build_opener(_NoRedirect, urllib.request.ProxyHandler({}))
 
 
@@ -482,11 +482,11 @@ def main(argv=None, transport=None) -> int:
             }, indent=2, default=str))
             return 0
         # call — never echo `arguments`: an arbitrary tool's args can carry a lock PIN, access code,
-        # or other secret the caller is setting, and stdout must not leak it (`rules/no-secrets.md`).
+        # or other secret the caller is setting, and stdout must not leak it (coding-policy `rules/no-secrets.md`).
         # The caller already knows what they passed via --args.
         outcome = client.call_tool(args.tool, arguments)
         # On a tool error the response can reflect submitted arguments (a lock PIN, an access code),
-        # so withhold it (`rules/no-secrets.md`); a successful result is the caller's requested data.
+        # so withhold it (coding-policy `rules/no-secrets.md`); a successful result is the caller's requested data.
         result = ("<error result withheld — it may reflect submitted arguments>"
                   if outcome["isError"] else outcome["data"])
         print(json.dumps({
