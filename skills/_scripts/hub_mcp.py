@@ -1,0 +1,367 @@
+#!/usr/bin/env python3
+"""Client for the first-party Hubitat **AI (MCP) Connector Integration** — list its tools
+and call one, over the hub's local MCP endpoint.
+
+Grounded live 2026-08-10 on 2.5.1.140 (C-8 Pro, local network) at http://<hub-ip>/mcp
+(see ../_reference/mcp-connector.md):
+
+  - Built-in integration app (Integrations -> Add Built-In Integration -> enable). **Local only**
+    (cloud agents unsupported at this time). Endpoint is port **80**, path /mcp — NOT the 8080 admin UI.
+  - Transport: **Streamable HTTP** — JSON-RPC 2.0 over POST /mcp; an SSE stream is offered on
+    GET /mcp for resource notifications (not used here). Protocol 2025-06-18, server
+    hubitat-mcp-gateway 0.1.0. A session id comes back in the `Mcp-Session-Id` response header on
+    initialize and is echoed on every following request.
+  - Auth: `Authorization: Bearer <token>`. Unauthenticated -> 401 {"error":"unauthorized"} with
+    `WWW-Authenticate: Bearer`. **The token is a secret** — this client reads it from
+    $HUBITAT_MCP_TOKEN or a --token-file and NEVER prints it, echoes it, or names its value in an
+    error; only the *source* is named. Never pass a token as a CLI literal (it lands in process
+    listings and shell history). Reset it in the app if compromised.
+  - A tools/call `result.content[].text` is itself a **JSON document string** (double-encoded); this
+    client unwraps it so the caller gets structured data, not a string to re-parse.
+  - Sensitive tools (locks, covers open/close, thermostats, hub mode, enable/disable device/app,
+    sensitive run_device_command) require `allowSensitive: true` in the arguments — pass
+    --allow-sensitive to merge it. The authoritative per-tool list is the gateway's own tool
+    descriptions (`list-tools`) / the reference doc, not hard-coded here (it drifts with the app).
+
+The deterministic pieces (request building, JSON/SSE body parsing, JSON-RPC error handling, the
+content-unwrap, session-id extraction, token/URL resolution) are pure functions unit-tested with an
+injectable `transport`; only the network call touches urllib.
+
+Usage:
+    hub_mcp.py list-tools --ip 192.0.2.15
+    hub_mcp.py list-tools --url http://192.0.2.15/mcp --schemas
+    hub_mcp.py initialize --hub main                      # handshake only: serverInfo + instructions
+    hub_mcp.py call hubitat_search_devices --args '{"query":"patio"}' --ip 192.0.2.15
+    hub_mcp.py call hubitat_lock --args '{"device":"Front Door"}' --allow-sensitive --ip 192.0.2.15
+    hub_mcp.py call list_modes --hub main                 # ip from ./hubs.json, forced to port 80 /mcp
+Token: `export HUBITAT_MCP_TOKEN=...` (preferred) or `--token-file ~/.hubitat/mcp_token`.
+Output: one JSON object on stdout. Exit 2 on a config/usage error, 1 on a hub/tool error, 0 otherwise.
+"""
+import argparse
+import json
+import os
+import sys
+import urllib.error
+import urllib.request
+from pathlib import Path
+from typing import Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# E402: this import must follow the sys.path insert above so hubclient resolves when run as a script.
+from hubclient import HubError, load_hubs, resolve_hub  # noqa: E402
+
+PROTOCOL_VERSION = "2025-06-18"
+CLIENT_INFO = {"name": "hubitat-dev/hub_mcp", "version": "1"}
+DEFAULT_PATH = "/mcp"
+
+
+def build_request(method: str, params=None, req_id: Optional[int] = 1) -> dict:
+    """Pure. A JSON-RPC 2.0 request (or notification when req_id is None)."""
+    msg: dict = {"jsonrpc": "2.0", "method": method}
+    if req_id is not None:
+        msg["id"] = req_id
+    if params is not None:
+        msg["params"] = params
+    return msg
+
+
+def parse_message_body(text: str) -> dict:
+    """Pure. Parse a Streamable-HTTP response body into one JSON-RPC message. The gateway answers
+    either as plain application/json or as an SSE stream (text/event-stream) whose `data:` lines
+    carry the JSON — both are handled so the caller never has to know which was chosen."""
+    text = (text or "").strip()
+    if not text:
+        raise HubError("empty response body from the MCP endpoint")
+    if text[0] in "{[":
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError as e:
+            raise HubError(f"MCP endpoint returned a non-JSON body: {text[:120]!r}") from e
+    payloads = []
+    for line in text.splitlines():
+        line = line.strip()
+        if line.startswith("data:"):
+            frag = line[len("data:"):].strip()
+            if frag and frag != "[DONE]":
+                payloads.append(frag)
+    if not payloads:
+        raise HubError(f"MCP SSE response carried no data frames: {text[:120]!r}")
+    try:
+        return json.loads(payloads[-1])  # one message per response here; the last data frame is it
+    except json.JSONDecodeError as e:
+        raise HubError(f"MCP SSE data frame was not JSON: {payloads[-1][:120]!r}") from e
+
+
+def jsonrpc_result(msg):
+    """Pure. Return the JSON-RPC `result`, or raise HubError on an `error` object or a malformed one.
+    `msg` is whatever `json.loads` produced — a top-level array or scalar is caught by the guard."""
+    if not isinstance(msg, dict):
+        raise HubError(f"MCP response was not a JSON object: {msg!r}")
+    if "error" in msg:
+        err = msg.get("error") or {}
+        code = err.get("code") if isinstance(err, dict) else None
+        message = (err.get("message") if isinstance(err, dict) else None) or str(err)
+        raise HubError(f"MCP returned error {code}: {message}")
+    if "result" not in msg:
+        raise HubError(f"MCP response had neither result nor error: {str(msg)[:120]}")
+    return msg["result"]
+
+
+def _maybe_json(text):
+    """Pure. Parse a string as JSON when it looks like JSON, else return it unchanged. The gateway
+    double-encodes: a content text part is itself a JSON document string."""
+    if not isinstance(text, str):
+        return text
+    s = text.strip()
+    if s[:1] in "{[":
+        try:
+            return json.loads(s)
+        except json.JSONDecodeError:
+            return text
+    return text
+
+
+def unwrap_tool_result(result) -> dict:
+    """Pure. Flatten a tools/call result into {isError, data, text}. `content[]` text parts are
+    collected; a single JSON text part is parsed (undoing the double-encoding), multiple parts become
+    a list, and a result with no text falls back to `structuredContent`."""
+    if not isinstance(result, dict):
+        return {"isError": False, "data": result, "text": None}
+    parts = result.get("content") or []
+    texts = [str(p["text"]) for p in parts
+             if isinstance(p, dict) and p.get("type") == "text" and p.get("text") is not None]
+    is_error = bool(result.get("isError"))
+    if len(texts) == 1:
+        data = _maybe_json(texts[0])
+    elif texts:
+        data = [_maybe_json(t) for t in texts]
+    else:
+        data = result.get("structuredContent")
+    return {"isError": is_error, "data": data, "text": ("\n".join(texts) if texts else None)}
+
+
+def session_id_from_headers(headers: dict) -> Optional[str]:
+    """Pure. The Mcp-Session-Id response header, case-insensitively. None when absent."""
+    for k, v in (headers or {}).items():
+        if str(k).lower() == "mcp-session-id":
+            return v
+    return None
+
+
+def resolve_token(env=None, token_file: Optional[str] = None) -> str:
+    """Resolve the bearer token from the environment or a file. The value is NEVER returned in any
+    error text or printed anywhere — only the *source* is named. Env var wins over the file."""
+    env = env if env is not None else os.environ
+    tok = env.get("HUBITAT_MCP_TOKEN")
+    if tok and tok.strip():
+        return tok.strip()
+    if token_file:
+        try:
+            content = Path(token_file).read_text()
+        except OSError as e:
+            raise HubError(f"cannot read token file {token_file}: {e}") from e
+        if not content.strip():
+            raise HubError(f"token file {token_file} is empty")
+        return content.strip()
+    raise HubError(
+        "no MCP bearer token — set HUBITAT_MCP_TOKEN or pass --token-file <path>. The token is shown "
+        "in the hub's AI (MCP) Connector app; treat it as a secret (never a CLI literal), and reset "
+        "it in that app if it may be compromised.")
+
+
+def resolve_mcp_url(url: Optional[str] = None, ip: Optional[str] = None,
+                    hub: Optional[str] = None, hubs_path: Optional[str] = None) -> str:
+    """Resolve the MCP endpoint URL. An explicit --url wins; --ip and --hub both force port 80 and the
+    /mcp path (the connector is NOT on the 8080 admin port that hubs.json records)."""
+    if url:
+        return url
+    if ip:
+        return f"http://{ip}{DEFAULT_PATH}"
+    if hub:
+        resolved = resolve_hub(load_hubs(hubs_path or "hubs.json"), hub)
+        return f"http://{resolved['ip']}{DEFAULT_PATH}"
+    raise HubError("provide --url http://<ip>/mcp, --ip <addr>, or --hub <name> (with a hubs.json)")
+
+
+def _mcp_transport(method: str, url: str, body: Optional[str], headers: dict):
+    """Default transport. Returns (status, headers_dict, text). Raises HubError only on a transport
+    failure (unreachable host); HTTP error statuses are returned for the caller to classify."""
+    data = body.encode() if body is not None else None
+    req = urllib.request.Request(url, data=data, headers=headers or {}, method=method)
+    try:
+        resp = urllib.request.urlopen(req, timeout=20)
+        return resp.status, dict(resp.headers), resp.read().decode("utf-8", "replace")
+    except urllib.error.HTTPError as e:
+        return e.code, dict(e.headers or {}), (e.read().decode("utf-8", "replace") if e.fp else "")
+    except urllib.error.URLError as e:
+        raise HubError(f"cannot reach {url}: {e.reason}") from e
+
+
+class MCPClient:
+    """A minimal MCP client for the Hubitat gateway: initialize (with the mandated `initialized`
+    notification), tools/list (following pagination), and tools/call (with the content unwrap).
+    `transport` is injectable for testing; the token is held privately and only ever sent as a
+    Bearer header, never surfaced."""
+
+    def __init__(self, url: str, token: str, transport=None):
+        self.url = url
+        self._token = token
+        self._t = transport or _mcp_transport
+        self.session_id = None
+        self.server_info = None
+        self.protocol_version = None
+
+    def _headers(self) -> dict:
+        h = {
+            "Authorization": f"Bearer {self._token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json, text/event-stream",
+        }
+        if self.session_id:
+            h["Mcp-Session-Id"] = self.session_id
+        return h
+
+    def _post(self, message: dict, expect_response: bool = True) -> dict:
+        status, headers, text = self._t("POST", self.url, json.dumps(message), self._headers())
+        if status == 401:
+            raise HubError(
+                "MCP endpoint returned 401 unauthorized — the bearer token was rejected. Check "
+                "HUBITAT_MCP_TOKEN / --token-file against the token in the hub's AI (MCP) Connector "
+                "app (reset it there and update your config if needed).")
+        sid = session_id_from_headers(headers)
+        if sid:
+            self.session_id = sid
+        if not expect_response:
+            # A notification carries no JSON-RPC response body; the gateway answers 200/202 empty.
+            if status not in (200, 202):
+                raise HubError(f"MCP notification returned HTTP {status}: {text[:120]!r}")
+            return {}
+        if status != 200:
+            raise HubError(f"MCP endpoint returned HTTP {status}: {text[:120]!r}")
+        result = jsonrpc_result(parse_message_body(text))
+        if not isinstance(result, dict):
+            raise HubError(f"MCP result was not a JSON object: {str(result)[:120]}")
+        return result
+
+    def initialize(self) -> dict:
+        result = self._post(build_request("initialize", {
+            "protocolVersion": PROTOCOL_VERSION,
+            "capabilities": {},
+            "clientInfo": CLIENT_INFO,
+        }, req_id=1))
+        self.server_info = result.get("serverInfo")
+        self.protocol_version = result.get("protocolVersion")
+        # The spec requires the client to announce it is initialized before issuing requests.
+        self._post(build_request("notifications/initialized", None, req_id=None), expect_response=False)
+        return result
+
+    def list_tools(self) -> list:
+        tools, cursor = [], None
+        while True:
+            params = {"cursor": cursor} if cursor else {}
+            result = self._post(build_request("tools/list", params, req_id=2))
+            tools.extend(result.get("tools") or [])
+            cursor = result.get("nextCursor")
+            if not cursor:
+                return tools
+
+    def call_tool(self, name: str, arguments: Optional[dict] = None) -> dict:
+        result = self._post(build_request(
+            "tools/call", {"name": name, "arguments": arguments or {}}, req_id=3))
+        return unwrap_tool_result(result)
+
+
+def _tool_summary(tool: dict, schemas: bool = False) -> dict:
+    out = {"name": tool.get("name"), "description": (tool.get("description") or "")}
+    if schemas:
+        out["inputSchema"] = tool.get("inputSchema")
+    return out
+
+
+def _add_target_args(sp):
+    sp.add_argument("--url", help="full MCP URL, e.g. http://192.0.2.15/mcp")
+    sp.add_argument("--ip", help="hub IP -> http://<ip>/mcp (port 80)")
+    sp.add_argument("--hub", help="named hub from hubs.json (uses its ip, forced to port 80 /mcp)")
+    sp.add_argument("--hubs", help="path to hubs.json (default ./hubs.json when --hub is given)")
+    sp.add_argument("--token-file", help="file holding the bearer token (else $HUBITAT_MCP_TOKEN)")
+
+
+def main(argv=None, transport=None) -> int:
+    p = argparse.ArgumentParser(description="Client for the Hubitat AI (MCP) Connector Integration.")
+    sub = p.add_subparsers(dest="action", required=True)
+
+    lt = sub.add_parser("list-tools", help="list the gateway's tools")
+    _add_target_args(lt)
+    lt.add_argument("--schemas", action="store_true", help="include each tool's inputSchema")
+
+    ini = sub.add_parser("initialize", help="handshake only; print serverInfo, protocol, instructions")
+    _add_target_args(ini)
+
+    cl = sub.add_parser("call", help="call one tool and print its (unwrapped) result")
+    _add_target_args(cl)
+    cl.add_argument("tool", help="tool name (see list-tools)")
+    cl.add_argument("--args", default="{}", help="tool arguments as a JSON object")
+    cl.add_argument("--allow-sensitive", action="store_true",
+                    help="merge allowSensitive=true (locks, covers, thermostats, modes, enable/disable)")
+
+    args = p.parse_args(argv)
+
+    try:
+        url = resolve_mcp_url(args.url, args.ip, args.hub, args.hubs)
+        token = resolve_token(token_file=args.token_file)
+    except HubError as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+    arguments = None
+    if args.action == "call":
+        try:
+            arguments = json.loads(args.args)
+        except json.JSONDecodeError as e:
+            print(f"--args is not valid JSON: {e}", file=sys.stderr)
+            return 2
+        if not isinstance(arguments, dict):
+            print("--args must be a JSON object", file=sys.stderr)
+            return 2
+        if args.allow_sensitive:
+            arguments["allowSensitive"] = True
+
+    client = MCPClient(url, token, transport)
+    try:
+        info = client.initialize()
+        if args.action == "initialize":
+            print(json.dumps({
+                "url": url,
+                "serverInfo": info.get("serverInfo"),
+                "protocolVersion": info.get("protocolVersion"),
+                "capabilities": info.get("capabilities"),
+                "instructions": info.get("instructions"),
+            }, indent=2, default=str))
+            return 0
+        if args.action == "list-tools":
+            tools = client.list_tools()
+            print(json.dumps({
+                "url": url,
+                "server": info.get("serverInfo"),
+                "tool_count": len(tools),
+                "tools": [_tool_summary(t, args.schemas) for t in tools],
+            }, indent=2, default=str))
+            return 0
+        # call
+        outcome = client.call_tool(args.tool, arguments)
+        print(json.dumps({
+            "url": url,
+            "tool": args.tool,
+            "arguments": arguments,
+            "isError": outcome["isError"],
+            "result": outcome["data"],
+        }, indent=2, default=str))
+        # isError:true means the tool itself reported a failure (bad args, guard, device miss).
+        return 1 if outcome["isError"] else 0
+    except HubError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())

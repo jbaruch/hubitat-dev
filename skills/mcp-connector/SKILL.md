@@ -1,0 +1,75 @@
+---
+name: mcp-connector
+description: Use the hub's first-party AI (MCP) Connector Integration to read hub state and drive devices over its local MCP endpoint — connect with the bearer token, discover the live tool surface, prefer read-only tools, gate sensitive actions, and verify the mutation. Use when the user wants to control or query a Hubitat hub through its MCP server / AI connector, or asks whether an operation should go through MCP or the hub_* scripts.
+argument-hint: "[list-tools|call <tool>] [--hub <name>|--ip <addr>]"
+---
+
+# MCP Connector Skill
+
+Process steps in order. Do not skip ahead.
+
+The connector is a **runtime control + inventory + events** surface, distinct from the code/mesh/lint
+tooling. Endpoint, transport, auth, the full tool catalog, and the when-to-prefer-MCP decision live in
+`skills/_reference/mcp-connector.md`; this skill runs the client and applies judgment.
+
+## Step 1 — Confirm the endpoint and token
+
+The connector listens on `http://<hub-ip>/mcp` (port **80**, not `:8080`) and needs a **bearer token**
+(enable the built-in app and read the URL/token from its UI — see the reference). The token is a
+secret: it comes from `$HUBITAT_MCP_TOKEN` or a gitignored `--token-file`, never a CLI literal, never
+logged (`rules/no-secrets.md`). Proceed to Step 2.
+
+## Step 2 — Discover the live tool surface
+
+Do not assume the tool set from the reference snapshot — the app versions it. List it:
+
+```
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py list-tools --hub <name>
+```
+
+Argument/output contract: `skills/_scripts/hub_mcp.py` module docstring. Add `--schemas` for input
+schemas, `--ip <addr>` or `--url http://<ip>/mcp` instead of `--hub`. If the call returns `401`, the
+token was rejected — fix the token before continuing. Proceed to Step 3.
+
+## Step 3 — Choose MCP or the hub_* scripts
+
+Decide per task (full rule in the reference, When to prefer MCP vs the grounded HTTP path):
+- **MCP** for device/room/scene/mode control, running a rule, and intent-shaped inventory/event reads.
+- **`hub_*` scripts / raw endpoints** for deploy, pull, lint, mesh detail, firmware, a **token-free**
+  path on a Hub-Security-off hub, or any field the tools do not expose — hand off to `Skill(skill: "deploy")`,
+  `Skill(skill: "lint-review")`, `Skill(skill: "mesh-health")`, `Skill(skill: "device-command")` as fits.
+
+If the task belongs to a hub_* skill, hand off now and finish here. Otherwise proceed to Step 4.
+
+## Step 4 — Read first, and resolve names before acting
+
+Prefer read-only tools. When the user named a device or scene ambiguously, resolve it first
+(`hubitat_search_devices`, `list_scenes`) rather than guessing an id:
+
+```
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py call hubitat_search_devices --args '{"query":"patio"}' --hub <name>
+```
+
+The client unwraps the double-encoded `content[].text` into structured data. If the run is purely a
+read, report the result and finish here. For a control action, proceed to Step 5.
+
+## Step 5 — Gate and fire a control action
+
+Send the control tool with the resolved id/name. A **sensitive** action (lock, cover open/close,
+thermostat, hub mode, enable/disable, sensitive `run_device_command`) refuses unless `allowSensitive`
+is set — the client's `--allow-sensitive` merges it. Sensitive actions are physical side effects:
+confirm intent with the user first, exactly as the destructive-op discipline elsewhere.
+
+```
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_mcp.py call hubitat_lock --args '{"device":"Front Door"}' --allow-sensitive --hub <name>
+```
+
+`isError:true` in the result is the tool reporting a failure (bad args, guard, device miss) — surface
+it, do not treat a printed result as success. Proceed to Step 6.
+
+## Step 6 — Verify the mutation
+
+A returned result is dispatch, not proof the device moved — the same trap as `/device/runmethod`
+(`rules/state-vs-attributes.md`). Re-read the affected device with `get_device_state` (or
+`list_device_events`) and confirm the relevant attribute changed. Report what changed and what did
+not; an already-in-state no-op is not a failure. Finish here.
