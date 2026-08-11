@@ -19,6 +19,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform builds through 2.5.1.1
 - **UI automation** — for the operations the hub exposes only through its web UI (installing an app instance, configuring built-in/community apps, deleting a device or app, importing devices, reading a backup), drive it with the Playwright MCP — with the Vue/MDL selection traps and silent-failure gotchas documented so a mutation is never assumed to have stuck (`skills/_reference/playwright-ui.md`).
 - **Device removal** — before deleting a device, read the hub's own "in use by" list (`/device/fullJson`) and warn with the concrete reference blast radius (enabled/disabled app switch state, dashboards, parent/child). Audit actual consumers separately through subscriptions or type-specific live state.
 - **Device replacement** — capture old memberships before replacement and re-wire them onto the new device id.
+- **MCP control** — drive the hub through its first-party **AI (MCP) Connector Integration** (a local MCP server the hub hosts): connect with the bearer token, discover the live tool surface, and prefer read-only tools while gating sensitive actions behind `allowSensitive` (`skills/_reference/mcp-connector.md`).
 
 ## Rules
 
@@ -56,6 +57,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [device-removal](skills/device-removal/SKILL.md) | Safely removing a device — enumerate usage, warn on blast radius, verify after, and restore references onto a replacement. |
 | [device-migration](skills/device-migration/SKILL.md) | Moving every app reference from an old device to a new one — Swap Device, a virtual bridge/parking slot, a Hub Mesh re-home across hubs, or a guided manual re-select, chosen by why the swap is blocked. |
 | [sensor-onboarding](skills/sensor-onboarding/SKILL.md) | Onboarding sensors (or a fleet) with a verified step per device — pair, confirm the driver, name by function+position, raise retention, read the real preferences, mirror to a peer hub, add to inactivity monitoring, acceptance-test past the settling window, and reconcile the inventory. |
+| [mcp-connector](skills/mcp-connector/SKILL.md) | Driving the hub through its first-party AI (MCP) Connector Integration — connect with the bearer token, discover the live tool surface, prefer read-only tools, gate sensitive actions with `allowSensitive`, and verify the mutation (dispatched ≠ executed). |
 
 Typical loop: `scaffold` → `lint-review` → `deploy` → `debug`, with `hub-config` set up once and `test` for anything with real logic. `mesh-health` is orthogonal — reach for it when the problem is the radio network (a flaky device, a ghost node) rather than the code.
 
