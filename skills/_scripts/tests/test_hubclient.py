@@ -162,6 +162,18 @@ class TestDeploy(unittest.TestCase):
         self.assertNotIsInstance(ctx.exception, hubclient.DeployConflict)
         self.assertIn("Modifier 'static' not allowed here.", str(ctx.exception))
 
+    def test_non_object_json_with_version_is_not_a_conflict(self):
+        # A valid JSON string/array containing "version" parsed fine — it is not an HTML page,
+        # so the version heuristic (JSON-parse-failure only) must not apply. Report plainly.
+        t = make_transport({
+            ("GET", "/driver/ajax/code"): (200, {}, json.dumps({"id": 5, "version": 3, "source": "old"})),
+            ("POST", "/driver/ajax/update"): (200, {}, json.dumps("version mismatch")),
+        })
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError) as ctx:
+            c.deploy("driver", "x", code_id=5)
+        self.assertNotIsInstance(ctx.exception, hubclient.DeployConflict)
+
     def test_create_without_new_id_raises(self):
         # A create that redirects somewhere without an editor id must not return {id: None}.
         t = make_transport({("POST", "/driver/save"): (302, {"Location": "/error"}, "")})

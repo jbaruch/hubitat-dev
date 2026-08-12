@@ -210,30 +210,27 @@ class HubClient:
         try:
             payload = json.loads(text)
         except json.JSONDecodeError:
-            payload = None
+            # Non-JSON response (an HTML page). This is the ONLY case the version heuristic runs
+            # in — the legacy tell for a stale-version rejection is the word "version" in the page.
+            # A parsed JSON body's echoed "version" field never reaches here, so a compile error
+            # (status "error" with the field) can no longer be misread as an optimistic-concurrency
+            # conflict. The genuine-conflict JSON shape is unconfirmed, so nothing is invented for it.
+            if "version" in text.lower():
+                raise DeployConflict(
+                    f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "
+                    f"version than {plan['version']}. Re-pull and reconcile before deploying.")
+            raise HubError(
+                f"update {kind} id={plan['id']} did not confirm success (HTTP {status}): {text[:200]}")
+        # Parsed JSON. A save returns {"status":"success"}; a rejection carries the reason in
+        # errorMessage. Surface that message verbatim — a Groovy compile error and a stale-version
+        # rejection both come back as status "error", and errorMessage is the only thing that tells
+        # them apart. A JSON body without an errorMessage (or a non-object JSON value) is reported
+        # plainly rather than guessed at — never as a conflict off the echoed "version" field.
         if isinstance(payload, dict):
             if payload.get("status") == "success":
                 return {"action": "update", "id": plan["id"], "version": plan["version"]}
-            # A rejection arrives as {"status":"error", "errorMessage": <the hub's reason>}.
-            # Surface that message verbatim: a Groovy compile error and a stale-version
-            # rejection both come back as status "error", and errorMessage is the only thing
-            # that tells them apart. This must run before the version heuristic below — the
-            # echoed "version" field is present in every rejection, so keying a conflict off
-            # the word "version" misreads a compile error as optimistic-concurrency failure.
             message = payload.get("errorMessage")
             if message:
                 raise HubError(f"hub rejected the save for {kind} id={plan['id']}: {message}")
-            # A JSON error with no errorMessage: the reason is unknown, and the echoed "version"
-            # field is not evidence of a conflict. Report it plainly rather than guessing — the
-            # version heuristic below is only for a non-JSON HTML page, never a parsed body.
-            raise HubError(
-                f"update {kind} id={plan['id']} did not confirm success (HTTP {status}): {text[:200]}")
-        # Non-JSON response (payload is None): the legacy tell for a stale-version rejection is the
-        # word "version" in an HTML rejection page. The genuine-conflict JSON shape is unconfirmed,
-        # so this heuristic is scoped to the unparseable case, never a JSON body's echoed field.
-        if "version" in text.lower():
-            raise DeployConflict(
-                f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "
-                f"version than {plan['version']}. Re-pull and reconcile before deploying.")
         raise HubError(
             f"update {kind} id={plan['id']} did not confirm success (HTTP {status}): {text[:200]}")
