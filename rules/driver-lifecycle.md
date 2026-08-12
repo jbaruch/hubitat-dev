@@ -25,8 +25,13 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 
 ## parse() and sending
 
-- `parse(String description)` receives raw inbound device data. Decode by source: Zigbee → `zigbee.parseDescriptionAsMap(description)`; Z-Wave → `zwave.parse(description, versionMap)` (returns **null** for unsupported command classes — always null-check); LAN → `parseLanMessage(description)`; MQTT → `interfaces.mqtt.parseMessage(description)`.
+- `parse(String description)` receives raw inbound device data. Decode by source: Zigbee → `zigbee.parseDescriptionAsMap(description)`; Z-Wave → `zwave.parse(description, cmdVersions())` (legacy backend; returns **null** for unsupported command classes — always null-check; zwaveJS differs, see the backend split below); LAN → `parseLanMessage(description)`; MQTT → `interfaces.mqtt.parseMessage(description)`.
 - Z-Wave uses multiple-dispatch `zwaveEvent(...)` overloads with a `hubitat.zwave.Command` catch-all placed **last**.
+- **Backend split: on a zwaveJS hub, `parse()`'s `description` is a decoded JSON value payload, not the classic `zw device: …` string.** Same backend split as the RSSI/routing one in `rules/zwave-zigbee-mesh.md`, reaching the driver layer.
+- Read that JSON directly rather than through `zwave.parse()` — it is richer (per-attribute `prevValue`, the device's own enum, already-decoded values, fields with no typed-class equivalent) and immune to typed-class defects. Payload shape and examples: `skills/_reference/endpoints.md`.
+- `zwave.parse()` on that JSON is lossy and **throws a `GroovyCastException` on some command classes**, and the throw escapes `parse()`, killing every attribute downstream in that execution (`rules/groovy-gotchas.md`).
+- Branch on the shape: `description?.trim()?.startsWith("{")` → parse the JSON; else `zwave.parse(description, cmdVersions())` for the legacy backend.
+- zwaveJS emits a frame only when a value **changes** — a `…Get()` against an already-interviewed node produces no frame at all, independent of how it would be decoded.
 - Returning a formatted command string/List from a command method **auto-sends it** to the device — easy to trigger unintentionally. S2 devices wrap with `zwaveSecureEncap(...)`.
 - First line of any protocol `parse()` while developing: `if (logEnable) log.debug "parse: ${description}"` — see `rules/logging-conventions.md`.
 
