@@ -223,9 +223,14 @@ class HubClient:
             message = payload.get("errorMessage")
             if message:
                 raise HubError(f"hub rejected the save for {kind} id={plan['id']}: {message}")
-        # No parseable errorMessage. The legacy tell for a stale-version rejection is the word
-        # "version" in a non-JSON HTML rejection page; the genuine-conflict JSON shape is
-        # unconfirmed, so this stays a heuristic on the raw text rather than a parsed field.
+            # A JSON error with no errorMessage: the reason is unknown, and the echoed "version"
+            # field is not evidence of a conflict. Report it plainly rather than guessing — the
+            # version heuristic below is only for a non-JSON HTML page, never a parsed body.
+            raise HubError(
+                f"update {kind} id={plan['id']} did not confirm success (HTTP {status}): {text[:200]}")
+        # Non-JSON response (payload is None): the legacy tell for a stale-version rejection is the
+        # word "version" in an HTML rejection page. The genuine-conflict JSON shape is unconfirmed,
+        # so this heuristic is scoped to the unparseable case, never a JSON body's echoed field.
         if "version" in text.lower():
             raise DeployConflict(
                 f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "
