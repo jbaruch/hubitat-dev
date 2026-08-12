@@ -11,6 +11,10 @@ Usage:
     hub_deploy.py --kind app --source a.groovy --id 143 --ip 192.0.2.10
     hub_deploy.py --kind driver --source d.groovy --name "My Driver" --ip 192.0.2.10
 
+A save rejection — most often a Groovy compile error — surfaces the hub's errorMessage
+verbatim and exits 1, distinct from the version-conflict path so its "re-pull and reconcile"
+advice never fires on a typo in your own source.
+
 Exit: 0 on success, 2 on a version conflict (re-pull and reconcile), 1 on other errors.
 """
 import argparse
