@@ -328,6 +328,18 @@ case-sensitive paths) — the per-frame decoded traffic, distinct from the drive
 
 Field meanings and the LR-vs-mesh remediation split: `rules/zwave-zigbee-mesh.md`.
 
+**zwaveJS hands a driver's `parse()` a decoded JSON value payload, not the classic `zw device: …` string** (`rules/driver-lifecycle.md`). It is the driver-side counterpart of the JSON surfaces above. Shape, per Door Lock CC v4 (`cc` / `cmd` / `ep` are **decimal**, not hex):
+
+```json
+{"cc":98,"cmd":3,"ep":0,"values":[
+  {"propertyName":"currentMode","value":255,"prevValue":0,
+   "metadata":{"states":{"0":"Unsecured","255":"Secured"}}},
+  {"propertyName":"boltStatus","value":"locked","prevValue":"unlocked"},
+  {"propertyName":"outsideHandlesCanOpenDoor","value":[false,false,false,false]}]}
+```
+
+Most values carry `prevValue`, often `metadata.states` (the device's own enum), and some hold fields with no typed-class equivalent — already decoded. `zwave.parse()` accepts it but is lossy and **throws on some command classes** (`rules/groovy-gotchas.md`), so read the JSON directly. Grounded one lock model, 2.5.1.135; payload stability across platform version and command class is unverified.
+
 ## Hub management (official — token API)
 
 `GET /hub/advanced/getManagementToken` → token, then `/management/reboot?token=`, `/management/firmwareUpdate?token=`. The Hub Information Driver (HPM) wraps reboot/update as device commands over Maker API.
