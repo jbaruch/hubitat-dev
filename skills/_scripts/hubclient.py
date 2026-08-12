@@ -206,13 +206,26 @@ class HubClient:
             _PATHS[kind]["update"], {"id": plan["id"], "version": plan["version"], "source": source})
         # Confirm via the parsed JSON status field, exactly "success" — a substring match
         # would wrongly accept {"status":"unsuccessful"} or an HTML page mentioning "success".
-        # The hub's /ajax/update returns {"status":"success"}.
+        # The hub's /ajax/update returns {"status":"success"} on save.
         try:
-            confirmed = json.loads(text).get("status") == "success"
-        except (json.JSONDecodeError, AttributeError):
-            confirmed = False
-        if confirmed:
-            return {"action": "update", "id": plan["id"], "version": plan["version"]}
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            payload = None
+        if isinstance(payload, dict):
+            if payload.get("status") == "success":
+                return {"action": "update", "id": plan["id"], "version": plan["version"]}
+            # A rejection arrives as {"status":"error", "errorMessage": <the hub's reason>}.
+            # Surface that message verbatim: a Groovy compile error and a stale-version
+            # rejection both come back as status "error", and errorMessage is the only thing
+            # that tells them apart. This must run before the version heuristic below — the
+            # echoed "version" field is present in every rejection, so keying a conflict off
+            # the word "version" misreads a compile error as optimistic-concurrency failure.
+            message = payload.get("errorMessage")
+            if message:
+                raise HubError(f"hub rejected the save for {kind} id={plan['id']}: {message}")
+        # No parseable errorMessage. The legacy tell for a stale-version rejection is the word
+        # "version" in a non-JSON HTML rejection page; the genuine-conflict JSON shape is
+        # unconfirmed, so this stays a heuristic on the raw text rather than a parsed field.
         if "version" in text.lower():
             raise DeployConflict(
                 f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "

@@ -132,6 +132,22 @@ class TestDeploy(unittest.TestCase):
         with self.assertRaises(hubclient.DeployConflict):
             c.deploy("driver", "x", code_id=5)
 
+    def test_compile_error_reports_message_not_conflict(self):
+        # A compile rejection echoes {"status":"error","version":N,"errorMessage":...}. The
+        # echoed "version" field must NOT make it read as a stale-version conflict — surface
+        # the hub's message verbatim and raise HubError (exit 1), not DeployConflict (exit 2).
+        t = make_transport({
+            ("GET", "/driver/ajax/code"): (200, {}, json.dumps({"id": 5, "version": 8, "source": "old"})),
+            ("POST", "/driver/ajax/update"): (200, {}, json.dumps(
+                {"id": 5, "version": 8, "status": "error",
+                 "errorMessage": "Modifier 'static' not allowed here.\n @ line 242, column 1."})),
+        })
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError) as ctx:
+            c.deploy("driver", "x", code_id=5)
+        self.assertNotIsInstance(ctx.exception, hubclient.DeployConflict)
+        self.assertIn("Modifier 'static' not allowed here.", str(ctx.exception))
+
     def test_create_without_new_id_raises(self):
         # A create that redirects somewhere without an editor id must not return {id: None}.
         t = make_transport({("POST", "/driver/save"): (302, {"Location": "/error"}, "")})
