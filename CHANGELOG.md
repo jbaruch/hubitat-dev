@@ -1,5 +1,9 @@
 # Changelog
 
+### Changed
+
+- **Folded a deferred `context-writing-style` advisory from the #91 review** (`rules/app-lifecycle.md`). Presentation-only, no behavior change. The `menu`-vs-`category` bullet dropped its named worked example (moved here): `Vacation Lighting Director` ships as `category: "Safety & Security"` but `menu: "Apps"`, so setting only `category` still files the app under `Apps`. The `menu`-lint bullet dropped its grounding-and-uncertainty prose (moved here): the three observed `menu` values (`Apps`, `Automations`, `Integrations`) are grounded on one hub / one platform version (C-8 Pro, 2.5.1.135), and whether that set is fixed across versions or what an invalid string does is unverified — which is why `lint-review` warns only on an absent `menu`, never on an unrecognized value. The rule now states each contract directly. Closes #99.
+
 ### Fixed
 
 - **`hub_deploy.py` reported a Groovy compile error as a stale-version conflict** (`skills/_scripts/hubclient.py`, tests). The hub rejects an uncompilable save with `{"status":"error","version":N,"errorMessage":<compiler diagnostics>}`, and the echoed `version` field tripped the `"version" in text.lower()` heuristic, so a typo surfaced as "the hub has a newer version — re-pull and reconcile." That advice points outward at a phantom concurrent editor when the fault is inside your own source, and `rules/multi-hub-topology.md` tells the reader to trust it. `deploy()` now parses the response and, on a non-success JSON body carrying `errorMessage`, surfaces that message verbatim as a save rejection (exit 1, distinct from the conflict exit 2) before the version heuristic runs. The heuristic stays only for a non-JSON HTML rejection page — the genuine stale-version JSON shape is still unconfirmed, so nothing was invented for it. Closes #93.
