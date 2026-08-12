@@ -123,14 +123,56 @@ class TestDeploy(unittest.TestCase):
         post = [call for call in t.calls if call[0] == "POST"][0]
         self.assertIn("version=3", post[2])
 
-    def test_stale_version_raises_conflict(self):
+    def test_stale_version_raises_conflict_on_non_json_page(self):
+        # The version heuristic is scoped to a non-JSON HTML rejection page — a parsed body's
+        # echoed "version" field must never trip it (that was the compile-error misclassification).
         t = make_transport({
             ("GET", "/driver/ajax/code"): (200, {}, json.dumps({"id": 5, "version": 3, "source": "old"})),
-            ("POST", "/driver/ajax/update"): (200, {}, json.dumps({"error": "version mismatch"})),
+            ("POST", "/driver/ajax/update"): (200, {}, "<html>a newer version exists on the hub</html>"),
         })
         c = hubclient.HubClient("http://h:8080", t)
         with self.assertRaises(hubclient.DeployConflict):
             c.deploy("driver", "x", code_id=5)
+
+    def test_json_error_without_message_is_not_a_conflict(self):
+        # A JSON error body with no errorMessage but an echoed "version" field must NOT be read as
+        # a conflict — report it plainly (HubError, exit 1), never DeployConflict (exit 2).
+        t = make_transport({
+            ("GET", "/driver/ajax/code"): (200, {}, json.dumps({"id": 5, "version": 8, "source": "old"})),
+            ("POST", "/driver/ajax/update"): (200, {}, json.dumps({"id": 5, "version": 8, "status": "error"})),
+        })
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError) as ctx:
+            c.deploy("driver", "x", code_id=5)
+        self.assertNotIsInstance(ctx.exception, hubclient.DeployConflict)
+
+    def test_compile_error_reports_message_not_conflict(self):
+        # A compile rejection echoes {"status":"error","version":N,"errorMessage":...}. The
+        # echoed "version" field must NOT make it read as a stale-version conflict — surface
+        # the hub's message verbatim and raise HubError (exit 1), not DeployConflict (exit 2).
+        t = make_transport({
+            ("GET", "/driver/ajax/code"): (200, {}, json.dumps({"id": 5, "version": 8, "source": "old"})),
+            ("POST", "/driver/ajax/update"): (200, {}, json.dumps(
+                {"id": 5, "version": 8, "status": "error",
+                 "errorMessage": "Modifier 'static' not allowed here.\n @ line 242, column 1."})),
+        })
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError) as ctx:
+            c.deploy("driver", "x", code_id=5)
+        self.assertNotIsInstance(ctx.exception, hubclient.DeployConflict)
+        self.assertIn("Modifier 'static' not allowed here.", str(ctx.exception))
+
+    def test_non_object_json_with_version_is_not_a_conflict(self):
+        # A valid JSON string/array containing "version" parsed fine — it is not an HTML page,
+        # so the version heuristic (JSON-parse-failure only) must not apply. Report plainly.
+        t = make_transport({
+            ("GET", "/driver/ajax/code"): (200, {}, json.dumps({"id": 5, "version": 3, "source": "old"})),
+            ("POST", "/driver/ajax/update"): (200, {}, json.dumps("version mismatch")),
+        })
+        c = hubclient.HubClient("http://h:8080", t)
+        with self.assertRaises(hubclient.HubError) as ctx:
+            c.deploy("driver", "x", code_id=5)
+        self.assertNotIsInstance(ctx.exception, hubclient.DeployConflict)
 
     def test_create_without_new_id_raises(self):
         # A create that redirects somewhere without an editor id must not return {id: None}.

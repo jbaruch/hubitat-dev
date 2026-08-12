@@ -206,16 +206,31 @@ class HubClient:
             _PATHS[kind]["update"], {"id": plan["id"], "version": plan["version"], "source": source})
         # Confirm via the parsed JSON status field, exactly "success" — a substring match
         # would wrongly accept {"status":"unsuccessful"} or an HTML page mentioning "success".
-        # The hub's /ajax/update returns {"status":"success"}.
+        # The hub's /ajax/update returns {"status":"success"} on save.
         try:
-            confirmed = json.loads(text).get("status") == "success"
-        except (json.JSONDecodeError, AttributeError):
-            confirmed = False
-        if confirmed:
-            return {"action": "update", "id": plan["id"], "version": plan["version"]}
-        if "version" in text.lower():
-            raise DeployConflict(
-                f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "
-                f"version than {plan['version']}. Re-pull and reconcile before deploying.")
+            payload = json.loads(text)
+        except json.JSONDecodeError:
+            # Non-JSON response (an HTML page). This is the ONLY case the version heuristic runs
+            # in — the legacy tell for a stale-version rejection is the word "version" in the page.
+            # A parsed JSON body's echoed "version" field never reaches here, so a compile error
+            # (status "error" with the field) can no longer be misread as an optimistic-concurrency
+            # conflict. The genuine-conflict JSON shape is unconfirmed, so nothing is invented for it.
+            if "version" in text.lower():
+                raise DeployConflict(
+                    f"hub rejected the update for {kind} id={plan['id']} — the hub has a newer "
+                    f"version than {plan['version']}. Re-pull and reconcile before deploying.")
+            raise HubError(
+                f"update {kind} id={plan['id']} did not confirm success (HTTP {status}): {text[:200]}")
+        # Parsed JSON. A save returns {"status":"success"}; a rejection carries the reason in
+        # errorMessage. Surface that message verbatim — a Groovy compile error and a stale-version
+        # rejection both come back as status "error", and errorMessage is the only thing that tells
+        # them apart. A JSON body without an errorMessage (or a non-object JSON value) is reported
+        # plainly rather than guessed at — never as a conflict off the echoed "version" field.
+        if isinstance(payload, dict):
+            if payload.get("status") == "success":
+                return {"action": "update", "id": plan["id"], "version": plan["version"]}
+            message = payload.get("errorMessage")
+            if message:
+                raise HubError(f"hub rejected the save for {kind} id={plan['id']}: {message}")
         raise HubError(
             f"update {kind} id={plan['id']} did not confirm success (HTTP {status}): {text[:200]}")
