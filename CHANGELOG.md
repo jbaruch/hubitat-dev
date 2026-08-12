@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- **The hidden-`settings[<name>]` device-input shortcut was scoped to the wrong axis** (`skills/_reference/playwright-ui.md` gotcha 14, `rules/ui-automation.md`). It read as "optional inputs skip the picker," implying a first-fill of an optional input works. Measured on 2.5.1.140 (app 1294, optional `guards` input, freshly added), the write-the-hidden-value + Done was a **silent no-op** — no error, `settings[guards]` absent from `configure/json`, `updated()` never ran. The real gate is **empty-vs-filled, not optional-vs-required**: any input with no stored value renders `device-btn-empty` whatever its `required:` value, the hidden write does not flip that class, and Done then drops it (optional → silent no-op; required → "complete the required fields"). The shortcut is only for an already-filled input; a never-set one needs the `fill()` class flip or the real picker. The prior "14 single-plug zones" verification never exercised an empty optional input (all were edits or installs where `fill()` had already flipped the class), which is why the framing looked confirmed. Also documents the 3-click recovery (the picker pre-reads the hidden value on mount). Corrects #51. Closes #103.
+
 ## 0.1.59 — 2026-08-11
 
 ### Added

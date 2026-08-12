@@ -167,25 +167,38 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     comma-separated id list after (`"35,33,26,21,…"`). Cheapest possible check, and it catches
     gotcha 10 immediately. `.value` order is **selection order, not sorted** — compare as a set.
 
-14. **For an *optional* device input, skip the picker — write the hidden `settings[<name>]` value and let Done serialize it.**
+14. **The hidden-`settings[<name>]` write is a shortcut for an *already-filled* input — the gate is empty-vs-filled, not optional-vs-required.**
     Done (`button[name="_action_update"]`) serializes the form's hidden `input[name="settings[<name>]"]`
-    values over the websocket, so an optional device input needs no picker: set the hidden input's
-    `.value` to the device id (comma-separated for multi-select — the same string the picker writes) in
-    `browser_evaluate`, then a real `browser_click` on Done. This is **not** the synthetic-event trap
-    (gotchas 2, 4): you write the real commit-signal field (gotcha 13), the exact value the picker's own
-    Update writes and Done reads — not a faked event on an option.
+    values over the websocket, so an input that **already carries a value** needs no picker to edit it: set
+    the hidden input's `.value` to the device id (comma-separated for multi-select — the same string the
+    picker writes) in `browser_evaluate`, then a real `browser_click` on Done. This is **not** the
+    synthetic-event trap (gotchas 2, 4): you write the real commit-signal field (gotcha 13), the exact value
+    the picker's own Update writes and Done reads — not a faked event on an option.
 
     ```js
     // browser_evaluate — set the commit signal directly; Done already has a stable selector
     document.querySelector('input[name="settings[plug_565]"]').value = "1246"; // id list
     // then: browser_click(target: 'button[name="_action_update"]')   <- real click on Done (id=btnDone)
     ```
-    Collapses each optional-input wiring from ~9 tool calls to ~3 (navigate → one evaluate → one Done
-    click). **Optional only**: a `required: true` input still validates on Done via `device-btn-empty`
-    (gotcha 17), which this does not flip — a required-empty input stays rejected, so use the real picker
-    to reach `device-btn-filled` (or edit an already-filled one). Verify at the source, never the UI:
-    after Done, `configure/json/<appId>/<page>` shows `settings[plug_565] = {"1246":"<label>"}` and every
-    other hidden `settings[*]` untouched (verified 2.5.1.131, 14 single-plug zones).
+
+    **The gate is `device-btn-empty`, not `required:`.** An input with **no stored value** renders
+    `device-btn-empty` whatever its `required:` value, and that class alone is what Done gates on —
+    `required: false` does **not** exempt it. Writing the hidden value does **not** flip the class, so on a
+    never-set input the write is silently dropped: an empty **optional** input makes Done a **silent no-op**
+    (no error; `settings[<name>]` simply absent from `configure/json`, and `updated()` never runs), and an
+    empty **required** input rejects with "complete the required fields" (gotcha 17). The shortcut is for an
+    **already-filled** input of either kind; a never-set one needs the `fill()` class flip or the real
+    picker. The earlier "14 single-plug zones" verification were all edits or installs where `fill()` had
+    already flipped the button to `device-btn-filled` — none exercised an empty *optional* input, which is
+    why the optional-vs-required framing looked confirmed (measured: an optional `guards` input, freshly
+    added with no stored value, silent no-op on 2.5.1.140, 2026-08-11).
+
+    **Recovery is 3 clicks — the picker pre-reads the hidden value.** The failed write survives, and opening
+    the real picker shows the target devices already ticked (it reads the hidden input on mount): click the
+    "Click to set" trigger (coordinate, per gotcha 12) → **Update** → **Done**. After Update the class flips
+    to `device-btn-filled` and the value is rewritten in selection order (compare as a set, gotcha 13); after
+    Done, `configure/json/<appId>/<page>` shows `settings[<name>] = {"<id>":"<label>"}` and the new
+    subscription appears — positive evidence, not the absence of an error.
 
 15. **`submitOnChange` device inputs gate the sections below them.** A device input with
     `submitOnChange: true` re-renders its dependent sections only **after its picker's Update
