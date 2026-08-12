@@ -49,6 +49,13 @@ These pass the sandbox compiler and then misbehave at runtime. They are the bulk
 - Read it through a guarded helper that try/catches the read itself, falls back to `e?.response?.status`, and returns null when both are unreadable. Branch on a null status with a check that does not need it (compare `atomicState.authTokenExpires` to `now()`).
 - Observed on 2.5.1.125 and 2.5.1.128; not observed on 2.5.0.159. That is correlation across one hub, not a bisect — the introducing build is unconfirmed.
 
+## `cmdVersions()` understating a CC version throws on every frame
+
+- A `cmdVersions()` entry pinned **below** the device's real command-class version makes `zwave.parse()` throw a `GroovyCastException` on **every** frame of that class, not just the command you were guarding — a v4 Door Lock frame carries fields the v1 typed class declares as scalars. It compiles clean and silently stops the driver publishing.
+- The cast escapes `parse()` and kills every attribute downstream in that execution, the same escape-the-`catch` shape as `e.statusCode` above.
+- Read the real versions from the device — `versionCommandClassGet` per class, version `0` = unsupported — never hardcode a low version "to be safe".
+- On a zwaveJS-backend hub, sidestep the typed decoder entirely and read the JSON `parse()` payload directly (`rules/driver-lifecycle.md`).
+
 ## GString keys in `state[...]` are safe
 
 - `state["pending${zone}"] = true` is **not** a bug. The subscript operator normalizes the key to `String` on write, so the entry survives `state`'s JSON round-trip and a later GString lookup hits.

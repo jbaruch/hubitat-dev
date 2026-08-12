@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **The zwaveJS-backend `parse()` split reaches the driver layer** (`rules/driver-lifecycle.md`, `skills/_reference/endpoints.md`, `rules/groovy-gotchas.md`). On a zwaveJS hub a driver's `parse(String description)` receives a **decoded JSON value payload**, not the classic `zw device: …` string. Reading the JSON directly is richer (`prevValue` per attribute, the device's own `metadata.states` enum, values with no typed-class equivalent like `outsideHandlesCanOpenDoor`, already decoded) and immune to typed-class defects: `zwave.parse()` on that JSON is lossy and **throws a `GroovyCastException` on some command classes** (a Door Lock v4 handles-mode field arrives as a 4-element list where the typed class declares a `Short`), and the throw escapes `parse()`, killing every attribute downstream. Branch on `description?.trim()?.startsWith("{")`. New `groovy-gotchas` entry: a `cmdVersions()` value understating a device's real CC version turns **every** frame of that class into a thrown cast and compiles clean — read real versions via `versionCommandClassGet`, never hardcode a low version. Also notes that zwaveJS emits a frame only on value **change**, so a `…Get()` against an already-interviewed node produces nothing. Grounded one lock model, 2.5.1.135; cross-platform/CC stability unverified. Closes #92.
+
 ## 0.1.59 — 2026-08-11
 
 ### Added
