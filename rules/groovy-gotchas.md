@@ -51,10 +51,10 @@ These pass the sandbox compiler and then misbehave at runtime. They are the bulk
 
 ## `cmdVersions()` understating a CC version throws on every frame
 
-- A `cmdVersions()` entry pinned **below** the device's real command-class version makes `zwave.parse()` throw a `GroovyCastException` on **every** frame of that class, not just the command you were guarding — a v4 Door Lock frame carries fields the v1 typed class declares as scalars. It compiles clean and silently stops the driver publishing.
-- The cast escapes `parse()` and kills every attribute downstream in that execution, the same escape-the-`catch` shape as `e.statusCode` above.
+- A `cmdVersions()` entry pinned **below** the device's real command-class version makes `zwave.parse()` throw a `GroovyCastException` on **every** frame of that class, not just the command you were guarding. It compiles clean and silently stops the driver publishing.
+- The cast escapes `parse()` and kills every attribute downstream in that execution (same escape-the-`catch` shape as `e.statusCode` above).
 - Read the real versions from the device — `versionCommandClassGet` per class, version `0` = unsupported — never hardcode a low version "to be safe".
-- On a zwaveJS-backend hub, sidestep the typed decoder entirely and read the JSON `parse()` payload directly (`rules/driver-lifecycle.md`).
+- On a zwaveJS-backend hub the JSON `parse()` payload sidesteps this (`rules/driver-lifecycle.md`).
 
 ## GString keys in `state[...]` are safe
 

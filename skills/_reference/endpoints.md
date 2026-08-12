@@ -325,7 +325,7 @@ Field meanings and the LR-vs-mesh remediation split: `rules/zwave-zigbee-mesh.md
   {"propertyName":"outsideHandlesCanOpenDoor","value":[false,false,false,false]}]}
 ```
 
-Each value carries `prevValue`, often `metadata.states` (the device's own enum), and may hold fields with no typed-class equivalent — already decoded. `zwave.parse()` accepts it but is lossy and **throws on some command classes** (`rules/groovy-gotchas.md`), so read the JSON directly. Grounded one lock model, 2.5.1.135; payload stability across platform version and command class is unverified.
+Most values carry `prevValue`, often `metadata.states` (the device's own enum), and some hold fields with no typed-class equivalent — already decoded. `zwave.parse()` accepts it but is lossy and **throws on some command classes** (`rules/groovy-gotchas.md`), so read the JSON directly. Grounded one lock model, 2.5.1.135; payload stability across platform version and command class is unverified.
 
 ## Hub management (official — token API)
 
