@@ -1,5 +1,12 @@
 # Changelog
 
+### Changed
+
+- **Qualified two Z-Wave mesh signals that a platform shift invalidated, and recorded one unverified neighbour-table observation** (`rules/zwave-zigbee-mesh.md`, `skills/mesh-health/SKILL.md`, `skills/_reference/endpoints.md`). Closes #96, #95.
+  - **`per` is not corroborated by the wire on zwaveJS / 2.5.1.140** — it decreased across a session (a cumulative count cannot) and rose +12 over 12 messages the radio log reported as transmit-OK, single-attempt, zero-retry. Don't rank a node on `per` alone; confirm against the transmit log, and treat `packet_errors[]` as a lead, not a verdict. (#96)
+  - **`hub_radiolog --summary` emitted no `transmit_report` on 2.5.1.140** — the raw transmit lines carried `ACK RSSI` only, no noise floor, so the hub-receiver-vs-device split could not be run there. Confirm `transmit_report` is present before relying on it; the fields that are present still separate a real drop from a slow S2/FLiRS exchange. (#96)
+  - **Observed once (n=1, unconfirmed): a `zwaveRepair2` rebuild may rebuild routes without refreshing neighbour tables; a hub reboot did.** A newly added repeater with high `hears` but near-zero `heard by` (`/hub/zwaveTopology`) is an unpropagated neighbour table, not a placement fault. Recorded with an explicit "not established" caveat — one hub, one evening, reboot confounded with a 2.5.1.134 → 2.5.1.140 update — per the reporter's request to hold for a second grounding. (#95)
+
 ## 0.1.59 — 2026-08-11
 
 ### Added
