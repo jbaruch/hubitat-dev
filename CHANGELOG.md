@@ -1,5 +1,14 @@
 # Changelog
 
+### Fixed
+
+- **`runmethod` args must be typed objects, not bare values** (`skills/_reference/endpoints.md`). Corrects #50 Finding 2. A parameterized command takes `args:[{"type":"ENUM","value":"3.0"}]` — the entry's `type` matches `fullJson.commands[].parameters[].type` (ENUM parameters also carry `constraints`). A bare `["3.0"]` or `[3.0]`, and form-urlencoded, all 500 **before dispatch**, so the driver logs nothing — indistinguishable from the platform not supporting parameterized commands, which is why an earlier read wrongly concluded `runmethod` was no-arg-only. Measured on `setDetectionDistance(ENUM)`, 2.5.1.140. Closes #97.
+
+### Added
+
+- **`POST /device/preference/save` — driver preferences over HTTP** (`skills/_reference/endpoints.md`). `/device/update` covers the device field set but not driver preferences; those have their own endpoint (`{deviceId, defaultCurrentState, commandRetry, showOnHome, preferences:[{name,type,value}]}`). Documents the **driver-swap stale-preference trap**: a swapped device keeps colliding preference names, and an out-of-range leftover (a TS0225 carrying `luxThreshold = -1` into a `0..999` driver) silently publishes only `motion` with none of its radar attributes until an in-range preferences save restores them — `configure()`/`refresh()` do not. Plus the PrimeVue Preferences-tab capture gotcha. Verified 2.5.1.140.
+- **`createchild`/`create` instance creation is three-way, not two-way** (`skills/_reference/endpoints.md`). Corrects the "persists only on Done, discarded on Cancel" framing from #89. The instance row is created **server-side by the GET itself**; **Done** keeps it, **Cancel** discards it, and **abandoning** the page (navigate away / fresh tab) leaves an empty orphan under the parent. Cancel is the only discard; clean orphans with the `_action_remove` POST. Closes #89.
+
 ## 0.1.59 — 2026-08-11
 
 ### Added
