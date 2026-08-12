@@ -75,14 +75,14 @@ Proceed to Step 5.
 ## Step 5 — Read the warnings and rankings against the rule
 
 Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
-- `zwave.packet_errors[]` — nonzero PER (cumulative error count); weigh against the node's `msgCount` and its peers, not an absolute number. **On zwaveJS / 2.5.1.140 `per` was not corroborated by the transmit log — it decreased across a session and rose on zero-retry OK bursts — so confirm against the wire (Step 6) before ranking a node on it (`rules/zwave-zigbee-mesh.md`).**
+- `zwave.packet_errors[]` — nonzero PER (cumulative error count); weigh against the node's `msgCount` and its peers, not an absolute number. On the zwaveJS backend `per` is not reliably corroborated by the wire; confirm against the transmit log (Step 6) before ranking a node on it (`rules/zwave-zigbee-mesh.md`).
 - `zwave.ranked.by_rtt_ms` / `by_rssi` — worst-first. **Check `zwave.backend` first**: `lwrRssi` is absolute dBm under `zwavejs` and dB-above-noise under `legacy` — the same number means different things.
 - `zwave.weak_signal_heuristic[]` — backend-aware RSSI-near-floor flags; each carries `heuristic:true` and a cited `basis`. Present as a hint, not a fact.
 - Z-Wave `listening:true` marks an always-on classic-mesh node that can repeat.
 - `beaming` means the device requires beam wake-up, not that it beams for others.
 - The JSON `beaming` value is unreliable on the grounded build. Never use it to select a repeater.
 - `zwave.route_fan_in` — how many nodes route through each repeater (`rules/zwave-zigbee-mesh.md` Route fan-in). `repeaters[]` is topology, **not a fault list**: a repeater carrying 12 nodes is a normal mesh and needs no remedy. Read `load_bearing_concerns[]` — a repeater that is itself never-heard/FAILED/weak, ranked by how many nodes sit behind it. Quote its `dependent_count` as the **scope** of the warning that node already carries in `never_heard[]`/`failed[]`, never as extra findings. Check the dependents' freshness first: a node reporting behind a flagged repeater proves that repeater still relays.
-- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair, and a **sleepy battery node** has no per-node "Rebuild route" even then — only a global rebuild reaches it, on its next wake, so a repeater near it is the durable fix, not a repair click. **A newly added repeater with high `hears` but near-zero `heard by` (`/hub/zwaveTopology`) is an unpropagated neighbour table, not a signal problem — observed once (n=1, reboot/version confounded): rebuilds did not refresh neighbours where a hub reboot did.** Read `heard by` before calling a fresh repeater badly placed (`rules/zwave-zigbee-mesh.md`).
+- **Check each node's `topology` before advising a fix.** `lr` nodes are a star — no neighbors, no routes, **no repeaters or Z-Wave repair**. For an *unreliable `lr` device at distance*, present the tradeoff (improve the direct link — hub antenna/placement/LR-channel — vs. re-include as classic mesh for repeater routing at the cost of mesh flakiness); **do not default to mesh — many networks find LR more reliable** (`rules/zwave-zigbee-mesh.md`). Only `mesh` nodes take repeaters/repair, and a **sleepy battery node** has no per-node "Rebuild route" even then — only a global rebuild reaches it, on its next wake, so a repeater near it is the durable fix, not a repair click. **A newly added repeater with high `hears` but near-zero `heard by` (`/hub/zwaveTopology`) is a hypothesis to verify, not a verdict** — possibly an unpropagated neighbour table rather than a signal problem. Read `heard by` and corroborate before calling a fresh repeater badly placed (unverified, n=1; `rules/zwave-zigbee-mesh.md`).
 - `zigbee.incomplete_joins[]` — the generic `"Device"` / `"Device"` unfinished-join signature.
 - `zigbee.stalest` ranks real activity age. It is the place long-dead `active:true` devices surface.
 
@@ -106,12 +106,11 @@ For a Z-Wave device that is slow or **flapping**, operate it while capturing and
 worse or spikier than the device's, the hub's receiver is the bottleneck, from its RF environment
 rather than the device or distance. Get the hub's receiver out of that noise by relocating the hub,
 fitting an external antenna, or separating co-located 900 MHz hubs. Do not touch the device. See
-`skills/_reference/zwave-lifecycle.md` (TransmitReport). **`transmit_report` may be absent on 2.5.1.140**
-— the raw transmit lines carried `ACK RSSI` only, no noise floor, so `hub_snr`/`dest_snr` could not be
-parsed and this hub-receiver split could not be run there. If the rollup has no `transmit_report`, report
-the noise-floor question as unmeasurable on this build rather than a hub-receiver verdict; the present
-fields (`transmit status`, `routing attempts`, `route speed`, `took`) still separate a real drop from a
-slow S2/FLiRS exchange (`rules/zwave-zigbee-mesh.md`).
+`skills/_reference/zwave-lifecycle.md` (TransmitReport). **`transmit_report` may be absent**
+(observed 2.5.1.140). If the rollup has no `transmit_report`, report the noise-floor question as
+unmeasurable rather than a hub-receiver verdict; the present fields (`transmit status`, `routing
+attempts`, `route speed`, `took`) still separate a real drop from a slow S2/FLiRS exchange
+(`rules/zwave-zigbee-mesh.md`).
 `--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
 worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
 `lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read
