@@ -1,5 +1,12 @@
 # Changelog
 
+### Changed
+
+- **Folded two deferred `context-writing-style` advisories from the #91 and #101 reviews** (`rules/app-lifecycle.md`, `skills/debug/SKILL.md`). Presentation-only, no behavior change. Closes #99, #102.
+  - `rules/app-lifecycle.md` `menu`-vs-`category` bullet dropped its named worked example (moved here): `Vacation Lighting Director` ships as `category: "Safety & Security"` but `menu: "Apps"`, so setting only `category` still leaves the app filed under `Apps` — the rule keeps the general directive alone.
+  - `rules/app-lifecycle.md` `menu`-lint bullet dropped its grounding-and-uncertainty prose (moved here): the three observed `menu` values (`Apps`, `Automations`, `Integrations`) are grounded on one hub / one platform version (C-8 Pro, 2.5.1.135), and whether that set is fixed across versions or what an invalid string does is unverified — which is why `lint-review` warns only on an absent `menu`, never on an unrecognized value. The rule now states that contract directly.
+  - `skills/debug/SKILL.md` Step 1 dropped the em-dash-appended justification clause "— no log tail will show it" from the network-path-failure directive, keeping the instruction to rule out the network path before tailing logs.
+
 ## 0.1.59 — 2026-08-11
 
 ### Added
