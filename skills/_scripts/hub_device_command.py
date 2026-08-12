@@ -5,14 +5,16 @@ surface, execute over the undocumented runmethod endpoint, and verify by observa
 Grounded live on 2.5.1.134–135 (C-8 Pro, Hub Security off — see ../_reference/endpoints.md):
 
     GET  /device/fullJson/<id>   -> {device:{currentStates[...]}, commands:[...], ...}
-    POST /device/runmethod       {"id":<id>,"method":"<cmd>","args":[...]}  -> {"success":<bool>,"message":<str|null>}
+    POST /device/runmethod       {"id":<id>,"method":"<cmd>","args":[{"type":"<T>","value":<v>}]}
+                                 -> {"success":<bool>,"message":<str|null>}
 
 The command surface is `commands[]` from fullJson — each `{name, parameters:[{type, defaultValue}],
 arguments, relatedAttribute, capability:<bool>}`. It is authoritative and includes driver custom
 commands (`capability:false`) that inferring from the declared capability would miss. This script
 validates the requested command against that list (rejecting an unknown name with the valid set) and
-coerces each argument to its declared `parameters[].type` before sending — `setZoneWaterTime` takes a
-number, and a string would fail oddly.
+coerces each argument into the runmethod typed-object form `{"type": <declared type>, "value": <coerced>}`
+before sending. The hub's runmethod parser **requires** typed objects — a bare value 500s before
+dispatch, logging nothing (../_reference/endpoints.md). A no-arg command sends `args:[]`.
 
 **A runmethod return code is not evidence the command executed.** The hub answers `{"success":true}`
 when the Groovy method is *dispatched*, not when the device moved — a method that throws, or a command
@@ -115,15 +117,19 @@ def parameter_types(command: dict) -> list:
 
 
 def coerce_args(command: dict, raw_args: list) -> list:
-    """Pure. Map positional CLI args onto the command's parameter types and coerce each. More args
-    than declared parameters is an error (the command does not take them); an arg past the declared
-    list with no type would be an ambiguous send."""
+    """Pure. Map positional CLI args onto the command's parameter types and coerce each into the
+    runmethod **typed-object** form `{"type": <declared type>, "value": <coerced value>}`. The hub's
+    runmethod parser requires typed objects — a bare value 500s before dispatch, logging nothing
+    (../_reference/endpoints.md). More args than declared parameters is an error (the command does not
+    take them). The `{type, value}` shape is verified for ENUM (2.5.1.140); NUMBER/DECIMAL keep the
+    same wrapper with a coerced numeric `value`, pending live confirmation."""
     types = parameter_types(command)
     if len(raw_args) > len(types):
         name = command.get("name")
         raise HubError(
             f"command {name!r} takes {len(types)} argument(s), got {len(raw_args)}: {raw_args!r}")
-    return [coerce_arg(value, types[i] if i < len(types) else None) for i, value in enumerate(raw_args)]
+    return [{"type": types[i], "value": coerce_arg(value, types[i])}
+            for i, value in enumerate(raw_args)]
 
 
 def current_states(full: dict) -> dict:

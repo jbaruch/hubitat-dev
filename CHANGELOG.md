@@ -2,7 +2,7 @@
 
 ### Fixed
 
-- **`runmethod` args must be typed objects, not bare values** (`skills/_reference/endpoints.md`). Corrects #50 Finding 2. A parameterized command takes `args:[{"type":"ENUM","value":"3.0"}]` — the entry's `type` matches `fullJson.commands[].parameters[].type` (ENUM parameters also carry `constraints`). A bare `["3.0"]` or `[3.0]`, and form-urlencoded, all 500 **before dispatch**, so the driver logs nothing — indistinguishable from the platform not supporting parameterized commands, which is why an earlier read wrongly concluded `runmethod` was no-arg-only. Measured on `setDetectionDistance(ENUM)`, 2.5.1.140. Closes #97.
+- **`runmethod` args must be typed objects, not bare values** (`skills/_reference/endpoints.md`, `skills/_scripts/hub_device_command.py` + tests). Corrects #50 Finding 2. `args` is an ordered array, one `{"type","value"}` per parameter (`setDetectionDistance` → `[{"type":"ENUM","value":"3.0"}]`); the `type` matches `fullJson.commands[].parameters[].type`. A bare `["3.0"]` or `[3.0]`, and form-urlencoded, all 500 **before dispatch**, so the driver logs nothing — indistinguishable from the platform not supporting parameterized commands, which is why an earlier read wrongly concluded `runmethod` was no-arg-only. `hub_device_command.py`'s `coerce_args` now emits the typed-object form (it previously sent bare values, so every parameterized `device-command`/`device-sequence` invocation 500'd); no-arg commands are unaffected. Measured on `setDetectionDistance(ENUM)`, 2.5.1.140. Closes #97.
 
 ### Added
 
