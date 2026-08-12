@@ -96,17 +96,25 @@ class TestArgCoercion(unittest.TestCase):
         with self.assertRaises(HubError):
             m.coerce_arg("high", "NUMBER")
 
-    def test_coerce_args_maps_positional_types(self):
+    def test_coerce_args_emits_typed_objects(self):
+        # runmethod requires typed objects {type, value}; a bare value 500s before dispatch.
         command = cmd("setLevel", params=["NUMBER", "NUMBER"])
-        self.assertEqual(m.coerce_args(command, ["40", "5"]), [40, 5])
+        self.assertEqual(m.coerce_args(command, ["40", "5"]),
+                         [{"type": "NUMBER", "value": 40}, {"type": "NUMBER", "value": 5}])
+
+    def test_coerce_args_enum_value_is_a_string(self):
+        # the verified case (2.5.1.140): an ENUM arg rides as {"type":"ENUM","value":"3.0"}.
+        command = cmd("setDetectionDistance", params=["ENUM"])
+        self.assertEqual(m.coerce_args(command, ["3.0"]), [{"type": "ENUM", "value": "3.0"}])
 
     def test_too_many_args_raises(self):
         with self.assertRaises(HubError):
             m.coerce_args(cmd("on"), ["40"])
 
-    def test_extra_untyped_arg_is_string(self):
-        # a command declaring one param, given one arg, coerces that one; count guard covers overflow
-        self.assertEqual(m.coerce_args(cmd("setZoneWaterTime", params=["NUMBER"]), ["10"]), [10])
+    def test_single_typed_arg(self):
+        # a command declaring one param, given one arg, wraps that one; count guard covers overflow
+        self.assertEqual(m.coerce_args(cmd("setZoneWaterTime", params=["NUMBER"]), ["10"]),
+                         [{"type": "NUMBER", "value": 10}])
 
 
 class TestCurrentStates(unittest.TestCase):
@@ -159,11 +167,12 @@ class TestRunmethodResponse(unittest.TestCase):
 class TestRunMethodTransport(unittest.TestCase):
     def test_posts_json_body_with_content_type(self):
         t = FakeTransport({("POST", "/device/runmethod"): (200, '{"success":true,"message":null}')})
-        out = m.run_method("http://h:8080", 1639, "setLevel", [40, 5], t)
+        args = [{"type": "NUMBER", "value": 40}, {"type": "NUMBER", "value": 5}]
+        out = m.run_method("http://h:8080", 1639, "setLevel", args, t)
         self.assertTrue(out["success"])
         call = t.calls[0]
         self.assertEqual(call["content_type"], "application/json")
-        self.assertEqual(json.loads(call["body"]), {"id": 1639, "method": "setLevel", "args": [40, 5]})
+        self.assertEqual(json.loads(call["body"]), {"id": 1639, "method": "setLevel", "args": args})
 
     def test_non_200_raises(self):
         t = FakeTransport({("POST", "/device/runmethod"): (404, "")})

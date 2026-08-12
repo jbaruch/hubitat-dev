@@ -167,25 +167,39 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     comma-separated id list after (`"35,33,26,21,…"`). Cheapest possible check, and it catches
     gotcha 10 immediately. `.value` order is **selection order, not sorted** — compare as a set.
 
-14. **For an *optional* device input, skip the picker — write the hidden `settings[<name>]` value and let Done serialize it.**
+14. **The hidden-`settings[<name>]` write is a shortcut for an *already-filled* input — the gate is empty-vs-filled, not optional-vs-required.**
     Done (`button[name="_action_update"]`) serializes the form's hidden `input[name="settings[<name>]"]`
-    values over the websocket, so an optional device input needs no picker: set the hidden input's
-    `.value` to the device id (comma-separated for multi-select — the same string the picker writes) in
-    `browser_evaluate`, then a real `browser_click` on Done. This is **not** the synthetic-event trap
-    (gotchas 2, 4): you write the real commit-signal field (gotcha 13), the exact value the picker's own
-    Update writes and Done reads — not a faked event on an option.
+    values over the websocket, so an input that **already carries a value** needs no picker to edit it: set
+    the hidden input's `.value` to the device id (comma-separated for multi-select — the same string the
+    picker writes) in `browser_evaluate`, then a real `browser_click` on Done. This is **not** the
+    synthetic-event trap (gotchas 2, 4): you write the real commit-signal field (gotcha 13), the exact value
+    the picker's own Update writes and Done reads — not a faked event on an option.
 
     ```js
     // browser_evaluate — set the commit signal directly; Done already has a stable selector
     document.querySelector('input[name="settings[plug_565]"]').value = "1246"; // id list
     // then: browser_click(target: 'button[name="_action_update"]')   <- real click on Done (id=btnDone)
     ```
-    Collapses each optional-input wiring from ~9 tool calls to ~3 (navigate → one evaluate → one Done
-    click). **Optional only**: a `required: true` input still validates on Done via `device-btn-empty`
-    (gotcha 17), which this does not flip — a required-empty input stays rejected, so use the real picker
-    to reach `device-btn-filled` (or edit an already-filled one). Verify at the source, never the UI:
-    after Done, `configure/json/<appId>/<page>` shows `settings[plug_565] = {"1246":"<label>"}` and every
-    other hidden `settings[*]` untouched (verified 2.5.1.131, 14 single-plug zones).
+
+    **The gate is `device-btn-empty`, not `required:`.** An input with **no stored value** renders
+    `device-btn-empty` whatever its `required:` value, and that class alone is what Done gates on —
+    `required: false` does **not** exempt it. Writing the hidden value does **not** flip the class, so on a
+    never-set input the write is silently dropped: an empty **optional** input makes Done a **silent no-op**
+    (no error; `settings[<name>]` simply absent from `configure/json`, and `updated()` never runs), and an
+    empty **required** input rejects with "complete the required fields" (gotcha 17). The shortcut is for an
+    **already-filled** input of either kind (see gotcha 24 for the reconciliation with the earlier
+    "author it `required: false`" note); a never-set one needs the `fill()` class flip or the real
+    picker. The earlier "14 single-plug zones" verification runs were all edits or installs where `fill()`
+    had already flipped the button to `device-btn-filled` — none exercised an empty *optional* input, which
+    is why the optional-vs-required framing looked confirmed (measured: an optional `guards` input, freshly
+    added with no stored value, silent no-op on 2.5.1.140, 2026-08-11).
+
+    **Recovery is 3 clicks — the picker pre-reads the hidden value.** The failed write survives, and opening
+    the real picker shows the target devices already ticked (it reads the hidden input on mount): click the
+    "Click to set" trigger (coordinate, per gotcha 12) → **Update** → **Done**. After Update the class flips
+    to `device-btn-filled` and the value is rewritten in selection order (compare as a set, gotcha 13); after
+    Done, `configure/json/<appId>/<page>` shows `settings[<name>] = {"<id>":"<label>"}` and the new
+    subscription appears — positive evidence, not the absence of an error.
 
 15. **`submitOnChange` device inputs gate the sections below them.** A device input with
     `submitOnChange: true` re-renders its dependent sections only **after its picker's Update
@@ -213,7 +227,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     swap, add the new device before removing the old** — the input never goes empty, stays
     `device-btn-filled`, and the trap never fires. This is the biggest limiter here: automated app
     *install* (empty required input) is unreliable while *edits* are fine (verified 2.5.1.131). If you
-    author the app, declaring the input `required: false` sidesteps this entirely (gotcha 24).
+    author the app, declaring the input `required: false` sidesteps this rejection — populating it still
+    needs the picker or a `fill()` flip (gotcha 24).
     **Picker/build-scoped:** this empty→filled failure is specific to the picker you are on — reproduced
     on the 2.5.1.131 re-point picker, the inline-Vue picker (gotcha 26), and the RM Custom Action
     required device picker (2.5.1.134, gotcha 34), but **not** on the classic
@@ -287,12 +302,17 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
       (`statusJson`/`fullJson`), not the returned url.
 
 24. **To make an app scriptably installable, author its device inputs `required: false` — it sidesteps
-    gotcha 17.** Gotcha 17's empty→filled trap blocks a scripted install of any app with a *required*
-    device input. An **optional** device input clears Done validation under automation, and the picker's
-    populated hidden-input value still persists on Done even while the button stays `device-btn-empty`
-    (verified: the instance saved all members and created its child device). A member-less instance is
-    then harmless and inert. This does not rescue a third-party app whose input is already required —
-    there it stays gotcha 17 (verified 2.5.1.131).
+    gotcha 17's *rejection*, not the empty→filled gate.** Gotcha 17's empty→filled trap blocks a scripted
+    install of any app with a *required* device input. An **optional** device input clears Done validation
+    under automation — Done does not reject a member-less instance, which is then harmless and inert. But
+    *populating* that input still needs the real picker or a `fill()` class flip: a bare hidden-value write
+    on a never-set input is silently dropped, whatever its `required:` value (gotcha 14, the empty-vs-filled
+    contract). **Version conflict, unreconciled:** a 2.5.1.131 run recorded the populated hidden value
+    persisting on Done while the button stayed `device-btn-empty` (the instance saved all members and
+    created its child device); a 2.5.1.140 run (gotcha 14) recorded the opposite — a bare hidden write on
+    an empty optional input was a silent no-op. Treat the empty-vs-filled contract as current and confirm
+    the flip per input rather than assuming persistence. This does not rescue a third-party app whose input
+    is already required — there it stays gotcha 17.
 
 25. **Swap a device's driver in place — it keeps the id, DNI, and every app reference.** Changing an
     existing device's Type re-points nothing: consumers (Room Lighting, Device Activity Check, Rule
