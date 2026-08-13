@@ -124,6 +124,113 @@ class TestTransmitReport(unittest.TestCase):
         self.assertNotIn("transmit", f)
 
 
+# Captured live on 2.5.1.151 / zwaveJS 15.26.0 (C-8 Pro, region USLR): the controller's own
+# GetBackgroundRSSI poll and the raw serial response it answers with. The response line carries no
+# field name — only the hex blob — which is why the decode keys on the bytes.
+BGRSSI_REQ = "» [REQ] [GetBackgroundRSSI]"
+BGRSSI_RES = "« 0x0107013ba0a2a2a5c7 (9 bytes)"
+
+
+def bg_line(channel_bytes) -> str:
+    """Build a GetBackgroundRSSI response line around the given channel bytes, computing the
+    Z-Wave serial checksum here rather than importing the module's, so a synthetic frame is not
+    validated by the same code under test. BGRSSI_RES is the real-hub anchor for that code."""
+    body = bytes([len(channel_bytes) + 3, 0x01, 0x3B, *channel_bytes])
+    chk = 0xFF
+    for b in body:
+        chk ^= b
+    return f"« 0x{bytes([0x01, *body, chk]).hex()} ({len(body) + 2} bytes)"
+
+
+class TestBackgroundRssi(unittest.TestCase):
+    def test_grounded_frame_decodes_to_signed_dbm(self):
+        bg = m.parse_background_rssi(BGRSSI_RES)
+        self.assertIsNotNone(bg)
+        assert bg is not None
+        self.assertEqual(bg["channels"], [-96, -94, -94, -91])  # 0xa0/0xa2/0xa2/0xa5
+        self.assertEqual(bg["status"], ["ok"] * 4)
+
+    def test_channel_count_comes_from_the_frame(self):
+        bg = m.parse_background_rssi(bg_line([0xa0, 0xa4]))
+        assert bg is not None
+        self.assertEqual(bg["channels"], [-96, -92])
+
+    def test_sentinels_are_status_not_readings(self):
+        # 127 not available, 126 saturated, 125 no signal, 0x80 this platform's "not measured"
+        bg = m.parse_background_rssi(bg_line([0x7F, 0x7E, 0x7D, 0x80]))
+        assert bg is not None
+        self.assertEqual(bg["channels"], [None, None, None, None])
+        self.assertEqual(bg["status"],
+                         ["not_available", "saturated", "no_signal_detected", "not_measured"])
+
+    def test_implausible_dbm_is_not_reported_as_a_reading(self):
+        bg = m.parse_background_rssi(bg_line([0x0A, 0xa0]))  # +10 dBm is not a noise floor
+        assert bg is not None
+        self.assertEqual(bg["channels"], [None, -96])
+        self.assertEqual(bg["status"], ["out_of_range", "ok"])
+
+    def test_bad_checksum_rejected(self):
+        self.assertIsNone(m.parse_background_rssi("« 0x0107013ba0a2a2a5ff (9 bytes)"))
+
+    def test_other_function_id_rejected(self):
+        # same length and a valid checksum, but function id 0x3A is not GetBackgroundRSSI
+        line = bg_line([0xa0, 0xa2, 0xa2, 0xa5]).replace("013b", "013a")
+        self.assertIsNone(m.parse_background_rssi(line))
+
+    def test_request_frame_type_rejected(self):
+        # the outgoing REQ carries frame type 0x00; only the RES (0x01) holds measurements
+        self.assertIsNone(m.parse_background_rssi("« 0x0107003ba0a2a2a5c6 (9 bytes)"))
+
+    def test_length_byte_mismatch_rejected(self):
+        self.assertIsNone(m.parse_background_rssi("« 0x0108013ba0a2a2a5c8 (9 bytes)"))
+
+    def test_non_serial_line_is_none(self):
+        self.assertIsNone(m.parse_background_rssi(BGRSSI_REQ))
+        self.assertIsNone(m.parse_background_rssi(TXREPORT))
+
+    def test_frame_gets_background_rssi_subdict(self):
+        f = m.parse_zwave_frame({"sourceLabel": "SERIAL", "plainTextMessage": BGRSSI_RES, "time": "t"})
+        self.assertEqual(f["background_rssi"]["channels"], [-96, -94, -94, -91])
+
+    def test_ordinary_frame_has_no_background_rssi(self):
+        self.assertNotIn("background_rssi", m.parse_zwave_frame(ZW_RAW))
+
+
+class TestBackgroundRssiSummary(unittest.TestCase):
+    def _frames(self, lines):
+        return [m.parse_zwave_frame({"sourceLabel": "SERIAL", "plainTextMessage": t, "time": "t"})
+                for t in lines]
+
+    def test_per_channel_min_mean_max(self):
+        s = m.summarize(self._frames([bg_line([0xa0, 0xa2, 0xa2, 0xa5]),    # -96 -94 -94 -91
+                                      bg_line([0xa2, 0xa2, 0xa2, 0xa7])]))  # -94 -94 -94 -89
+        ch = s["background_rssi"]["channels"]
+        self.assertEqual(s["background_rssi"]["samples"], 2)
+        self.assertEqual((ch[0]["min"], ch[0]["mean"], ch[0]["max"], ch[0]["n"]), (-96, -95.0, -94, 2))
+        self.assertEqual((ch[3]["min"], ch[3]["mean"], ch[3]["max"]), (-91, -90.0, -89))
+
+    def test_poll_yield_is_reported(self):
+        # the controller answers only some of its own polls — the ratio is the finding
+        s = m.summarize(self._frames([BGRSSI_REQ, BGRSSI_REQ, BGRSSI_REQ, BGRSSI_RES]))
+        self.assertEqual((s["background_rssi"]["polls"], s["background_rssi"]["samples"]), (3, 1))
+
+    def test_polls_with_no_samples_still_reported(self):
+        # a busy radio (rebuild running) answers nothing — that must read as "radio busy",
+        # not as a missing key that reads as "this hub does not support the measurement"
+        s = m.summarize(self._frames([BGRSSI_REQ, BGRSSI_REQ]))
+        self.assertEqual((s["background_rssi"]["polls"], s["background_rssi"]["samples"]), (2, 0))
+        self.assertEqual(s["background_rssi"]["channels"], [])
+
+    def test_sentinel_channel_excluded_from_stats(self):
+        s = m.summarize(self._frames([bg_line([0x80, 0xa2]), bg_line([0x80, 0xa4])]))
+        ch = s["background_rssi"]["channels"]
+        self.assertEqual((ch[0]["n"], ch[0]["mean"]), (0, None))  # never measured -> no stat
+        self.assertEqual((ch[1]["n"], ch[1]["mean"]), (2, -93.0))
+
+    def test_absent_when_no_polls_and_no_samples(self):
+        self.assertNotIn("background_rssi", m.summarize([m.parse_zwave_frame(ZW_RAW)]))
+
+
 class TestRssiSentinel(unittest.TestCase):
     def test_positive_dbm_dropped_zwave(self):
         f = m.parse_zwave_frame({"sourceLabel": "DRIVER",
