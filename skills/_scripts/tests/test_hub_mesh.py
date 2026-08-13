@@ -26,10 +26,15 @@ NOW = datetime(2026, 7, 15, 18, 0, 0, tzinfo=timezone.utc)
 def zw_node(**kw):
     base = {"nodeId": 10, "deviceId": 100, "deviceName": "Dev", "nodeState": "OK",
             "per": 0, "averageRtt": "30.0", "lwrRssi": "-50db", "neighbors": 5,
-            "routeChanges": 0, "route": "01 -> 0A", "security": "S2_Authenticated",
+            "routeChanges": 0, "security": "S2_Authenticated",
             "listening": True, "beaming": False,
             "lastTime": "2026-07-15T17:00:00+0000"}
     base.update(kw)
+    # The default route is this node's own DIRECT route, derived from its id. A fixed literal
+    # made every node claim a path terminating at node 0x0A whatever its own id — the same drift
+    # PR #94 fixed in the eval fixture, and it now reads as an incoherent route rather than as a
+    # direct one. Tests that care about repeaters pass `route=` explicitly.
+    base.setdefault("route", f"01 -> {base['nodeId']:02X}")
     return base
 
 
@@ -142,18 +147,19 @@ class TestAnalyzeZwave(unittest.TestCase):
                           zwavejs=True)
         r = m.analyze_zwave(d, NOW)
         self.assertEqual(r["backend"], "zwavejs")
-        self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rssi"]], [2, 1])  # -90 worst
+        self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rssi_direct"]], [2, 1])  # -90 worst
 
     def test_legacy_rssi_ranking_lowest_above_noise_worst(self):
         d = zwave_details([zw_node(nodeId=1, lwrRssi="30dB"), zw_node(nodeId=2, lwrRssi="5dB")],
                           zwavejs=False)
         r = m.analyze_zwave(d, NOW)
         self.assertEqual(r["backend"], "legacy")
-        self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rssi"]], [2, 1])  # 5 (near noise) worst
+        # 5 (near noise) worst
+        self.assertEqual([n["nodeId"] for n in r["ranked"]["by_rssi_direct"]], [2, 1])
 
     def test_listening_and_beaming_are_surfaced_raw(self):
         d = zwave_details([zw_node(listening=False, beaming=True)])
-        node = m.analyze_zwave(d, NOW)["ranked"]["by_rssi"][0]
+        node = m.analyze_zwave(d, NOW)["ranked"]["by_rssi_direct"][0]
         self.assertFalse(node["listening"])
         self.assertTrue(node["beaming"])
 
@@ -229,7 +235,8 @@ class TestTopology(unittest.TestCase):
 
     def test_topology_surfaced_on_analyzed_nodes(self):
         d = zwave_details([zw_node(nodeId=268), zw_node(nodeId=100)])
-        nodes = {n["nodeId"]: n["topology"] for n in m.analyze_zwave(d, NOW)["ranked"]["by_rssi"]}
+        ranked = m.analyze_zwave(d, NOW)["ranked"]["by_rssi_direct"]
+        nodes = {n["nodeId"]: n["topology"] for n in ranked}
         self.assertEqual(nodes[268], "lr")
         self.assertEqual(nodes[100], "mesh")
 
@@ -609,6 +616,74 @@ class TestParseRoute(unittest.TestCase):
     def test_speed_suffix_is_stripped_only_from_something_route_shaped(self):
         # Without the '->' guard this parses to [1] — a one-hop list that reads as a route.
         self.assertIsNone(m.parse_route("01 100kbps"))
+
+
+class TestRouteHopCount(unittest.TestCase):
+    """`hops` is what says whether a node's lwrRssi is its own link or a repeater's."""
+
+    def test_direct_route_is_zero_hops(self):
+        self.assertEqual(m.route_hop_count("01 -> 0A", 10), 0)
+
+    def test_each_intermediate_is_one_hop(self):
+        self.assertEqual(m.route_hop_count("01 -> 07 -> 0A", 10), 1)
+        self.assertEqual(m.route_hop_count("01 -> 07 -> 08 -> 0A", 10), 2)
+
+    def test_link_speed_suffix_does_not_blank_the_count(self):
+        self.assertEqual(m.route_hop_count("01 -> 1B -> 71 40kbps", 113), 1)
+
+    def test_lr_star_route_is_direct(self):
+        # LR talks straight to the hub by construction, so its lwrRssi is always its own link
+        self.assertEqual(m.route_hop_count("01 -> 10C", 268), 0)
+
+    def test_unreadable_route_is_none_never_zero(self):
+        # None means "which link this measures is unknown". Zero would assert a direct link the
+        # route does not evidence, putting a repeater's RSSI into the direct ranking.
+        for raw, node_id in (("", 10), (None, 10), ("01 -> ZZ", 10),
+                             ("01 -> 0A", 11),          # ends at a different node — stale record
+                             ("01 -> 10C -> 0A", 10)):  # an LR id repeats for nobody
+            self.assertIsNone(m.route_hop_count(raw, node_id))
+
+    def test_hops_and_fan_in_read_the_same_route_the_same_way(self):
+        # One definition of a coherent route. A node counted direct by one reader while the other
+        # says it routes through a repeater is the exact misreading the hop count prevents.
+        nodes = [zw_node(nodeId=7, route="01 -> 07"), zw_node(nodeId=10, route="01 -> 07 -> 0A"),
+                 zw_node(nodeId=11, route="01 -> 0A")]  # incoherent: ends at node 10
+        r = m.analyze_zwave(zwave_details(nodes), NOW)
+        hops = {n["nodeId"]: n["hops"] for n in r["ranked"]["by_rssi_direct"]
+                + r["ranked"]["by_rssi_routed"] + r["ranked"]["by_rssi_route_unknown"]}
+        self.assertEqual(hops, {7: 0, 10: 1, 11: None})
+        self.assertEqual(r["route_fan_in"]["repeaters"][0]["dependents"], [10])
+        self.assertEqual([a["nodeId"] for a in r["route_fan_in"]["anomalies"]], [11])
+
+
+class TestRssiSplitByHops(unittest.TestCase):
+    """lwrRssi is the last hop INTO the hub, so a routed node reports its final repeater's link.
+    Grounded: three battery shades read -48 dBm routed through an extender beside the hub, then
+    -88/-80/-70 on direct routes after a rebuild — 40 dB with nothing physically moved."""
+
+    def test_repeated_node_is_never_ranked_against_a_direct_one(self):
+        nodes = [zw_node(nodeId=10, deviceName="Shade", lwrRssi="-48db", route="01 -> 07 -> 0A"),
+                 zw_node(nodeId=7, deviceName="Extender", lwrRssi="-52db", route="01 -> 07"),
+                 zw_node(nodeId=11, deviceName="Sensor", lwrRssi="-88db", route="01 -> 0B")]
+        r = m.analyze_zwave(zwave_details(nodes), NOW)["ranked"]
+        # In one list the shade's -48 outranks the sensor's -88 and the fleet reads as strong.
+        self.assertEqual([n["nodeId"] for n in r["by_rssi_direct"]], [11, 7])
+        self.assertEqual([n["nodeId"] for n in r["by_rssi_routed"]], [10])
+        self.assertNotIn("by_rssi", r)  # the mixed ranking is gone, not merely supplemented
+
+    def test_route_unknown_nodes_stay_rankable(self):
+        # A weak reading with no readable route is still a weak link — unattributed, not dropped.
+        nodes = [zw_node(nodeId=10, lwrRssi="-95db", route=""),
+                 zw_node(nodeId=11, lwrRssi="-60db", route="")]
+        r = m.analyze_zwave(zwave_details(nodes), NOW)["ranked"]
+        self.assertEqual([n["nodeId"] for n in r["by_rssi_route_unknown"]], [10, 11])
+        self.assertEqual(r["by_rssi_direct"], [])
+
+    def test_hops_rides_on_the_weak_signal_flag(self):
+        # The flag is real either way, but on a routed node it describes the REPEATER's link
+        nodes = [zw_node(nodeId=10, lwrRssi="-105db", route="01 -> 07 -> 0A")]
+        r = m.analyze_zwave(zwave_details(nodes), NOW)
+        self.assertEqual(r["weak_signal_heuristic"][0]["hops"], 1)
 
 
 class TestRouteFanIn(unittest.TestCase):
