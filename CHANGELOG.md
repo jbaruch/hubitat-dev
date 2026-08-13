@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.67 — 2026-08-13
+
 ### Changed
 
 - **Folded a deferred `context-writing-style` advisory from the #101 review** (`skills/debug/SKILL.md`). Presentation-only, no behavior change. Step 1 dropped the em-dash-appended justification clause "— no log tail will show it" from the network-path-failure directive, keeping the instruction to rule out the network path before tailing logs. Closes #102.
