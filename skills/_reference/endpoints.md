@@ -179,9 +179,9 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 | Endpoint | Body / params | Effect |
 |----------|---------------|--------|
 | `POST /hub/zwave/nodeRemove` | `zwaveNodeId=<decimalNodeId>` (`application/x-www-form-urlencoded`, no CSRF token) | Force-removes a **FAILED** Z-Wave orphan → 302 to `/hub/zwaveInfo`; the node drops out of `/hub/zwaveDetails/json`. Removal is **async** — poll the census, don't assume instant |
-| `GET /hub/zwaveRepair2?resetStats=false&maxHealth=10` | UI defaults; other values untested | Starts a **full Z-Wave network rebuild** (zwaveJS) → 200. Poll with the two below (2026-07-22) |
-| `GET /hub/zwaveRepair2Status` | — | Rebuild progress `{stage, html}`; `html` lists `Pending` / `Skipped` node ids in **hex** (`57` = node 87) (2026-07-22) |
-| `GET /hub/checkZwaveRepairRunning` | — | `{"isZWaveNetworkHealRunning":"true"}` — whether a rebuild is in progress (2026-07-22) |
+| `GET /hub/zwaveRepair2?resetStats=false&maxHealth=10` | UI defaults; other values untested | Starts a **full Z-Wave network rebuild** (zwaveJS) → 200 `{"success":true,"message":null}`. A **trigger, never a status check** — see the note below. Poll with the two below (2026-07-22) |
+| `GET /hub/zwaveRepair2Status` | — | Rebuild progress `{stage, html}`; `stage` is `IDLE` when none is running, `html` lists `Pending` / `Skipped` node ids in **hex** (`57` = node 87) (2026-07-22, re-verified 2026-08-13) |
+| `GET /hub/checkZwaveRepairRunning` | — | `{"isZWaveNetworkHealRunning":"true"}` — whether a rebuild is in progress (2026-07-22, re-verified 2026-08-13) |
 | `POST /device/runmethod` | JSON `{"id":<deviceId>,"method":"<command>","args":[{"type":"<T>","value":<v>}]}` | Sends a device command **without a Maker API app or token** → 200 `{"success":<bool>,"message":null}`. Each `args` entry is a **typed object** (`[]` for a no-arg command); a bare value 500s (see note). `success:true` means **dispatched**, not that anything changed — verify by observation (below) |
 | `POST /device/update` | form-urlencoded, **the full device field set** (see note) | Renames / edits a device's **fields** (name, label, retention, driver, mesh booleans) → 200. Does **not** touch driver preferences — those have their own endpoint (below). **Omitting any field clears it.** Carries a `version` concurrency token; the mesh-boolean pair is destructive if mis-encoded (see note) |
 | `POST /device/preference/save` | JSON `{deviceId, defaultCurrentState, commandRetry, showOnHome, preferences:[{name,type,value}]}` | Saves a device's **driver preferences** (the Preferences → Save panel), distinct from the `/device/update` field set → 200. Sends the **full** preference set; each entry `{name, type, value}` with `type` from `fullJson.settings[].type` (see note) |
@@ -242,6 +242,19 @@ The full field set: `name, label, zigbeeId, maxEvents, maxStates, spammyThreshol
 **Retention fields are display-tuned defaults.** `maxEvents` defaults to **11 per attribute** — 11 stored *changes*, not reports (`eventsJson` is change-filtered), so on a slow-moving signal it is a few hours and on a fast-changing one under an hour, rolled silently either way. `maxStates` 30, `spammyThreshold` 300. Raise `maxEvents` through this endpoint to use the hub as a short-horizon data buffer — 1000 covers ~two weeks of a slow-moving signal (`rules/data-collection.md`).
 
 **Hub-mesh mirrors follow a rename automatically** — all nine mirror `name` values updated on the consuming hub with no action there. This is the **opposite** of delete, where mirrors survive the source's removal and need cleanup on both hubs (`rules/device-lifecycle.md`): **rename propagates, delete does not.**
+
+**`zwaveRepair2` is a trigger, and polling it to read progress starts a rebuild.** It answers by
+state, which makes it look like a status route exactly once: idle → `{"success":true,"message":null}`
+**and a rebuild is now running**; already running → `{"success":false,"message":"Inclusion or
+rebuild is already running"}`. Poll `zwaveRepair2Status` (`{"stage":"IDLE","html":"Stage: Finished"}`
+when none is running) or `checkZwaveRepairRunning` instead — both are read-only and both answered
+live on 2026-08-13. Route names that do **not** exist (all 404): `/hub/zwaveRepairStatus`,
+`/hub/zwaveRebuildStatus`, `/hub/zwaveNodeRebuildStatus`, `/hub/zwave/rebuildStatus`,
+`/hub/zwaveRepairReport`. A second, independent progress signal is the radio log: during a rebuild
+the stream carries `RequestNodeNeighborUpdate` / `NodeNeighborUpdate` / `DeleteReturnRoute` /
+`GetRoutingInfo` at roughly one node per 15 s. Measured on one hub, same day: **active 83 lines/60 s**
+(4 × `RequestNodeNeighborUpdate`, 4 × `NodeNeighborUpdate`, 3 × `DeleteReturnRoute`) vs **finished
+9 lines/60 s**, the remainder being the routine `GetBackgroundRSSI` polls.
 
 **Z-Wave rebuild is gated by node type.** The per-node "Rebuild route" action is offered only for **mains / always-listening** nodes (repeaters, plugs, lamps); **sleepy battery** nodes (e.g. a door lock) show only Refresh · State — no on-demand route rebuild. The global rebuild (`zwaveRepair2`) is the only lever that touches a sleepy node, and its route rebuilds **on its next wake** — it sits in the status `Pending` list and completes async. zwaveJS backend only (the "Rebuild network" label); legacy uses different wording. For a marginal battery node the durable fix is RF/topology — a repeater — not a repair click (`rules/zwave-zigbee-mesh.md`). **Observed once (unconfirmed):** a rebuild refreshes *routes* but may not refresh *neighbour tables* — a newly added repeater can stay invisible to the existing fleet (`heard by` ≈ 0 in `/hub/zwaveTopology`) across repeated rebuilds until a hub reboot re-interviews neighbours; reboot and a 2.5.1.134 → 2.5.1.140 update were confounded in that single observation (`rules/zwave-zigbee-mesh.md`).
 
@@ -320,6 +333,41 @@ case-sensitive paths) — the per-frame decoded traffic, distinct from the drive
 |--------|-------------------------------|
 | `ws://<hub-ip>/zwaveLogsocket` | `{sourceLabel, plainTextMessage, deviceId, time}` — `sourceLabel` ∈ `SERIAL\|CNTRLR\|DRIVER`; node id and per-frame `RSSI: -NN dBm` live inside the decoded `plainTextMessage` text (`deviceId` is `-999` for hub-level lines) |
 | `ws://<hub-ip>/zigbeeLogsocket` | `{name, id, deviceId, profileId, clusterId, sourceEndpoint, destinationEndpoint, groupId, sequence, lastHopLqi, lastHopRssi, type, payload, time}` — **`lastHopLqi` (0–255) and `lastHopRssi` (dBm) of the last hop into the hub** (the repeater→hub link for a routed device) |
+
+**`GetBackgroundRSSI` — the hub's own receive noise floor, already in the `zwaveLogsocket` stream**
+(verified live 2026-08-11/13 on 2.5.1.151 and 2.5.1.125, zwaveJS 15.26.0, C-8 Pro, region USLR).
+A zwaveJS hub polls `FUNC_ID_ZW_GET_BACKGROUND_RSSI` (`0x3B`) by itself roughly every 30 s whenever
+its queues go idle; nothing has to be triggered. The request and the controller's raw serial
+response are both plain `plainTextMessage` lines:
+
+```
+[DRIVER] hub: » [REQ] [GetBackgroundRSSI]
+[SERIAL] hub: « [ACK] (0x06)
+[SERIAL] hub: « 0x0107013ba0a2a2a5c7 (9 bytes)
+
+  01   07   01   3B   a0   a2   a2   a5   c7
+  SOF  len  RES  fn   ch0  ch1  ch2  ch3  checksum
+```
+
+- The response line carries **no field name** — only the blob. `hub_radiolog.py` keys the decode on
+  the bytes and verifies the Z-Wave serial checksum (`0xFF` XOR the length byte through the last
+  data byte). `len` counts every byte after itself; frame type `01` is the response (`00` is the
+  outgoing request and holds no measurement).
+- Channel bytes are **signed dBm** (`0xa0` = −96). Z-Wave RSSI sentinels apply — `127`
+  not-available, `126` receiver-saturated, `125` no-signal-detected — and this platform also emits
+  `0x80` (−128) for a channel it did not measure.
+- **`ch1` and `ch2` were identical in every sample** across three hubs (~150 + 6 samples). Read them
+  as one channel.
+- **Yield is the gotcha.** Only some polls carry a payload (6 of 10 on one hub, ~1 in 5 reported on
+  another), and the controller answers only while its radio is idle: a capture taken during a
+  `zwaveRepair2` rebuild returns **zero** frames. `--summary` reports `polls` beside `samples` so a
+  busy radio does not read as a missing endpoint. Budget a long window — a 300 s capture returned
+  ~2 samples where 1200 s returned ~37.
+- Reference measurements, 20-minute captures, same night, same method: a hub in a server rack read
+  ch0 −96.2 / ch1−2 −95.4 / ch3 −91.0 (n=37); a quiet study −109.3 / −105.2 / −104.2 (n=17); an
+  upstairs office −97.8 / −91.0 / −89.1 (n=38). Per-channel spread 4–5 dB, and a control hub
+  re-measured 20 h later drifted 0.2–0.8 dB. Against a 700-series −97 dBm receiver sensitivity the
+  rack hub is noise-limited rather than sensitivity-limited.
 
 **Backend vs topology — two independent axes, both verified live (the load-bearing gotcha):**
 

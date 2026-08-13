@@ -76,7 +76,8 @@ Proceed to Step 5.
 
 Interpret, don't threshold — apply `rules/zwave-zigbee-mesh.md`:
 - `zwave.packet_errors[]` — nonzero PER (cumulative error count); weigh against the node's `msgCount` and its peers, not an absolute number. On the zwaveJS backend `per` is not reliably corroborated by the wire; confirm against the transmit log (Step 6) before ranking a node on it (`rules/zwave-zigbee-mesh.md`).
-- `zwave.ranked.by_rtt_ms` / `by_rssi` — worst-first. **Check `zwave.backend` first**: `lwrRssi` is absolute dBm under `zwavejs` and dB-above-noise under `legacy` — the same number means different things.
+- `zwave.ranked.by_rtt_ms` — worst-first. **Check `zwave.backend` first**: `lwrRssi` is absolute dBm under `zwavejs` and dB-above-noise under `legacy` — the same number means different things.
+- `zwave.ranked.by_rssi_direct` / `by_rssi_routed` / `by_rssi_route_unknown` — worst-first within each. **Compare inside one list only** (`rules/zwave-zigbee-mesh.md`). `lwrRssi` on a routed node is its final repeater's link into the hub. A strong entry in `by_rssi_routed` says nothing about that device's own radio. Each node carries `hops`. Quote it whenever you quote its RSSI.
 - `zwave.weak_signal_heuristic[]` — backend-aware RSSI-near-floor flags; each carries `heuristic:true` and a cited `basis`. Present as a hint, not a fact.
 - Z-Wave `listening:true` marks an always-on classic-mesh node that can repeat.
 - `beaming` means the device requires beam wake-up, not that it beams for others.
@@ -107,10 +108,14 @@ worse or spikier than the device's, the hub's receiver is the bottleneck, from i
 rather than the device or distance. Get the hub's receiver out of that noise by relocating the hub,
 fitting an external antenna, or separating co-located 900 MHz hubs. Do not touch the device. See
 `skills/_reference/zwave-lifecycle.md` (TransmitReport). **`transmit_report` may be absent**
-(observed 2.5.1.140). If the rollup has no `transmit_report`, report the noise-floor question as
-unmeasurable rather than a hub-receiver verdict; the present fields (`transmit status`, `routing
-attempts`, `route speed`, `took`) still separate a real drop from a slow S2/FLiRS exchange
-(`rules/zwave-zigbee-mesh.md`).
+(observed 2.5.1.140); the present fields (`transmit status`, `routing attempts`, `route speed`,
+`took`) still separate a real drop from a slow S2/FLiRS exchange.
+Read the hub's own noise floor from the `--summary` `background_rssi` rollup. It needs no
+TransmitReport and no device operated: the hub polls it unprompted. Per-channel `min`/`mean`/`max`
+dBm against the receiver sensitivity in `rules/zwave-zigbee-mesh.md` answers whether the hub is
+noise-limited. Two reading rules. `samples` well below `polls` means the radio was busy, never that
+the hub lacks the measurement. A capture taken during a `zwaveRepair2` rebuild returns zero samples.
+Capture for several minutes. A 20-second window may catch none.
 `--summary` aggregates the window into a per-device rollup (frame count, LQI/RSSI min+avg, `sequence_gaps`),
 worst-signal first — the live counterpart to the snapshot. **Zigbee frames carry per-device
 `lastHopLqi`/`lastHopRssi`** (the last hop into the hub — a repeater's link for a routed device). Read
@@ -128,5 +133,6 @@ Ghost/failed-node removal and channel changes are **hub-UI actions** (Z-Wave Det
 Remove; Zigbee Details → change channel/power) — this skill does not automate destructive mesh
 operations. A FAILED-**orphan** force-remove via `POST /hub/zwave/nodeRemove` and a full Z-Wave network
 rebuild via `GET /hub/zwaveRepair2` are groundable HTTP (`skills/_reference/endpoints.md`), but destructive
-removal stays guide-the-user, never auto-run. Guide the user through the UI step, and offer
+removal stays guide-the-user, never auto-run. Never call `zwaveRepair2` to check on a rebuild — it
+starts one (`rules/zwave-zigbee-mesh.md`); poll `zwaveRepair2Status` / `checkZwaveRepairRunning`. Guide the user through the UI step, and offer
 `Skill(skill: "debug")` if a driver-level log-tail would confirm the device side. Finish here.

@@ -33,7 +33,12 @@ healthy, so the devices are fine" — see `The command path`.
 - `neighbors` — how many nodes a **classic-mesh** node hears. `0` for Long Range nodes (a star has none — see below), not a backend artifact.
 - `route` — hexadecimal node ids with hub (`01`) first, the destination itself last, and repeaters
   only between them. `01 -> 57` reaches node `0x57` directly. `01 -> 1B -> 57` uses repeater
-  `0x1B`. `hub_mesh.py` reads only intermediate hops into `zwave.route_fan_in`.
+  `0x1B`. `hub_mesh.py` reads intermediate hops into `zwave.route_fan_in` and a per-node `hops`
+  count (`0` direct, `N` repeaters, `null` no readable route).
+- **`lwrRssi` is the last hop INTO the hub**, as Zigbee's `lastHopRssi` is. On a routed node it is the final repeater→hub link, not the end device's own radio. Measured: three shades read −48 dBm through an extender beside the hub and −88/−80/−70 on direct routes after a rebuild, nothing physically moved.
+- **Never rank RSSI across `hops`.** `hub_mesh.py` splits `ranked.by_rssi_direct` / `by_rssi_routed` / `by_rssi_route_unknown`. Compare within one list.
+- A mixed ranking inverts both ways. Repeaters near the hub push routed devices to the top, and a well-repeated fleet reads as a strong one.
+- `weak_signal_heuristic[]` entries carry `hops` too. A flag on a routed node names the repeater's link into the hub, not the device's own.
 
 ## Route fan-in (a repeater's blast radius)
 
@@ -87,7 +92,11 @@ healthy, so the devices are fine" — see `The command path`.
 - Read them for live signal (Zigbee `lastHopLqi`/`lastHopRssi`, Z-Wave per-frame `RSSI: -NN dBm`), `sequence` gaps (a soft missed-frame hint, not a hard drop count — the counter is shared across the device's traffic), and which cluster/command a device uses.
 - `lastHopLqi`/`lastHopRssi` are the **last hop into the hub** — for a routed device that is the repeater→hub link, not the end device's own radio. ZCL cluster names for the common clusters; `0xFC00–0xFFFE` is manufacturer-specific, `0xE000–0xEFFF` is reserved space vendors (Tuya) use off-spec.
 - The Z-Wave **TransmitReport** (`hub_radiolog --summary` → `transmit_report`) gives the noise floor and SNR at *both* ends. An elevated or spiky **hub** noise floor with `hub_snr` well below `dest_snr` means the hub's own receiver is the bottleneck, from its RF environment rather than the device or distance. Common culprits are co-located 900 MHz radios, USB3, and gear clusters. The fix gets the hub's receiver out of that noise by relocating the hub, fitting an external antenna, or separating co-located hubs. Never the device.
-- **`transmit_report` may be absent** (observed 2.5.1.140: the transmit lines carried `ACK RSSI` only, no noise floor). Confirm `transmit_report` is present before relying on the hub-receiver split; where it is absent, report the noise-floor question as unmeasurable rather than a hub-receiver verdict. The present transmit fields (`transmit status`, `routing attempts`, `route speed`, `took`) still separate a real drop from a slow S2/FLiRS exchange.
+- **`transmit_report` may be absent** (observed 2.5.1.140: the transmit lines carried `ACK RSSI` only, no noise floor). Confirm `transmit_report` is present before relying on it for the hub-receiver split. The present transmit fields (`transmit status`, `routing attempts`, `route speed`, `took`) still separate a real drop from a slow S2/FLiRS exchange.
+- **The hub's own noise floor is measurable without `transmit_report`.** A zwaveJS hub polls `GetBackgroundRSSI` unprompted (~30 s) and the raw serial response is already in `zwaveLogsocket`. `hub_radiolog --summary` decodes it into `background_rssi`: per-channel min/mean/max dBm, plus `polls` and `samples`. Read it against the receiver sensitivity above. A floor near sensitivity means the hub is noise-limited. No device-side work moves it.
+- **The floor samples only on an idle radio.** The controller polls when its queues go idle and answers only some polls. `samples` well below `polls` means the radio was busy, never that the hub lacks the measurement.
+- **A rebuild returns zero samples.** Noise measurement and `zwaveRepair2` are mutually exclusive. Re-measure once neighbour-update traffic stops.
+- `ch1` and `ch2` read identically in every sample on the grounded hubs. Read them as one channel, not two.
 
 ## Device lifecycle & removal
 
@@ -95,6 +104,7 @@ healthy, so the devices are fine" — see `The command path`.
 - **Graceful removal is two steps and one is physical**: remove the device from the SmartStart provisioning list (else it re-includes), *and* exclude/factory-reset the physical device. An agent cannot do the physical step — so removal is guide-the-user, not automate.
 - **The tooling confirms a removal, it does not trigger one.** Including or excluding a real device is hub-UI + physical — no endpoint triggers it. Confirm a removal two ways: the snapshot node-count/id diff, and the radio-log signature (`skills/_reference/zwave-lifecycle.md`).
 - Force-remove (`RemoveFailedNode`) applies only to a FAILED **orphan ghost**, never a recoverable real device — groundable via `POST /hub/zwave/nodeRemove`. A full Z-Wave network rebuild is groundable too, via `GET /hub/zwaveRepair2` — both in `skills/_reference/endpoints.md`.
+- **`/hub/zwaveRepair2` is a trigger, never a status check.** Called on an idle hub it starts a rebuild, and its `{"success":false,"message":"Inclusion or rebuild is already running"}` is a side effect of one already running. Poll `GET /hub/zwaveRepair2Status` or `GET /hub/checkZwaveRepairRunning` instead (`skills/_reference/endpoints.md`).
 
 ## Grounding sources
 
