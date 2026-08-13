@@ -53,7 +53,7 @@ jobs:
       # review failure still hard-fails. De-vendored now that the native input
       # exists (jbaruch/coding-policy#188 / #190).
       - name: Skill review (changed only)
-        uses: jbaruch/coding-policy/.github/actions/skill-review@3e3f74e90f1ff6ae283fedc51a7191d1b628b543
+        uses: jbaruch/coding-policy/.github/actions/skill-review@bbea1b92c621e1330278e04914500783e75bc78e
         with:
           threshold: '85'
           credit-outage: 'skip'
