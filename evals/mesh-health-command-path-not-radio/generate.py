@@ -86,10 +86,13 @@ HUB_BASE = "http://10.0.4.10:8080"
 # `rules/zwave-zigbee-mesh.md`), avg RTT ms, lwrRssi (absolute dBm on this backend), msgCount,
 # neighbors, route. deviceId is 400 + node id.
 #
-# Ranking guard: the analyzer emits only the worst 10 by age / RTT / RSSI, so the extenders and
-# the LR sensors stay out of every ranked list by being fresh, fast (RTT < 73) and strong
-# (RSSI > -72 dBm). Weakening one would silently push a visible node out of a ranked list and
-# invalidate criteria.json's ground truth.
+# Ranking guard: the analyzer emits only the worst 10 by age and by RTT, so the extenders and the
+# LR sensors stay out of those two lists by being fresh and fast (RTT < 73). Weakening one would
+# silently push a visible node out of a ranked list and invalidate criteria.json's ground truth.
+# RSSI is ranked in three lists split by hop count (#112) rather than one, each far shorter than
+# the fleet, so strong nodes do surface there — criteria.json grades the staleness pattern and the
+# flag buckets, never the RSSI order. What every node's RSSI must still clear is the weak-signal
+# FLAG (> -72 dBm keeps it well off the floor heuristic), which assert_ground_truth() enforces.
 ZWAVE_NODES = [
     # --- infrastructure: repeaters. Fresh; an extender is neither actuator nor reporter. ---
     (7, "Extender Hall", "2026-07-16 09:13:44", 30, -48, 902, 9, "01 -> 07"),

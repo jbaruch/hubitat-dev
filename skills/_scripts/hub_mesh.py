@@ -23,6 +23,13 @@ Grounding (rules/zwave-zigbee-mesh.md carries the citations):
     above the noise floor (positive = good). "Higher is better" holds on both; a fixed
     numeric cutoff does NOT transfer across backends. Silicon Labs RX sensitivity floor:
     -97 dBm (700-series), -110 dBm (800-series).
+  - lwrRssi is the LAST WORKING ROUTE's signal — the last hop INTO the hub. On a routed node
+    that hop is the REPEATER->hub link, not the node's own radio, exactly as Zigbee's
+    lastHopRssi is. Each node therefore carries `hops` (0 = direct, N = N repeaters, null =
+    no readable route) and ranked.by_rssi_* is split on it: ranked together, a well-repeated
+    fleet reads as a strong one. Measured on a live hub — three battery shades reporting
+    -48 dBm through an extender beside the hub read -88/-80/-70 once a rebuild moved them to
+    direct routes, a 40 dB swing with nothing physically moved.
   - nodeState FAILED marks an unreachable node. It splits by deviceId: FAILED + a bound deviceId
     is a REAL device currently unreachable (may be transient — recover, don't delete); FAILED with
     NO deviceId is an orphan ghost (a pairing that never bound a device — safe to remove).
@@ -268,6 +275,49 @@ def node_topology(node_id) -> str:
     return "unknown"
 
 
+def route_intermediates(raw_route, node_id):
+    """Split a node's route into its REPEATER hops — the ids between the hub and the node itself.
+
+    Returns (intermediates, reason): a list (empty = a direct link) with reason None when the
+    route is coherent, or (None, reason) naming why it is not.
+
+    ONE definition of a coherent route, for both readers of it: the hop COUNT that says whether a
+    node's lwrRssi is its own link or a repeater's (normalize_zwave_node), and the fan-in that
+    counts who depends on whom (analyze_route_fan_in). Two definitions could disagree, and a node
+    counted direct by one while the other says it routes through a repeater is precisely the
+    misreading the hop count exists to prevent.
+
+    A coherent route starts at the hub and ends at the node it belongs to; anything else is a
+    stale or malformed record, and guessing which ids are repeaters out of it would invent
+    dependents. Every intermediate must itself be a classic-mesh node: an LR id (>= 256) or one in
+    the reserved 233..255 gap repeats for nobody — LR is a star, and a star node relays nothing —
+    so a route naming one is incoherent, not a discovery. Rejected whole, never halfway: a route
+    rejected after some hops were counted would leave those hops credited with a dependent from a
+    path this function just called impossible.
+    """
+    hops = parse_route(raw_route)
+    if hops is None:
+        return None, "route is present but not parseable as hex hops"
+    if hops[0] != HUB_NODE_ID or hops[-1] != node_id:
+        return None, (f"route does not run from the hub (node {HUB_NODE_ID}) to node "
+                      f"{node_id} — parsed hops {hops}")
+    intermediates = hops[1:-1]
+    non_mesh = [h for h in intermediates if node_topology(h) != "mesh"]
+    if non_mesh:
+        return None, (f"route names non-mesh hop(s) {non_mesh} as repeaters — a Long Range "
+                      f"or reserved-range id repeats for nobody, so the route is incoherent")
+    return intermediates, None
+
+
+def route_hop_count(raw_route, node_id) -> Optional[int]:
+    """How many REPEATERS the hub's route to this node passes through. 0 = a direct link, so the
+    node's lwrRssi is its own radio; >= 1 = lwrRssi is the last hop into the hub, i.e. the final
+    REPEATER's link. None = no readable route, so which of the two it is cannot be known — never
+    0, which would assert a direct link the route does not evidence."""
+    intermediates, _ = route_intermediates(raw_route, node_id)
+    return None if intermediates is None else len(intermediates)
+
+
 def normalize_zwave_node(node: dict, now: datetime, naive_tz=None) -> dict:
     """Project a raw hub node to the fields the analysis ranks/flags on. `now` and `naive_tz`
     are injected so age is deterministic under test (never call the clock in here)."""
@@ -291,6 +341,9 @@ def normalize_zwave_node(node: dict, now: datetime, naive_tz=None) -> dict:
         "neighbors": node.get("neighbors"),
         "routeChanges": parse_num(node.get("routeChanges")),
         "route": node.get("route") or "",
+        # Repeaters between hub and node — what says whether `rssi` below is this node's own link
+        # or the last repeater's link into the hub. See route_hop_count().
+        "hops": route_hop_count(node.get("route"), node.get("nodeId")),
         "security": node.get("security"),
         "battery": node.get("batteryPercent"),
         "lastTime": node.get("lastTime"),
@@ -327,35 +380,14 @@ def analyze_route_fan_in(nodes: list, backend: str, series: str = "800") -> dict
     for n in nodes:
         if n["topology"] != "mesh":
             continue  # LR star, or the reserved 233..255 gap: no routing to read
-        hops = parse_route(n["route"])
-        if hops is None:
+        intermediates, reason = route_intermediates(n["route"], n["nodeId"])
+        if intermediates is None:
             if n["route"]:
-                # Present but unreadable. A shape this script does not know, not a mesh fault —
-                # surfaced like unparsed_timestamps rather than silently counted as "direct".
-                anomalies.append({"nodeId": n["nodeId"], "route": n["route"],
-                                  "reason": "route is present but not parseable as hex hops"})
-            continue
-        if hops[0] != HUB_NODE_ID or hops[-1] != n["nodeId"]:
-            # A coherent route starts at the hub and ends at the node it belongs to. Anything
-            # else is a stale or malformed record, and guessing which hops are repeaters out of
-            # it would invent dependents. Surface it and count nothing.
-            anomalies.append({
-                "nodeId": n["nodeId"], "route": n["route"],
-                "reason": f"route does not run from the hub (node {HUB_NODE_ID}) to node "
-                          f"{n['nodeId']} — parsed hops {hops}"})
-            continue
-        # Every intermediate hop must itself be a classic-mesh node. An LR id (>= 256) or one in
-        # the reserved 233..255 gap cannot repeat for anyone — LR is a star, and a star node
-        # relays nothing — so a mesh route naming one is incoherent, not a discovery. Validated
-        # before any counting: a route rejected halfway would leave its earlier hops credited
-        # with a dependent from a path this function just called impossible.
-        intermediates = hops[1:-1]
-        non_mesh = [h for h in intermediates if node_topology(h) != "mesh"]
-        if non_mesh:
-            anomalies.append({
-                "nodeId": n["nodeId"], "route": n["route"],
-                "reason": f"route names non-mesh hop(s) {non_mesh} as repeaters — a Long Range "
-                          f"or reserved-range id repeats for nobody, so the route is incoherent"})
+                # A route present but unreadable or incoherent — a shape this script does not
+                # know, or a stale record. Not a mesh fault: surfaced like unparsed_timestamps
+                # rather than silently counted as "direct". An ABSENT route says nothing at all
+                # and gets no anomaly. What "coherent" means lives in route_intermediates().
+                anomalies.append({"nodeId": n["nodeId"], "route": n["route"], "reason": reason})
             continue
         for hop in intermediates:
             dependents.setdefault(hop, []).append(n["nodeId"])
@@ -433,8 +465,8 @@ def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
         if h:
             weak_signal.append({**n, **h})
 
-    def worst(key, reverse):
-        have = [n for n in nodes if n[key] is not None]
+    def worst(key, reverse, pool=None):
+        have = [n for n in (nodes if pool is None else pool) if n[key] is not None]
         return sorted(have, key=lambda n: n[key], reverse=reverse)
 
     # lastTime absent entirely = the hub has never heard this node since its stats last reset.
@@ -463,7 +495,20 @@ def analyze_zwave(details: dict, now: datetime, naive_tz=None) -> dict:
             "by_rtt_ms": worst("rtt_ms", True)[:10],
             # Higher RSSI is better on BOTH scales (absolute dBm and dB-above-noise), so
             # worst-first is always ascending. Backend only changes the floor heuristic, not this.
-            "by_rssi": worst("rssi", False)[:10],
+            #
+            # SPLIT BY HOP COUNT, never one list. lwrRssi is the last hop INTO the hub, so on a
+            # routed node it measures the final REPEATER's link, not the node's own radio — the
+            # two are different links and ranking them together compares different measurements.
+            # Grounded: three battery shades read -48 dBm routed through an extender beside the
+            # hub, then -88/-80/-70 on direct routes after a rebuild, nothing physically moved.
+            # Whichever way that fleet is read from one list, it is read wrong.
+            "by_rssi_direct": worst("rssi", False, [n for n in nodes if n["hops"] == 0])[:10],
+            "by_rssi_routed": worst("rssi", False,
+                                    [n for n in nodes if n["hops"] is not None and n["hops"] > 0])[:10],
+            # No readable route: which link `rssi` describes is unknown. Kept rankable rather than
+            # dropped — a weak reading here is still a weak link, just an unattributed one.
+            "by_rssi_route_unknown": worst("rssi", False,
+                                           [n for n in nodes if n["hops"] is None])[:10],
         },
         # The Z-Wave counterpart of zigbee.stalest. Staleness is not itself a fault — a
         # command-only device is silent until commanded — so this ranks, never flags. The

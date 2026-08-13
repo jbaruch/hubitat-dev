@@ -19,6 +19,10 @@ Frame shapes (grounded):
       real latency (took_ms), retransmits, TX power. hub_* is at the controller, dest_* at the
       device; a hub SNR far below the device SNR points at the hub's RF environment, not the device.
       Invalid RSSI sentinels (a positive dBm like +78) are dropped, not reported as real.
+      A raw serial GetBackgroundRSSI RESPONSE gets a structured `background_rssi` sub-dict — the
+      hub receiver's own per-channel noise floor, measured with no transmission involved. This is
+      the answer to "is the hub's receiver sitting in noise" on a build where `transmit` carries
+      no noise floor at all (2.5.1.140 shipped ACK RSSI only). See parse_background_rssi().
   Zigbee  {name, id, deviceId, profileId, clusterId, sourceEndpoint, destinationEndpoint,
            groupId, sequence, lastHopLqi, lastHopRssi, time, type, payload}
       Carries per-frame lastHopLqi (0–255) and lastHopRssi (dBm) — the per-device signal the
@@ -77,6 +81,23 @@ _ZW_DESTNF_RE = re.compile(r"measured noise floor by destination: (-?\d+) dBm")
 _ZW_ACKRSSI_RE = re.compile(r"\bACK RSSI: (-?\d+) dBm")
 _ZW_DESTRSSI_RE = re.compile(r"measured RSSI of ACK from destination: (-?\d+) dBm")
 
+# GetBackgroundRSSI — the hub's own receive noise floor, per channel, with nothing transmitting.
+# A zwaveJS hub polls it by itself (~30 s) whenever its queues go idle, so the measurement is
+# already in the stream; the REQUEST line names the function, and the controller's answer arrives
+# as a bare hex blob on a [SERIAL] line with no field name in it at all. The decode therefore keys
+# on the frame's BYTES (SOF + type + function id + length + checksum), never on the text.
+_ZW_BGRSSI_REQ_RE = re.compile(r"\[GetBackgroundRSSI\]")
+_ZW_SERIAL_HEX_RE = re.compile(r"\b0x((?:[0-9a-fA-F]{2}){5,})\b")
+ZW_SOF = 0x01                               # start of frame
+ZW_FRAME_TYPE_RESPONSE = 0x01               # RES (a REQ is 0x00) — only the response carries data
+FUNC_ID_ZW_GET_BACKGROUND_RSSI = 0x3B
+# Z-Wave RSSI sentinels (Silicon Labs serial API): a channel byte holding one of these is a STATUS,
+# not a reading, so it is reported as such rather than as an absurd dBm. -128 (0x80) is NOT in the
+# spec table — this platform emits it for a channel it did not measure (grounded live on 2.5.1.151,
+# zwaveJS 15.26.0, two C-8 Pro hubs, region USLR).
+ZW_RSSI_SENTINELS = {127: "not_available", 126: "saturated", 125: "no_signal_detected",
+                     -128: "not_measured"}
+
 
 def _valid_dbm(v):
     """A received-signal RSSI on the zwave/zigbee logs is negative dBm (~ -30..-110). Positive or
@@ -110,6 +131,63 @@ def parse_transmit_report(text: str) -> dict:
         "hub_snr": hub_rssi - hub_nf if hub_rssi is not None and hub_nf is not None else None,
         "dest_snr": dest_rssi - dest_nf if dest_rssi is not None and dest_nf is not None else None,
     }
+
+
+def _zw_serial_checksum(payload: bytes) -> int:
+    """Z-Wave serial-API checksum: 0xFF XOR every byte from the LENGTH byte through the last data
+    byte (the SOF and the checksum itself are excluded)."""
+    chk = 0xFF
+    for b in payload:
+        chk ^= b
+    return chk
+
+
+def parse_background_rssi(text: str):
+    """Decode a GetBackgroundRSSI serial response out of a raw Z-Wave log line, or None.
+
+    This is the hub receiver's own noise floor — measured with nothing transmitting, which is what
+    makes it the answer to "is the hub in noise" when a build's TransmitReport carries no noise
+    floor (2.5.1.140 shipped ACK RSSI only, and rules/zwave-zigbee-mesh.md had to report the
+    question unmeasurable). A zwaveJS hub polls it unprompted, so nothing has to be triggered.
+
+        01   07   01   3B   a0   a2   a2   a5   c7
+        SOF  len  RES  fn   ch0  ch1  ch2  ch3  checksum
+
+    The log line is `« 0x0107013ba0a2a2a5c7 (9 bytes)` — a bare blob with no field name, so every
+    structural byte is checked before anything is decoded, and the serial checksum is VERIFIED.
+    That is what makes it safe to key on bytes: an unrelated hex blob of the right length would
+    have to also carry function id 0x3B and a matching checksum to be mistaken for a reading.
+
+    Channel bytes are SIGNED dBm (0xa0 = -96). A byte holding one of the Z-Wave RSSI sentinels
+    (or a value outside a plausible dBm range) is reported in `status` with its `channels` entry
+    None — never as a reading. Channel COUNT is taken from the frame, not assumed: a region or
+    firmware serving a different number of channels decodes as itself.
+
+    Returns {"channels": [dBm|None, ...], "status": ["ok"|<sentinel>|"out_of_range", ...],
+             "raw": "<hex>"} or None when the line is not a GetBackgroundRSSI response.
+    """
+    m = _ZW_SERIAL_HEX_RE.search(text)
+    if not m:
+        return None
+    try:
+        raw = bytes.fromhex(m.group(1))
+    except ValueError:
+        return None
+    if (len(raw) < 6 or raw[0] != ZW_SOF or raw[2] != ZW_FRAME_TYPE_RESPONSE
+            or raw[3] != FUNC_ID_ZW_GET_BACKGROUND_RSSI):
+        return None
+    if raw[1] != len(raw) - 2:  # the length byte counts every byte after itself
+        return None
+    if _zw_serial_checksum(raw[1:-1]) != raw[-1]:
+        return None
+    channels, status = [], []
+    for b in raw[4:-1]:
+        val = b - 256 if b > 127 else b  # signed 8-bit
+        sentinel = ZW_RSSI_SENTINELS.get(val)
+        dbm = None if sentinel else _valid_dbm(val)
+        channels.append(dbm)
+        status.append(sentinel or ("ok" if dbm is not None else "out_of_range"))
+    return {"channels": channels, "status": status, "raw": m.group(1).lower()}
 
 
 def cluster_name(cluster_id) -> str:
@@ -161,7 +239,8 @@ def parse_zigbee_frame(f: dict) -> dict:
 
 def parse_zwave_frame(f: dict) -> dict:
     """Normalize a raw Z-Wave log frame. Node id and RSSI come from the decoded text; a frame that
-    carries a TransmitReport (`transmit status: ...`) gets a structured `transmit` sub-dict."""
+    carries a TransmitReport (`transmit status: ...`) gets a structured `transmit` sub-dict, and a
+    raw GetBackgroundRSSI response gets a `background_rssi` one."""
     text = f.get("plainTextMessage") or ""
     node = _ZW_NODE_RE.search(text)
     rssi = _ZW_RSSI_RE.search(text)
@@ -175,6 +254,9 @@ def parse_zwave_frame(f: dict) -> dict:
     }
     if _ZW_TXSTATUS_RE.search(text):
         out["transmit"] = parse_transmit_report(text)
+    bg = parse_background_rssi(text)
+    if bg:
+        out["background_rssi"] = bg
     return out
 
 
@@ -287,6 +369,30 @@ def summarize(frames: list) -> dict:
             "hub_snr_med": med(t["hub_snr"] for t in tx),      # device->hub headroom
             "dest_snr_med": med(t["dest_snr"] for t in tx),    # hub->device headroom
         }
+
+    # Background-noise-floor rollup — the hub receiver's own floor, per channel, from the polls the
+    # controller already runs. Reported whenever a poll was SEEN, because `polls` vs `samples` is
+    # itself the finding: the controller answers roughly one poll in five, and only while its queues
+    # are idle, so `samples: 0` against a nonzero `polls` says the radio was busy (a rebuild, heavy
+    # traffic) — not that the measurement is unavailable. Per channel because the channels differ by
+    # several dB. Read against the receiver sensitivity in rules/zwave-zigbee-mesh.md: a floor near
+    # sensitivity means the hub is noise-limited, which no amount of device-side work fixes.
+    bg = [fr["background_rssi"] for fr in frames if fr.get("background_rssi")]
+    polls = sum(1 for fr in frames if _ZW_BGRSSI_REQ_RE.search(fr.get("text") or ""))
+    if bg or polls:
+        width = max((len(s["channels"]) for s in bg), default=0)
+        channels = []
+        for i in range(width):
+            vals = [s["channels"][i] for s in bg
+                    if i < len(s["channels"]) and s["channels"][i] is not None]
+            channels.append({
+                "channel": i,
+                "n": len(vals),
+                "min": min(vals) if vals else None,    # quietest sample (most negative dBm)
+                "mean": round(sum(vals) / len(vals), 1) if vals else None,
+                "max": max(vals) if vals else None,    # noisiest sample
+            })
+        result["background_rssi"] = {"polls": polls, "samples": len(bg), "channels": channels}
     return result
 
 
