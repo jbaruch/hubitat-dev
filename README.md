@@ -9,7 +9,7 @@ Grounded against real hardware: Hubitat C-8 Pro, platform builds through 2.5.1.1
 ## What it covers
 
 - **Authoring** — apps and drivers are single Groovy 2.4 files run in a locked-down sandbox. The rules encode what that sandbox forbids and the idioms that keep an app from silently doing nothing.
-- **Deploy / pull** — push source to a hub and pull it back over the same undocumented HTTP endpoints HPM and the VS Code extension use, with the `version` optimistic-concurrency token handled for you.
+- **Deploy / pull** — push source to a hub and pull it back over the same undocumented HTTP endpoints HPM and the VS Code extension use, with the `version` optimistic-concurrency stamp handled for you.
 - **Debug** — tail the hub's `/logsocket` and `/eventsocket` websockets (structured JSON, no library needed) and read them against the code.
 - **Mesh health** — read the Z-Wave/Zigbee mesh detail endpoints and flag ghost/failed nodes, packet errors, weak routes, and incomplete joins.
 - **Device liveness** — rank real `lastActivity` evidence without trusting Zigbee's misleading `active` flag.
@@ -34,7 +34,7 @@ All rules are always-on — installing the plugin means you want this context.
 | [state-vs-attributes](rules/state-vs-attributes.md) | Attributes via `sendEvent` (subscribable) vs. `state`/`atomicState` (private, JSON-serializable). Why a value's timestamp can't tell you the source is alive. |
 | [self-reported-vs-measured](rules/self-reported-vs-measured.md) | Distinguishing a cloud integration's measured attributes from model output computed off hand-entered config. Tell them apart by timestamp, rank suspicion by observability, and map the model with `runmethod` refresh + diff. |
 | [groovy-gotchas](rules/groovy-gotchas.md) | Silent-failure traps the compiler misses: string handler names, `0`-is-falsy, null device inputs, reserved names. |
-| [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version token. |
+| [multi-hub-topology](rules/multi-hub-topology.md) | Code is per-hub-by-IP, devices can mesh; local-no-security assumption; the deploy version stamp. |
 | [zwave-zigbee-mesh](rules/zwave-zigbee-mesh.md) | What the Z-Wave/Zigbee mesh metrics mean, including `listening` vs `beaming`, hex routes, the two-scale `lwrRssi` split, and `lastActivity` vs misleading `active`. |
 | [ui-automation](rules/ui-automation.md) | Driving the hub web UI with Playwright for UI-only operations — the Vue/MDL selection traps, `statusJson.appSettings[]`, Room Lighting sentinel values, and verify-every-mutation. |
 | [room-lighting-shades](rules/room-lighting-shades.md) | Room Lighting can group **shades**, not just lights (staff-endorsed) — `Act==Off` is a one-position preset (100=open, 0=closed), not a broken toggle; don't flag it. |
