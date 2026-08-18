@@ -1,5 +1,9 @@
 # Changelog
 
+### Fixed
+
+- **A hub-mesh rename propagates the mirror's `name`, not its `label` — "do not rename twice" was wrong** (`rules/device-lifecycle.md`, `skills/_reference/endpoints.md`). The rule's propagation claim was right and its closing directive was the actionable half, so the wrong half is the one readers acted on. A mirror's `label` is custom, overrides the propagated `name`, and is what every reader sees — the UI, device pickers, and any tool resolving by label. Measured on 2.5.1.156 across both hubs: renaming a mesh-shared soil probe on the source hub (`devices` 941, `Zone 8 Back Yard Plants Soil - Right Leg` → `… - Drainage Channel`) updated the mirror's `name` (`main` 1666) immediately and left its `label` untouched, still unchanged 15 minutes later and indefinitely thereafter. Following "do not rename twice" therefore produced a hub whose source and consumers disagreed. The consequence is not cosmetic, because a freed position name gets reused: this rename existed to free `Right Leg` for a replacement probe, and renaming only the source then pairing the replacement leaves the consuming hub holding two devices with the identical label, from which every label-resolving consumer picks one arbitrarily — on a soil-probe fleet, an app confidently reporting moisture for the wrong bed. The rule now states the rename is two operations, source first, and directs a `label` verification on the mirror after every source rename; the `Verify after removing` section is retitled `Verify after removing or renaming` to match what it now covers. Also adds the no-op round-trip directive for a device whose field set has not been round-tripped before — both renames here were verified that way first, and a mis-encoded mesh boolean pair unshares the device and deletes the mirror outright. Closes #119.
+
 ## 0.1.67 — 2026-08-13
 
 ### Changed

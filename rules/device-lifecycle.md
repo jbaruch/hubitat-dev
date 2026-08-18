@@ -37,11 +37,19 @@ them onto the new id.
 - Use the live audit before calling an enabled reference active or inert.
 - The usage script only reads — it never deletes. Deletion is irreversible: read the hub-UI confirm dialog's "in use by N apps" state with Playwright (`skills/_reference/playwright-ui.md`), then have the **user** perform the final removal — the agent guides and confirms, it does not click the destructive delete. A radio (Z-Wave/Zigbee) device also needs a physical exclusion/factory-reset only the user can do (`rules/zwave-zigbee-mesh.md`).
 
-## Verify after removing
+## Verify after removing or renaming
 
 - Re-read usage after the delete — do not assume the hub auto-pruned every reference type. Auto-pruning of app subscriptions is not guaranteed for dashboards, device inputs, or parent/child links.
 - A reference that survives the delete is a dangling pointer to fix on the referencing app.
-- **Hub-mesh mirrors are asymmetric across operations.** A `POST /device/update` rename **propagates** to the mirror on the consuming hub automatically; a delete does **not** — the mirror survives the source's removal and needs separate cleanup on the other hub (`skills/_reference/endpoints.md`). Do not over-correct into renaming twice.
+- **Hub-mesh mirrors are asymmetric across operations.** A `POST /device/update` rename propagates to the mirror's **`name`** on the consuming hub; a delete does not, and the mirror survives the source's removal (`skills/_reference/endpoints.md`).
+- A mirror's **`label`** is custom, overrides the propagated `name`, and changes only under an explicit rename on the consuming hub.
+- `label` is the field every reader sees — the UI, device pickers, and any tool resolving by label.
+- Renaming a mesh-shared device is TWO operations, source first.
+- Verify the mirror's `label` after every source rename.
+- Two devices sharing a `label` make every label-resolving consumer pick one of them arbitrarily.
+- Never leave a freed label duplicated when the source's old name is about to be reused.
+- Round-trip the field set with a no-op `POST /device/update` before the first real edit of any device.
+- A mis-encoded mesh boolean pair unshares the device and deletes the mirror (`skills/_reference/endpoints.md`).
 
 ## Replacement re-wires nothing
 
