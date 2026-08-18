@@ -40,9 +40,9 @@ healthy, so the devices are fine" — see `The command path`.
   only between them. `01 -> 57` reaches node `0x57` directly. `01 -> 1B -> 57` uses repeater
   `0x1B`. `hub_mesh.py` reads intermediate hops into `zwave.route_fan_in` and a per-node `hops`
   count (`0` direct, `N` repeaters, `null` no readable route).
-- **`lwrRssi` is the last hop INTO the hub**, as Zigbee's `lastHopRssi` is. On a routed node it is the final repeater→hub link, not the end device's own radio. Measured: three shades read −48 dBm through an extender beside the hub and −88/−80/−70 on direct routes after a rebuild, nothing physically moved.
+- **`lwrRssi` is the last hop INTO the hub**, as Zigbee's `lastHopRssi` is. On a routed node it is the final repeater→hub link, not the end device's own radio.
 - **Never rank RSSI across `hops`.** `hub_mesh.py` splits `ranked.by_rssi_direct` / `by_rssi_routed` / `by_rssi_route_unknown`. Compare within one list.
-- A mixed ranking inverts both ways. Repeaters near the hub push routed devices to the top, and a well-repeated fleet reads as a strong one.
+- A reading from one list is not comparable to a reading from another, in either direction.
 - `weak_signal_heuristic[]` entries carry `hops` too. A flag on a routed node names the repeater's link into the hub, not the device's own.
 
 ## Route fan-in (a repeater's blast radius)
@@ -101,7 +101,7 @@ healthy, so the devices are fine" — see `The command path`.
 - **The hub's own noise floor is measurable without `transmit_report`.** A zwaveJS hub polls `GetBackgroundRSSI` unprompted (~30 s) and the raw serial response is already in `zwaveLogsocket`. `hub_radiolog --summary` decodes it into `background_rssi`: per-channel min/mean/max dBm, plus `polls` and `samples`. Read it against the receiver sensitivity above. A floor near sensitivity means the hub is noise-limited. No device-side work moves it.
 - **The floor samples only on an idle radio.** The controller polls when its queues go idle and answers only some polls. `samples` well below `polls` means the radio was busy, never that the hub lacks the measurement.
 - **A rebuild returns zero samples.** Noise measurement and `zwaveRepair2` are mutually exclusive. Re-measure once neighbour-update traffic stops.
-- `ch1` and `ch2` read identically in every sample on the grounded hubs. Read them as one channel, not two.
+- Read `ch1` and `ch2` as one channel, not two.
 
 ## Device lifecycle & removal
 

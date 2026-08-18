@@ -42,7 +42,9 @@ them onto the new id.
 - Re-read usage after the delete — do not assume the hub auto-pruned every reference type. Auto-pruning of app subscriptions is not guaranteed for dashboards, device inputs, or parent/child links.
 - A reference that survives the delete is a dangling pointer to fix on the referencing app.
 - **Hub-mesh mirrors are asymmetric across operations.** A `POST /device/update` rename propagates to the mirror's **`name`** on the consuming hub; a delete does not, and the mirror survives the source's removal (`skills/_reference/endpoints.md`).
-- A mirror's **`label`** is custom, overrides the propagated `name`, and changes only under an explicit rename on the consuming hub.
+- A mirror's **`label`** is custom.
+- A mirror's `label` overrides its propagated `name`.
+- A mirror's `label` changes only under an explicit rename on the consuming hub.
 - `label` is the field every reader sees — the UI, device pickers, and any tool resolving by label.
 - Renaming a mesh-shared device is TWO operations, source first.
 - Verify the mirror's `label` after every source rename.
