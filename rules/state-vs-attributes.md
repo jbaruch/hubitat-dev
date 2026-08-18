@@ -27,18 +27,18 @@ Hubitat has two distinct persistence mechanisms. Choosing the wrong one is a des
 
 ## Reader side: a value space can mix a reading with a flag
 
-- An attribute may carry a warning code in the same slot as its measurement. Z-Wave's Battery command class encodes "battery low" as level `0xFF`, and drivers flatten it into the same `battery` attribute the percentage uses.
+- An attribute may carry a warning code in the same slot as its measurement. Z-Wave's Battery command class encodes "battery low" as the reserved level `0xFF`, and drivers flatten it into the same `battery` attribute the percentage uses.
 - The signature is a pair of events inside one wakeup — a plausible level, then an implausible one a few hundred milliseconds later.
 - Read the pair, never either value alone. Two disagreeing values that close together are one report.
 - An implausible value there is neither a percentage nor noise to filter out. It is the device asserting a condition.
 - Confirm such a value; never dismiss it as a decoding glitch.
-- Confirm against the raw frame rather than the attribute: force a wakeup with the device's Z-Wave button and read `[BatteryCCReport] level: N` in `skills/_scripts/hub_radiolog.py --radio zwave`.
+- Confirm against the raw frame rather than the attribute: force a wakeup with the device's Z-Wave button and read `[BatteryCCReport] level: N` via `skills/_scripts/hub_radiolog.py --ip <addr> --radio zwave`.
 - A sleepy sensor reports battery only on a wakeup. Tamper does not trigger one.
-- The hub issues a `BatteryCCGet` on wake and the report lands within ~200 ms — a seconds-long check, not a wait for the wakeup interval.
-- A flag present on some wakeups and absent on others is diagnostic, not noise. A cell at the trip threshold sags below it under transmit load and recovers at rest.
-- A lithium primary reads near its nominal voltage from new until it collapses.
-- Never treat a resting multimeter reading as refuting a low-battery flag. Swap in a known-good cell instead.
-- Describe the symptom, never one encoding — a device may assert the same condition over the Power Management notification class instead of `0xFF`.
+- The hub issues a `BatteryCCGet` on wake and the report lands within ~200 ms.
+- A flag present on some wakeups and absent on others is diagnostic, not noise.
+- Never treat a resting multimeter reading as refuting a low-battery flag on a lithium primary.
+- Swap in a known-good cell to test the flag instead.
+- Describe the symptom, never one encoding. A device may assert the same condition through the Notification CC's Power Management notification type.
 
 ## state / atomicState (internal, private)
 
