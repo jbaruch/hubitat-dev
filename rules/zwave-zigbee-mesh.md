@@ -31,6 +31,11 @@ healthy, so the devices are fine" — see `The command path`.
 - Never use the JSON `beaming` key as repeater proof.
 - `routeChanges` — classic-mesh stability indicator; frequent changes mean the Last Working Route keeps failing. Reported by the **legacy** backend; `N/A` on the zwaveJS backend.
 - `neighbors` — how many nodes a **classic-mesh** node hears. `0` for Long Range nodes (a star has none — see below), not a backend artifact.
+- A Z-Wave device's `deviceNetworkId` is **hex**; `nodeId` and every node-facing surface are **decimal** (`skills/_reference/endpoints.md`).
+- Never pass a `deviceNetworkId` to anything taking a node id.
+- Never read an empty capture as proof a device is silent. Re-check the id form first.
+- Convert with `hub_radiolog.py --dni`, or filter by `--device-id` instead.
+- Zigbee is unaffected. `zigbeeId` is hex on both sides.
 - `route` — hexadecimal node ids with hub (`01`) first, the destination itself last, and repeaters
   only between them. `01 -> 57` reaches node `0x57` directly. `01 -> 1B -> 57` uses repeater
   `0x1B`. `hub_mesh.py` reads intermediate hops into `zwave.route_fan_in` and a per-node `hops`
