@@ -241,7 +241,14 @@ The full field set: `name, label, zigbeeId, maxEvents, maxStates, spammyThreshol
 
 **Retention fields are display-tuned defaults.** `maxEvents` defaults to **11 per attribute** — 11 stored *changes*, not reports (`eventsJson` is change-filtered), so on a slow-moving signal it is a few hours and on a fast-changing one under an hour, rolled silently either way. `maxStates` 30, `spammyThreshold` 300. Raise `maxEvents` through this endpoint to use the hub as a short-horizon data buffer — 1000 covers ~two weeks of a slow-moving signal (`rules/data-collection.md`).
 
-**Hub-mesh mirrors follow a rename automatically** — all nine mirror `name` values updated on the consuming hub with no action there. This is the **opposite** of delete, where mirrors survive the source's removal and need cleanup on both hubs (`rules/device-lifecycle.md`): **rename propagates, delete does not.**
+**Hub-mesh mirrors follow a rename into `name` only — not into `label`.** All nine mirror `name` values updated on the consuming hub with no action there (2.5.1.135). A mirror's `label` is custom, overrides the propagated `name`, and is the field every reader sees — the UI, device pickers, and any tool resolving by label; it changes only under an explicit rename on the consuming hub. Re-measured on **2.5.1.156**, renaming a mesh-shared soil probe on the source hub (`devices` 941) via `POST /device/update`:
+
+| mirror field (`main` 1666) | before | after source rename |
+|--|--|--|
+| `name` | `… Right Leg on Devices In The New House…` | `… Drainage Channel on Devices In The New House…` — propagated immediately |
+| `label` | `Zone 8 Back Yard Plants Soil - Right Leg` | `Zone 8 Back Yard Plants Soil - Right Leg` — unchanged, still so 15 min later |
+
+So renaming a mesh-shared device is **two** operations, source first. Skipping the second leaves the source and every consumer on the other hub disagreeing, and it bites hardest when the freed name is reused: rename the source, pair the replacement, and the consuming hub holds **two devices with the identical label**, from which every label-resolving consumer picks one arbitrarily. This is still the **opposite** of delete, where mirrors survive the source's removal and need cleanup on both hubs (`rules/device-lifecycle.md`): **`name` propagates, `label` and delete do not.**
 
 **`zwaveRepair2` is a trigger, and polling it to read progress starts a rebuild.** It answers by
 state, which makes it look like a status route exactly once: idle → `{"success":true,"message":null}`
