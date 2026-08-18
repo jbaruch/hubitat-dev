@@ -58,6 +58,8 @@ from hub_logtail import build_handshake, iter_frames  # noqa: E402
 
 RADIO_SOCKETS = {"zwave": "/zwaveLogsocket", "zigbee": "/zigbeeLogsocket"}
 
+_HEX_DIGITS = frozenset("0123456789abcdefABCDEF")
+
 # Zigbee Cluster Library IDs → human names (the common home-automation clusters, per the ZCL
 # spec). Unknown ids are classified in cluster_name(), never guessed. Extend from the ZCL spec.
 ZCL_CLUSTERS = {
@@ -277,14 +279,17 @@ def node_id_from_dni(dni) -> int:
     """
     raw = str(dni).strip()
     body = raw[2:] if raw[:2].lower() == "0x" else raw
-    try:
-        return int(body, 16)
-    except ValueError:
+    # int(x, 16) also accepts Python integer syntax a deviceNetworkId never has — a sign
+    # ('-61', '+61'), underscores, non-ASCII digits. A signed value would convert to a
+    # node filter matching nothing, which is exactly the silent empty capture this
+    # conversion exists to prevent, so the digits are checked explicitly.
+    if not body or any(c not in _HEX_DIGITS for c in body):
         raise ValueError(
             f"--dni {raw!r} is not a hex deviceNetworkId. Read it from "
-            f"GET /device/fullJson/<id> -> device.deviceNetworkId (Z-Wave stores it as hex); "
-            f"pass a decimal node id to --node instead."
+            f"GET /device/fullJson/<id> -> device.deviceNetworkId (Z-Wave stores it as hex, "
+            f"digits 0-9a-f with an optional 0x prefix); pass a decimal node id to --node instead."
         )
+    return int(body, 16)
 
 
 def matches(frame: dict, name_substr=None, node=None, device_id=None, cluster=None) -> bool:
@@ -524,6 +529,9 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
 
     if args.dni is not None:
+        if args.radio != "zwave":
+            p.error("--dni is a Z-Wave deviceNetworkId; Zigbee has no node ids "
+                    "(filter Zigbee with --name or --device-id)")
         if args.node is not None:
             p.error("pass --node (decimal) or --dni (hex), not both")
         try:

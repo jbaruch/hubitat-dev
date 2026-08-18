@@ -33,7 +33,7 @@ healthy, so the devices are fine" — see `The command path`.
 - `neighbors` — how many nodes a **classic-mesh** node hears. `0` for Long Range nodes (a star has none — see below), not a backend artifact.
 - A Z-Wave device's `deviceNetworkId` is **hex**; `nodeId` and every node-facing surface are **decimal** (`skills/_reference/endpoints.md`).
 - Never pass a `deviceNetworkId` to anything taking a node id.
-- Both failure modes are silent: an empty capture, or an unrelated device's frames.
+- Never read an empty capture as proof a device is silent. Re-check the id form first.
 - Convert with `hub_radiolog.py --dni`, or filter by `--device-id` instead.
 - Zigbee is unaffected. `zigbeeId` is hex on both sides.
 - `route` — hexadecimal node ids with hub (`01`) first, the destination itself last, and repeaters

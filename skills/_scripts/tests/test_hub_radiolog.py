@@ -295,6 +295,23 @@ class TestNodeIdFromDni(unittest.TestCase):
         self.assertIn("deviceNetworkId", str(cm.exception))
         self.assertIn("--node", str(cm.exception))
 
+    def test_a_signed_value_is_rejected(self):
+        """int(x, 16) accepts '-61'/'+61'; a deviceNetworkId never carries a sign, and a
+        negative would convert to a node filter matching nothing — the silent empty
+        capture this conversion exists to prevent."""
+        for signed in ("-61", "+61"):
+            with self.assertRaises(ValueError):
+                m.node_id_from_dni(signed)
+
+    def test_python_integer_syntax_is_rejected(self):
+        for weird in ("6_1", "0x", "", "   ", "0xzz"):
+            with self.assertRaises(ValueError):
+                m.node_id_from_dni(weird)
+
+    def test_non_ascii_digits_are_rejected(self):
+        with self.assertRaises(ValueError):
+            m.node_id_from_dni("\u0666\u0661")
+
 
 class TestDniCli(unittest.TestCase):
     """--dni converts to the decimal node id; --node takes the decimal one directly."""
@@ -310,6 +327,16 @@ class TestDniCli(unittest.TestCase):
     def test_a_bad_dni_exits_rather_than_tailing_the_wrong_node(self):
         with self.assertRaises(SystemExit):
             m.main(["--ip", "1.2.3.4", "--radio", "zwave", "--dni", "zz"])
+
+    def test_a_signed_dni_exits_rather_than_capturing_nothing(self):
+        with self.assertRaises(SystemExit):
+            m.main(["--ip", "1.2.3.4", "--radio", "zwave", "--dni", "-61"])
+
+    def test_dni_is_rejected_on_the_zigbee_radio(self):
+        """Zigbee has no node ids, so a --dni there would become a filter that quietly
+        matches nothing rather than reporting the misuse."""
+        with self.assertRaises(SystemExit):
+            m.main(["--ip", "1.2.3.4", "--radio", "zigbee", "--dni", "61"])
 
 
 class TestSequenceTracker(unittest.TestCase):
