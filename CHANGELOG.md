@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.73 — 2026-08-18
+
 ### Changed
 
 - **Folded the deferred `context-writing-style` advisories from the #113, #121, #122 and #123 reviews** (`rules/zwave-zigbee-mesh.md`, `rules/device-lifecycle.md`, `rules/state-vs-attributes.md`, `skills/mesh-health/SKILL.md`). Presentation-only, no behaviour change. Every fact removed from an auto-loaded surface is already archived here, which is the whole point of the move.
