@@ -92,5 +92,5 @@ re-interview, so `/details` is polled until it flips). Re-read `device.data.firm
 second confirmation. Report per device: updated / skipped (already current) / skipped-weak /
 skipped-unknown / failed. For any failure, report that the device is **on old firmware, not bricked**
 (`nodeState OK`) and retryable. Do not silently drop the weak/unknown/failed nodes; name them and their
-current version. A `skipped_unknown` node was not judged unflashable — its own link was never measured.
-Report it that way rather than as weak.
+current version. A `skipped_unknown` node was not judged unflashable. Its own link was never measured.
+Report it that way, never as weak.
