@@ -74,7 +74,7 @@ nodes already at target) and carries **two required guards plus a floor**:
 - **Canary** (`--canary devId:nodeId`, a known-healthy **mains** node) — after a **failed** flash (a
   verified success already proved the radio transmits), confirms the controller still transmits; if not,
   it **reboots the hub and re-checks**, aborting if it stays hung.
-- **RSSI floor, read per hop count** (`--rssi-floor`, default −95 dBm) — skips a node whose link the floor
+- **RSSI floor, read per hop count** (`--rssi-floor`) — skips a node whose link the floor
   does not clear, in two reported buckets: `skipped_weak` (override when attended with `--flash-weak`) and
   `skipped_unknown` (override when attended with `--flash-unmeasured`). The two overrides are independent —
   a flash-everything run passes both. Which bucket a node lands in is the script's decision predicate:

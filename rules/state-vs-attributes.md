@@ -38,7 +38,7 @@ Hubitat has two distinct persistence mechanisms. Choosing the wrong one is a des
 - A flag present on some wakeups and absent on others is diagnostic, not noise.
 - Never treat a resting multimeter reading as refuting a low-battery flag on a lithium primary.
 - Swap in a known-good cell to test the flag instead.
-- Describe the symptom, never one encoding. A device may assert the same condition through the Notification CC's Power Management notification type.
+- Describe the symptom, never one encoding.
 
 ## state / atomicState (internal, private)
 

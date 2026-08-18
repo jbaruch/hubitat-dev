@@ -112,8 +112,8 @@ fitting an external antenna, or separating co-located 900 MHz hubs. Do not touch
 `skills/_reference/zwave-lifecycle.md` (TransmitReport). **`transmit_report` may be absent**
 (observed 2.5.1.140); the present fields (`transmit status`, `routing attempts`, `route speed`,
 `took`) still separate a real drop from a slow S2/FLiRS exchange.
-Read the hub's own noise floor from the `--summary` `background_rssi` rollup. It needs no
-TransmitReport and no device operated: the hub polls it unprompted. Per-channel `min`/`mean`/`max`
+Read the hub's own noise floor from the `--summary` `background_rssi` rollup. The hub polls it
+unprompted. It needs no TransmitReport and no device operated. Per-channel `min`/`mean`/`max`
 dBm against the receiver sensitivity in `rules/zwave-zigbee-mesh.md` answers whether the hub is
 noise-limited. Two reading rules. `samples` well below `polls` means the radio was busy, never that
 the hub lacks the measurement. A capture taken during a `zwaveRepair2` rebuild returns zero samples.
@@ -136,5 +136,5 @@ Remove; Zigbee Details → change channel/power) — this skill does not automat
 operations. A FAILED-**orphan** force-remove via `POST /hub/zwave/nodeRemove` and a full Z-Wave network
 rebuild via `GET /hub/zwaveRepair2` are groundable HTTP (`skills/_reference/endpoints.md`), but destructive
 removal stays guide-the-user, never auto-run. Never call `zwaveRepair2` to check on a rebuild — it
-starts one (`rules/zwave-zigbee-mesh.md`); poll `zwaveRepair2Status` / `checkZwaveRepairRunning`. Guide the user through the UI step, and offer
+starts one (`rules/zwave-zigbee-mesh.md`); poll `GET /hub/zwaveRepair2Status` / `GET /hub/checkZwaveRepairRunning`. Guide the user through the UI step, and offer
 `Skill(skill: "debug")` if a driver-level log-tail would confirm the device side. Finish here.

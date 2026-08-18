@@ -351,7 +351,7 @@ def main(argv=None):
     p.add_argument("--hubs", help="path to hubs.json (default ./hubs.json when --hub is given)")
     p.add_argument("--canary", help="devId:nodeId of a known-healthy MAINS node for the radio-health check")
     p.add_argument("--rssi-floor", type=int, default=RSSI_FLOOR_DEFAULT,
-                   help=f"skip nodes with lwrRssi <= this dBm (default {RSSI_FLOOR_DEFAULT}); hang-prone")
+                   help=f"skip a DIRECT, MEASURED node with lwrRssi <= this dBm (default {RSSI_FLOOR_DEFAULT}); hang-prone. This floor does not apply to routed or unmeasured links, which skip by default unless --flash-unmeasured")
     p.add_argument("--flash-weak", action="store_true",
                    help="flash a DIRECT, MEASURED node below the RSSI floor (attended only); does not lift --flash-unmeasured")
     p.add_argument("--flash-unmeasured", action="store_true",
