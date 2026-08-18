@@ -37,7 +37,9 @@ for the agent to judge against rules/zwave-zigbee-mesh.md.
 
 Usage:
     hub_radiolog.py --ip <addr> --radio zigbee [--name SUBSTR] [--seconds 20]
-    hub_radiolog.py --ip <addr> --radio zwave  [--node 359] [--follow]
+    hub_radiolog.py --ip <addr> --radio zwave  [--node 359 | --dni 61 | --device-id 404] [--follow]
+      A Z-Wave device's deviceNetworkId is HEX and every node-facing surface here is DECIMAL:
+      --node takes the decimal id, --dni converts the hex one, --device-id sidesteps both.
     hub_radiolog.py --ip <addr> --radio zigbee --summary [--seconds 30]   # per-device rollup
 Output is structured JSON by default (per-frame JSON objects); --text switches to human-formatted
 lines for watching live by eye; --summary aggregates the window into a JSON per-device rollup.
@@ -258,6 +260,31 @@ def parse_zwave_frame(f: dict) -> dict:
     if bg:
         out["background_rssi"] = bg
     return out
+
+
+def node_id_from_dni(dni) -> int:
+    """Hubitat stores a Z-Wave device's `deviceNetworkId` as HEX; every node-facing surface
+    here — this filter, the `[Node NNN]` log text, /hub/zwaveDetails/json, hub_mesh.py —
+    speaks DECIMAL. '61' -> 97, '0x61' -> 97, '1B' -> 27.
+
+    The conversion is silent to get wrong in both directions: a hex DNI like '61' is a
+    perfectly plausible decimal node id, so --node 61 matches nothing on a hub where node 61
+    is asleep (reading as "the device isn't transmitting") and, worse, tails an unrelated
+    device on a hub that does have a node 61. Zigbee is unaffected: `zigbeeId` is hex on
+    both sides and reads as hex.
+
+    Raises ValueError with an actionable message on anything that is not hex.
+    """
+    raw = str(dni).strip()
+    body = raw[2:] if raw[:2].lower() == "0x" else raw
+    try:
+        return int(body, 16)
+    except ValueError:
+        raise ValueError(
+            f"--dni {raw!r} is not a hex deviceNetworkId. Read it from "
+            f"GET /device/fullJson/<id> -> device.deviceNetworkId (Z-Wave stores it as hex); "
+            f"pass a decimal node id to --node instead."
+        )
 
 
 def matches(frame: dict, name_substr=None, node=None, device_id=None, cluster=None) -> bool:
@@ -483,8 +510,11 @@ def main(argv=None) -> int:
     p.add_argument("--ip", required=True)
     p.add_argument("--radio", required=True, choices=["zwave", "zigbee"])
     p.add_argument("--name", help="Zigbee device-name substring filter")
-    p.add_argument("--node", type=int, help="Z-Wave node id filter")
-    p.add_argument("--device-id", help="Hubitat device id filter")
+    p.add_argument("--node", type=int,
+                   help="Z-Wave node id filter, DECIMAL as the log prints it. A device's "
+                        "deviceNetworkId is HEX — pass that to --dni instead")
+    p.add_argument("--dni", help="Z-Wave deviceNetworkId (HEX) filter — converted to the decimal node id")
+    p.add_argument("--device-id", help="Hubitat device id filter (unambiguous; no hex/decimal conversion)")
     p.add_argument("--cluster", help="Zigbee cluster filter (name or hex id)")
     p.add_argument("--seconds", type=int, default=20)
     p.add_argument("--follow", action="store_true", help="run until interrupted")
@@ -492,6 +522,14 @@ def main(argv=None) -> int:
     p.add_argument("--text", action="store_true",
                    help="human-formatted lines instead of the default JSON (for watching live by eye)")
     args = p.parse_args(argv)
+
+    if args.dni is not None:
+        if args.node is not None:
+            p.error("pass --node (decimal) or --dni (hex), not both")
+        try:
+            args.node = node_id_from_dni(args.dni)
+        except ValueError as e:
+            p.error(str(e))
 
     filters = {"name_substr": args.name, "node": args.node,
                "device_id": args.device_id, "cluster": args.cluster}

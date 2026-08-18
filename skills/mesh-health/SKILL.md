@@ -97,11 +97,13 @@ confirming, tail its live traffic:
 
 ```
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_radiolog.py --ip <addr> --radio zigbee|zwave \
-    [--name "<device>" | --node <n>] --summary [--seconds N]
+    [--name "<device>" | --node <decimal> | --dni <hex> | --device-id <id>] --summary [--seconds N]
 ```
 
 The script emits structured JSON by default; `--summary` gives the per-device rollup you want for
 diagnosis (raw per-frame JSON otherwise). Argument and frame contract: `skills/_scripts/hub_radiolog.py` module docstring.
+`--node` takes a **decimal** node id. A Z-Wave device's `deviceNetworkId` is **hex** — pass it to `--dni`,
+or filter by `--device-id` (`rules/zwave-zigbee-mesh.md`).
 For a Z-Wave device that is slow or **flapping**, operate it while capturing and read the `--summary`
 `transmit_report` rollup. If `hub_snr_med` is well below `dest_snr_med` and the hub noise floor is
 worse or spikier than the device's, the hub's receiver is the bottleneck, from its RF environment

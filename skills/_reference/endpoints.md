@@ -238,6 +238,7 @@ The full field set: `name, label, zigbeeId, maxEvents, maxStates, spammyThreshol
 - **`version` is an optimistic-concurrency token**, the same pattern as `/app/ajax/code` (`rules/multi-hub-topology.md`) — read it fresh from `fullJson` immediately before each POST; a successful update bumps it.
 - **The form mixes two boolean encodings.** `meshEnabled` / `meshFullSync` are **checkbox-semantic** — sent as `on` when true, **omitted entirely** when false. `retryEnabled` / `homeKitEnabled`, right beside them, are literal `true` / `false` strings. Mis-encoding the mesh pair is **destructive**: it disables hub-mesh sharing, removing the mirrored device on the consuming hub and breaking every app bound to the mirror. A naive "serialize all booleans the same way" replay triggers it.
 - **The label input hides on an inactive PrimeVue tab** — UI-capture mechanics in `skills/_reference/playwright-ui.md`.
+- **A Z-Wave `deviceNetworkId` is HEX, and every node-facing surface is DECIMAL.** See the node-addressing note in the Z-Wave census section below before feeding this field to anything that takes a node id.
 
 **Retention fields are display-tuned defaults.** `maxEvents` defaults to **11 per attribute** — 11 stored *changes*, not reports (`eventsJson` is change-filtered), so on a slow-moving signal it is a few hours and on a fast-changing one under an hour, rolled silently either way. `maxStates` 30, `spammyThreshold` 300. Raise `maxEvents` through this endpoint to use the hub as a short-horizon data buffer — 1000 covers ~two weeks of a slow-moving signal (`rules/data-collection.md`).
 
@@ -283,6 +284,26 @@ weigh `per` against it), `per` (cumulative packet-error **count**, not a %), `av
 `lwrRssi` (string — see scale note), `neighbors` (int), `routeChanges` (int or `N/A`), `route`,
 `security`, `listening`, `beaming`, `batteryPercent`, `lastTime` (when the hub last heard the node —
 see the timestamp trap below; **absent** on a node never heard, which is reported `nodeState:OK`).
+
+**A Z-Wave `deviceNetworkId` is HEX; `nodeId` and the radio log are DECIMAL.** Hubitat stores the
+device-side identifier (`GET /device/fullJson/<id>` → `device.deviceNetworkId`, and the same field in
+the `POST /device/update` set) as **hex**, while every node-facing surface speaks **decimal**:
+`nodes[].nodeId` here, `zwaveNodeId` on `nodeRemove`, the `[Node NNN]` text in `zwaveLogsocket`,
+`hub_radiolog.py --node`, and `hub_mesh.py`. Measured on 2.5.1.156 (C-8 Pro, zwaveJS):
+
+| device | `fullJson` → `deviceNetworkId` | node id in the radio log |
+|--|--|--|
+| Patio Right Motion Sensor (404) | `61` | **97** (`0x61`) |
+| Patio Left Motion Sensor (405) | `62` | **98** (`0x62`) |
+
+Both failure modes are **silent**, because a hex DNI like `61` is a perfectly plausible decimal node
+id: on a hub where node 61 is asleep the filter matches nothing and reads as "the device isn't
+transmitting", and on a hub that *does* have a node 61 you tail an unrelated device and draw
+conclusions from its frames. In the #117 diagnosis the first capture was filtered on the decimal
+reading and returned nothing; the real device surfaced only because an unfiltered capture caught
+`Node 097` emitting `Tampering, product cover removed` as the sensor was handled. Pass the hex value
+to `hub_radiolog.py --dni`, which converts it, or sidestep the conversion entirely with
+`--device-id`. **Zigbee is unaffected** — `zigbeeId` is hex on both sides and reads as hex.
 
 `listening:true` is the always-on / classic-mesh repeater indicator. `beaming` means the node
 **requires** beam wake-up, not that it beams for others; its JSON value was false for every sampled
