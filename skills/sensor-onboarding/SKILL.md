@@ -21,7 +21,7 @@ Read `GET /device/fullJson/<id>` and confirm the device landed on a real built-i
 
 ## Step 4 — Name by function and position
 
-Name the device by **function and position** (`<function> - <position>`), qualifying even a single-sensor unit so a second sensor later does not force a rename (`rules/data-collection.md`). The rename is a `POST /device/update` mutation carrying the full field set, a `version` token, and a **destructive mesh-boolean trap** (`skills/_reference/endpoints.md`) — do it on the device edit page (`skills/_reference/playwright-ui.md`), or over HTTP only by reading the current full field set first and preserving every field. Proceed to Step 5.
+Name the device by **function and position** (`<function> - <position>`), qualifying even a single-sensor unit so a second sensor later does not force a rename (`rules/data-collection.md`). The rename is a `POST /device/update` mutation carrying the full field set, the current `version` stamp, and a **destructive mesh-boolean trap** (`skills/_reference/endpoints.md`). `version` is the integer the hub bumps on every save, echoed back unchanged so a concurrent edit is detected. Do it on the device edit page (`skills/_reference/playwright-ui.md`), or over HTTP only by reading the current full field set first and preserving every field. Proceed to Step 5.
 
 ## Step 5 — Raise event retention
 
