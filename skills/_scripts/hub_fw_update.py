@@ -38,15 +38,27 @@ a mid-transfer stall):
      false-trigger a reboot). Refresh a known-healthy MAINS node and confirm its Z-Wave `lastTime`
      advances; if it does not, the controller is hung -> reboot and re-probe; abort if it stays hung.
 
-Plus an RSSI FLOOR: devices at/below --rssi-floor dBm (default -95; the Silicon Labs 700-series RX
-floor is -97, 800-series LR -110) are hang-prone and rarely flash — skip them unless --flash-weak.
-Not worth risking a whole-hub Z-Wave blackout to update one bathroom plug.
+Plus an RSSI FLOOR, applied PER HOP COUNT. `lwrRssi` is the last hop INTO the hub, so it is the
+node's own radio only on a DIRECT link. On a routed node it measures the final repeater's link and
+says nothing about the device — read as the device's signal it runs both ways wrong: a node routed
+through a repeater beside the hub reads strong and PASSES a gate that exists to stop a hang-prone
+flash, while a node behind a weak repeater is skipped on a number that is not about it. So:
+  - DIRECT (hops == 0, every LR node included) with a readable dBm reading: this is the ONLY shape
+    with a measured own-link. At/below --rssi-floor dBm (default -95; the Silicon Labs 700-series RX
+    floor is -97, 800-series LR -110) is hang-prone and rarely flashes — skipped as `skipped_weak`
+    unless --flash-weak.
+  - EVERY OTHER SHAPE — routed (hops >= 1), no readable route, or direct with no readable lwrRssi —
+    leaves this node's own link UNMEASURED, and the floor cannot clear an unmeasured link for a
+    flash. Skipped as `skipped_unknown` unless --flash-unmeasured.
+Not worth risking a whole-hub Z-Wave blackout to update one bathroom plug. The two overrides are
+independent: --flash-weak lifts the floor on a direct measured link, --flash-unmeasured lifts the
+unmeasured-link skip; an attended flash-everything run passes both.
 
 Reboot recovery: GET /hub/advanced/getManagementToken -> GET /management/reboot?token=<token>
 (~2-3 min; zwaveJS re-interviews all nodes; verify a fresh systemStart in /hub/eventsJson).
 
 Worklist JSON (--worklist): [{"nodeId":N,"fileName":"X.gbl","target":"2.6","name":"..."}, ...]
-Progress goes to stderr; a JSON summary {ok,skipped,skipped_weak,failed,rebooted} to stdout.
+Progress goes to stderr; a JSON summary {ok,skipped,skipped_weak,skipped_unknown,failed,rebooted} to stdout.
 Idempotent (skips nodes already at target); MAX_CONSEC_FAIL circuit breaker; optional --wait-pid
 chains this run after another batch on the same radio finishes.
 """
@@ -61,6 +73,7 @@ import urllib.error
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # E402: import must follow the sys.path insert above so hubclient resolves when run as a script.
 from hubclient import HubError, resolve_base_from_args  # noqa: E402
+from hub_mesh import parse_rssi, route_hop_count  # noqa: E402
 
 POLL_SECS = 15
 STALL_SECS = 240          # abort a flash if percent has not advanced for this long (at ANY %)
@@ -97,18 +110,60 @@ def cur_version(base, node):
     return tg[0].get("version") if tg else None
 
 
-def node_rssi(base, node):
-    """lwrRssi in dBm for a zwaveJS node (negative). None if unknown/legacy-scale."""
+def node_link(base, node):
+    """(rssi, hops) for a zwaveJS node, from one /hub/zwaveDetails/json read.
+
+    rssi is lwrRssi in dBm (negative), or None when absent or on the legacy dB-above-noise
+    scale — this gate reads only the zwaveJS absolute-dBm scale, and a positive number is
+    the other one. hops is how many REPEATERS the hub's route passes through: 0 direct,
+    N routed, None no readable route (hub_mesh.route_hop_count owns that definition).
+    A node absent from the payload answers (None, None) — nothing is known about its link.
+    """
     for n in _get(base, "/hub/zwaveDetails/json").get("nodes", []):
         if n.get("nodeId") == node:
-            raw = (n.get("lwrRssi") or "").strip()
-            m = "".join(c for c in raw if c in "-0123456789")
-            try:
-                v = int(m)
-                return v if v < 0 else None   # only trust the zwaveJS absolute-dBm scale here
-            except ValueError:
-                return None
-    return None
+            rssi = parse_rssi(n.get("lwrRssi"))
+            if rssi is not None:
+                rssi = int(rssi) if rssi < 0 else None
+            return rssi, route_hop_count(n.get("route"), node)
+    return None, None
+
+
+def rssi_gate(rssi, hops, floor, flash_weak, flash_unmeasured):
+    """Decide whether a node's link permits a flash. Pure — no I/O, no clock.
+
+    Only ONE shape of node has a measured own-link: a DIRECT one (hops == 0) carrying a
+    readable absolute-dBm lwrRssi. That node is gated on the floor. Every other shape —
+    routed, no readable route, or direct with no readable reading — leaves this node's own
+    link UNMEASURED, and the floor cannot clear an unmeasured link for a flash. See the
+    RSSI FLOOR note in the module docstring.
+
+    Returns (verdict, reason). verdict is 'flash' | 'skipped_weak' | 'skipped_unknown';
+    reason is the operator-facing explanation, empty when the verdict is 'flash'.
+    """
+    if hops == 0 and rssi is not None:
+        if rssi <= floor and not flash_weak:
+            return "skipped_weak", (f"rssi {rssi}dBm <= floor {floor} on a direct link — "
+                                    "hang-prone; use --flash-weak to force")
+        return "flash", ""
+    if flash_unmeasured:
+        return "flash", ""
+    if hops == 0:
+        why = "direct link but no readable lwrRssi"
+    elif hops is None:
+        why = "no readable route, so direct-vs-routed is itself unknown"
+    else:
+        reading = f"rssi {rssi}dBm is" if rssi is not None else "the only reading is"
+        why = f"{reading} the last hop into the hub via {hops} repeater(s), not this node"
+    return "skipped_unknown", (f"{why} — this node's own link is UNMEASURED and the RSSI floor "
+                               "cannot clear it; use --flash-unmeasured to force")
+
+
+def link_note(rssi, hops):
+    """Trailing ' rssi -61dBm direct' / ' link via 2 repeater(s)' for a START line. '' if nothing known."""
+    where = "direct" if hops == 0 else ("route unknown" if hops is None else f"via {hops} repeater(s)")
+    if rssi is not None:
+        return f" rssi {rssi}dBm {where}"
+    return "" if hops is None else f" link {where}"
 
 
 def _all_lasttimes(base):
@@ -186,16 +241,18 @@ def ensure_radio_ok(base, canary_dev, canary_node, allow_reboot, results=None):
     return False
 
 
-def flash(base, node, name, fname, target, rssi_floor, flash_weak):
+def flash(base, node, name, fname, target, rssi_floor, flash_weak, flash_unmeasured):
     v = cur_version(base, node)
     if v == target:
         log(f"SKIP node {node} ({name}) already {target}")
         return "skipped"
-    rssi = node_rssi(base, node)
-    if not flash_weak and rssi is not None and rssi <= rssi_floor:
-        log(f"SKIP-WEAK node {node} ({name}) rssi {rssi}dBm <= floor {rssi_floor} — hang-prone; use --flash-weak to force")
-        return "skipped_weak"
-    log(f"START node {node} ({name}) {v} -> {target} [{fname}]" + (f" rssi {rssi}dBm" if rssi is not None else ""))
+    rssi, hops = node_link(base, node)
+    verdict, reason = rssi_gate(rssi, hops, rssi_floor, flash_weak, flash_unmeasured)
+    if verdict != "flash":
+        label = "SKIP-WEAK" if verdict == "skipped_weak" else "SKIP-UNKNOWN"
+        log(f"{label} node {node} ({name}) {reason}")
+        return verdict
+    log(f"START node {node} ({name}) {v} -> {target} [{fname}]" + link_note(rssi, hops))
     resp = _post(base, "/hub/zwave/deviceFirmware/start",
                  {"nodeId": node, "target": 0, "fileName": fname})
     if not resp.get("success", False):
@@ -253,19 +310,19 @@ def pid_alive(pid):
         return False
 
 
-def run(base, work, canary_dev, canary_node, rssi_floor, flash_weak, allow_reboot, wait_pid):
+def run(base, work, canary_dev, canary_node, rssi_floor, flash_weak, flash_unmeasured, allow_reboot, wait_pid):
     if wait_pid:
         log(f"waiting for pid {wait_pid} (prior batch on same radio) to finish…")
         while pid_alive(wait_pid):
             time.sleep(30)
     log(f"=== fw batch: {len(work)} nodes on {base} "
         f"(canary {canary_dev}:{canary_node}, rssi_floor {rssi_floor}) ===")
-    results = {"ok": [], "skipped": [], "skipped_weak": [], "failed": [], "rebooted": 0}
+    results = {"ok": [], "skipped": [], "skipped_weak": [], "skipped_unknown": [], "failed": [], "rebooted": 0}
     consec = 0
     for w in work:
         node, name = w["nodeId"], w.get("name", "?")
         try:
-            r = flash(base, node, name, w["fileName"], w["target"], rssi_floor, flash_weak)
+            r = flash(base, node, name, w["fileName"], w["target"], rssi_floor, flash_weak, flash_unmeasured)
         except Exception as e:
             log(f"ERROR node {node} ({name}): unhandled {type(e).__name__}: {e}")
             r = "failed"
@@ -295,7 +352,11 @@ def main(argv=None):
     p.add_argument("--canary", help="devId:nodeId of a known-healthy MAINS node for the radio-health check")
     p.add_argument("--rssi-floor", type=int, default=RSSI_FLOOR_DEFAULT,
                    help=f"skip nodes with lwrRssi <= this dBm (default {RSSI_FLOOR_DEFAULT}); hang-prone")
-    p.add_argument("--flash-weak", action="store_true", help="flash even below the RSSI floor (attended only)")
+    p.add_argument("--flash-weak", action="store_true",
+                   help="flash a DIRECT, MEASURED node below the RSSI floor (attended only); does not lift --flash-unmeasured")
+    p.add_argument("--flash-unmeasured", action="store_true",
+                   help="flash a node whose OWN link is unmeasured — routed, no readable route, or no "
+                        "readable lwrRssi (attended only)")
     p.add_argument("--no-reboot", action="store_true", help="do not auto-reboot on a hung radio (abort instead)")
     p.add_argument("--wait-pid", type=int, help="block until this pid exits (chain after another batch)")
     args = p.parse_args(argv)
@@ -313,10 +374,10 @@ def main(argv=None):
     canary_dev, canary_node = (args.canary.split(":") if args.canary else (None, None))
 
     results = run(base, work, canary_dev, canary_node, args.rssi_floor,
-                  args.flash_weak, not args.no_reboot, args.wait_pid)
+                  args.flash_weak, args.flash_unmeasured, not args.no_reboot, args.wait_pid)
 
     log("=== SUMMARY ===")
-    for k in ("ok", "skipped", "skipped_weak", "failed"):
+    for k in ("ok", "skipped", "skipped_weak", "skipped_unknown", "failed"):
         log(f"{k}: {len(results[k])}")
         for x in results[k]:
             log(f"   {x}")

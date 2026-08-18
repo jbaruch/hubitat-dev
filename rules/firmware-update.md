@@ -40,12 +40,18 @@ Grounded live twice (2026-07-22). A flash that **fails mid-transfer**, or **stal
 
 1. **No-progress watchdog.** Abort a flash if `percent` stops advancing for a few minutes at **ANY** level, not only at 0%. A frozen transfer never emits `DONE`/`FAILED`, so a plain start→wait-for-DONE loop hangs forever and takes the radio with it. (A canary-only guard *missed* a mid-transfer stall — that's why this is separate.)
 2. **Canary radio-health probe**, run **only after a failed flash**. A hung controller freezes **every** node's `lastTime` (it transmits nothing); a healthy hub always has some node reporting, and a rebooting hub advances `lastTime`s as it re-interviews. So nudge a known-healthy **mains** node and, over a **wide window**, check whether **ANY** node's `lastTime` advances — *not* whether one specific node answers inside a tight window. If nothing advances, the controller is hung → **reboot and re-check**; abort if it stays hung. Two false-positive traps this avoids, both learned live on a 75-LR-node hub: (a) do **not** probe after a *successful* flash — the success already proved the radio transmits, and the flashed device's own re-interview busies the radio → needless reboot; (b) a single-node/30 s check false-reads "hung" (and post-reboot "still hung," while zwaveJS is still interviewing) even though the radio is fine — checking **any** node over a wide window fixes both directions.
-3. **RSSI floor.** Skip nodes at/below ~−95 dBm `lwrRssi` (SiLabs RX floor: −97 dBm 700-series, −110 dBm 800-LR) — floor-signal nodes are hang-prone and rarely flash. Not worth risking a whole-hub Z-Wave blackout to update one bathroom plug; force only when attended.
+3. **RSSI floor, read per hop count.** `lwrRssi` is the last hop **into** the hub (`rules/zwave-zigbee-mesh.md`).
+   - A node's own link is measured only when it is **direct** (`hops == 0`) and carries a readable `lwrRssi`.
+   - Skip such a node at/below ~−95 dBm. SiLabs RX floor: −97 dBm 700-series, −110 dBm 800-LR.
+   - Skip every other shape — routed, no readable route, or direct with no readable `lwrRssi`.
+   - The floor never clears an unmeasured link for a flash.
+   - Force either skip only when attended.
 
-Never fire-and-forget across marginal devices. Flash strong-signal devices; leave floor-RSSI ones on their current firmware.
+Never fire-and-forget across marginal devices. Flash devices whose **own** link is measured and strong. Leave floor-RSSI and unmeasured-link ones on their current firmware.
 
 ## Recovery and verification
 
 - **Reboot clears the hang**: `GET /hub/advanced/getManagementToken` → `GET /management/reboot?token=<token>` (~2–3 min; zwaveJS re-interviews every node; confirm a fresh `systemStart` in `/hub/eventsJson`). On the automation hub a reboot is a ~3-min blackout, so **prevention (the guardrails) beats recovery** here.
 - **Nothing bricks from a hang** — after recovery all nodes read `nodeState OK`; a stalled node sometimes even completes to target once the reboot frees the queue.
-- **Verify** each node against its target: the hub caches the old version in `device.data.firmwareVersion` until the post-reboot re-interview, so poll `/hub/zwave/deviceFirmware/details?nodeId=N` → `targets[0].version` until it flips. Report per device — updated / already-current / skipped-weak / failed — and name any failure with its current version (on old firmware, not bricked, retryable).
+- **Verify** each node against its target: the hub caches the old version in `device.data.firmwareVersion` until the post-reboot re-interview, so poll `/hub/zwave/deviceFirmware/details?nodeId=N` → `targets[0].version` until it flips. Report per device — updated / already-current / skipped-weak / skipped-unknown / failed — and name any failure with its current version (on old firmware, not bricked, retryable).
+- A skipped-unknown node was never judged unflashable. Its own link was not measured. Report it that way, never as weak.

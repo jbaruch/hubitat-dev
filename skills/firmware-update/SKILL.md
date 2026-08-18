@@ -74,8 +74,12 @@ nodes already at target) and carries **two required guards plus a floor**:
 - **Canary** (`--canary devId:nodeId`, a known-healthy **mains** node) — after a **failed** flash (a
   verified success already proved the radio transmits), confirms the controller still transmits; if not,
   it **reboots the hub and re-checks**, aborting if it stays hung.
-- **RSSI floor** (`--rssi-floor`, default −95 dBm) — skips hang-prone floor-signal nodes; override only
-  when attended with `--flash-weak`.
+- **RSSI floor, read per hop count** (`--rssi-floor`, default −95 dBm) — skips a node whose link the floor
+  does not clear, in two reported buckets: `skipped_weak` (override when attended with `--flash-weak`) and
+  `skipped_unknown` (override when attended with `--flash-unmeasured`). The two overrides are independent —
+  a flash-everything run passes both. Which bucket a node lands in is the script's decision predicate:
+  `rssi_gate()` in `skills/_scripts/hub_fw_update.py`, with the policy it implements in
+  `rules/firmware-update.md` Guardrails.
 
 **One batch per radio** (a hub's Z-Wave is single-threaded for OTA); use `--wait-pid` to chain a second
 batch after the first, or run different hubs in parallel. Never run two flashes into the same radio at
@@ -85,6 +89,8 @@ once. Proceed to Step 6.
 
 The script verifies each node against its target (the hub caches the old version until the post-reboot
 re-interview, so `/details` is polled until it flips). Re-read `device.data.firmwareVersion` for a
-second confirmation. Report per device: updated / skipped (already current) / skipped-weak / failed —
-and for any failure, that the device is **on old firmware, not bricked** (`nodeState OK`) and retryable.
-Do not silently drop the weak/failed nodes; name them and their current version.
+second confirmation. Report per device: updated / skipped (already current) / skipped-weak /
+skipped-unknown / failed. For any failure, report that the device is **on old firmware, not bricked**
+(`nodeState OK`) and retryable. Do not silently drop the weak/unknown/failed nodes; name them and their
+current version. A `skipped_unknown` node was not judged unflashable. Its own link was never measured.
+Report it that way, never as weak.
