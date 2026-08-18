@@ -74,11 +74,12 @@ nodes already at target) and carries **two required guards plus a floor**:
 - **Canary** (`--canary devId:nodeId`, a known-healthy **mains** node) — after a **failed** flash (a
   verified success already proved the radio transmits), confirms the controller still transmits; if not,
   it **reboots the hub and re-checks**, aborting if it stays hung.
-- **RSSI floor, applied per hop count** (`--rssi-floor`, default −95 dBm) — `lwrRssi` is the node's own
-  radio only on a **direct** link. A **direct** node at/below the floor is hang-prone and skips as
-  `skipped_weak`; override when attended with `--flash-weak`. A **routed** node, or one with no readable
-  route, has an **unknown** own-link and skips as `skipped_unknown`; override when attended with
-  `--flash-routed`. The two overrides are independent — a flash-everything run passes both.
+- **RSSI floor, applied per hop count** (`--rssi-floor`, default −95 dBm) — a node's own link is measured
+  only when it is **direct** (`hops == 0`) with a readable `lwrRssi`. Such a node at/below the floor skips
+  as `skipped_weak`; override when attended with `--flash-weak`. Every other shape — routed, no readable
+  route, or direct with no readable reading — has an **unmeasured** own-link and skips as
+  `skipped_unknown`; override when attended with `--flash-unmeasured`. The two overrides are independent —
+  a flash-everything run passes both.
 
 **One batch per radio** (a hub's Z-Wave is single-threaded for OTA); use `--wait-pid` to chain a second
 batch after the first, or run different hubs in parallel. Never run two flashes into the same radio at

@@ -41,10 +41,21 @@ class TestRssiGateDirect(unittest.TestCase):
     def test_flash_weak_forces_a_weak_direct_node(self):
         self.assertEqual(m.rssi_gate(-96, 0, FLOOR, True, False)[0], "flash")
 
-    def test_direct_node_with_unreadable_rssi_still_flashes(self):
-        """An unknown reading on a known-direct link is not a reason to skip — the
-        pre-existing behaviour, preserved."""
-        self.assertEqual(m.rssi_gate(None, 0, FLOOR, False, False)[0], "flash")
+    def test_direct_node_with_unreadable_rssi_is_skipped_unknown(self):
+        """A direct link with no readable reading is still an UNMEASURED own-link, and the
+        rule leaves unmeasured links on their current firmware. The pre-hop-accounting gate
+        flashed these on a vacuous "no reading"."""
+        verdict, reason = m.rssi_gate(None, 0, FLOOR, False, False)
+        self.assertEqual(verdict, "skipped_unknown")
+        self.assertIn("no readable lwrRssi", reason)
+        self.assertIn("--flash-unmeasured", reason)
+
+    def test_flash_unmeasured_forces_a_direct_node_with_no_reading(self):
+        self.assertEqual(m.rssi_gate(None, 0, FLOOR, False, True)[0], "flash")
+
+    def test_flash_weak_does_not_lift_the_unmeasured_skip_on_a_direct_node(self):
+        """--flash-weak speaks to the floor, which needs a reading to apply at all."""
+        self.assertEqual(m.rssi_gate(None, 0, FLOOR, True, False)[0], "skipped_unknown")
 
 
 class TestRssiGateRouted(unittest.TestCase):
@@ -55,24 +66,25 @@ class TestRssiGateRouted(unittest.TestCase):
         -48 dBm routed through an extender beside the hub and -88/-80/-70 once direct."""
         verdict, reason = m.rssi_gate(-48, 2, FLOOR, False, False)
         self.assertEqual(verdict, "skipped_unknown")
-        self.assertIn("--flash-routed", reason)
+        self.assertIn("--flash-unmeasured", reason)
         self.assertIn("2 repeater(s)", reason)
 
     def test_routed_node_reading_weak_is_skipped_as_unknown_not_weak(self):
         """A weak routed reading is not evidence about the device, so it is not skipped_weak."""
         self.assertEqual(m.rssi_gate(-99, 1, FLOOR, False, False)[0], "skipped_unknown")
 
-    def test_flash_routed_forces_a_routed_node(self):
+    def test_flash_unmeasured_forces_a_routed_node(self):
         self.assertEqual(m.rssi_gate(-48, 2, FLOOR, False, True)[0], "flash")
 
     def test_flash_weak_alone_does_not_lift_the_routed_skip(self):
-        """The two overrides are independent; --flash-weak speaks only to the floor."""
+        """The two overrides are independent; --flash-weak speaks only to the floor on a
+        direct measured link."""
         self.assertEqual(m.rssi_gate(-48, 2, FLOOR, True, False)[0], "skipped_unknown")
 
     def test_routed_node_with_unreadable_rssi_is_skipped(self):
         verdict, reason = m.rssi_gate(None, 3, FLOOR, False, False)
         self.assertEqual(verdict, "skipped_unknown")
-        self.assertIn("the reading is", reason)
+        self.assertIn("the only reading is", reason)
 
 
 class TestRssiGateUnknownRoute(unittest.TestCase):
@@ -87,7 +99,7 @@ class TestRssiGateUnknownRoute(unittest.TestCase):
         """A strong reading must not buy a flash when the route does not evidence a direct link."""
         self.assertEqual(m.rssi_gate(-40, None, FLOOR, False, False)[0], "skipped_unknown")
 
-    def test_flash_routed_forces_an_unknown_route(self):
+    def test_flash_unmeasured_forces_an_unknown_route(self):
         self.assertEqual(m.rssi_gate(-70, None, FLOOR, False, True)[0], "flash")
 
 
