@@ -2,7 +2,7 @@
 
 ### Changed
 
-- **Folded the deferred `context-writing-style` advisories from the #113, #121 and #122 reviews** (`rules/zwave-zigbee-mesh.md`, `rules/device-lifecycle.md`, `rules/state-vs-attributes.md`, `skills/mesh-health/SKILL.md`). Presentation-only, no behaviour change. Every fact removed from an auto-loaded surface is already archived here, which is the whole point of the move.
+- **Folded the deferred `context-writing-style` advisories from the #113, #121, #122 and #123 reviews** (`rules/zwave-zigbee-mesh.md`, `rules/device-lifecycle.md`, `rules/state-vs-attributes.md`, `skills/mesh-health/SKILL.md`). Presentation-only, no behaviour change. Every fact removed from an auto-loaded surface is already archived here, which is the whole point of the move.
   - `lwrRssi` last-hop bullet — dropped the measured three-shade case (−48 dBm routed vs −88/−80/−70 direct), archived in the 0.1.67 entry. The last-hop directive stays.
   - Mixed-ranking bullet — replaced the failure-mode explanation with the contract it was explaining: a reading from one list is not comparable to a reading from another, in either direction.
   - `ch1`/`ch2` bullet — dropped the "in every sample on the grounded hubs" sampling evidence, archived in the 0.1.67 entry. "Read them as one channel" stays.
@@ -10,6 +10,8 @@
   - `mesh-health` Step 7 — the rebuild-status routes now read `GET /hub/zwaveRepair2Status` / `GET /hub/checkZwaveRepairRunning`, matching the `GET /hub/zwaveRepair2` beside them. The paragraph exists to stop an agent probing the trigger route, and mixed path forms worked against it.
   - `device-lifecycle` mirror-`label` bullet — split three contract statements into one bullet each (custom, overrides the propagated `name`, changes only under an explicit rename on the consuming hub).
   - `state-vs-attributes` encoding bullet — dropped the Notification CC example that explained the directive; it is archived in the 0.1.70 entry.
+  - `firmware-update` skill — dropped the `default −95 dBm` numeric, which duplicated the script-owned `RSSI_FLOOR_DEFAULT` constant (`script-as-black-box`). The flag name and the reference to `rssi_gate()` stay.
+  - `hub_fw_update.py` `--rssi-floor` help — still read as though the floor gated every node's `lwrRssi`; it now says it gates a direct, measured link and points at `--flash-unmeasured` for the rest.
   - Also corrected the 0.1.70 entry's confirmation command, which omitted `hub_radiolog.py`'s required `--ip`.
 
   Closes #116.
