@@ -11,7 +11,7 @@
   - `device-lifecycle` mirror-`label` bullet — split three contract statements into one bullet each (custom, overrides the propagated `name`, changes only under an explicit rename on the consuming hub).
   - `state-vs-attributes` encoding bullet — dropped the Notification CC example that explained the directive; it is archived in the 0.1.70 entry.
   - `firmware-update` skill — dropped the `default −95 dBm` numeric, which duplicated the script-owned `RSSI_FLOOR_DEFAULT` constant (`script-as-black-box`). The flag name and the reference to `rssi_gate()` stay.
-  - `hub_fw_update.py` `--rssi-floor` help — still read as though the floor gated every node's `lwrRssi`; it now says it gates a direct, measured link and points at `--flash-unmeasured` for the rest.
+  - `hub_fw_update.py` `--rssi-floor` help — still read as though the floor gated every node's `lwrRssi`; it now says it gates a direct, measured link, and that routed and unmeasured links skip by default unless `--flash-unmeasured` is supplied.
   - Also corrected the 0.1.70 entry's confirmation command, which omitted `hub_radiolog.py`'s required `--ip`.
 
   Closes #116.
