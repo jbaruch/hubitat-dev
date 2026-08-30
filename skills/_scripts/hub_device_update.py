@@ -246,6 +246,9 @@ def parse_set(assignments: list) -> dict:
         if key in SCRIPT_OWNED_FIELDS:
             raise HubError(f"--set {key} is not allowed: the script owns it — the device comes from "
                            f"--device and `version` is read fresh immediately before the POST")
+        if key not in FORM_FIELDS:
+            raise HubError(f"--set {key} is not a field on this form — valid: "
+                           f"{', '.join(f for f in FORM_FIELDS if f not in SCRIPT_OWNED_FIELDS)}")
         changes[key] = as_bool(value) if key in CHECKBOX_FIELDS else value
     return changes
 

@@ -52,7 +52,8 @@ them onto the new id.
 - Never leave a freed label duplicated when the source's old name is about to be reused.
 - Round-trip the field set before the first real edit of any device — `skills/_scripts/hub_device_update.py --hub <name> --device <id> --noop` (argument and output contract in its module docstring).
 - A mis-encoded mesh boolean pair unshares the device and deletes the mirror (`skills/_reference/endpoints.md`).
-- Every boolean on that form is checkbox-semantic; a literal `true` clears the field.
+- Every boolean on that form is checkbox-semantic.
+- A literal `true` clears the field.
 
 ## Replacement re-wires nothing
 

@@ -241,6 +241,11 @@ class TestParseSet(unittest.TestCase):
         with self.assertRaises(HubError):
             m.parse_set(["version=1"])
 
+    def test_unknown_field_is_rejected_before_any_hub_call(self):
+        with self.assertRaises(HubError) as ctx:
+            m.parse_set(["notAField=x"])
+        self.assertIn("notAField", str(ctx.exception))
+
     def test_missing_equals_raises(self):
         with self.assertRaises(HubError):
             m.parse_set(["label"])
@@ -440,6 +445,12 @@ class TestMain(unittest.TestCase):
     def test_setting_version_exits_two_and_posts_nothing(self):
         t = FakeTransport([])
         rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "version=1"], transport=t)
+        self.assertEqual(rc, 2)
+        self.assertEqual(t.calls, [])
+
+    def test_unknown_set_field_exits_two_without_contacting_the_hub(self):
+        t = FakeTransport([])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "notAField=x"], transport=t)
         self.assertEqual(rc, 2)
         self.assertEqual(t.calls, [])
 
