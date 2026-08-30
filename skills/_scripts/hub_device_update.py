@@ -1,0 +1,286 @@
+#!/usr/bin/env python3
+"""Rebuild and post a Hubitat device's `/device/update` field set with the correct boolean
+encoding, and report what actually moved.
+
+Grounded live on 2.5.1.135 and 2.5.1.169 (C-8 Pro, Hub Security off — see
+../_reference/endpoints.md):
+
+    GET  /device/fullJson/<id>  -> {device:{id, name, label, ... version}, ...}
+    POST /device/update         form-urlencoded, the FULL field set, omissions clear values
+
+Two properties of that endpoint make a hand-rolled POST dangerous, and both are encoded here
+rather than left to the caller:
+
+1. **Every boolean is checkbox-semantic.** `meshEnabled`, `meshFullSync`, `retryEnabled` and
+   `homeKitEnabled` are sent as `on` when true and OMITTED when false. Posting the literal string
+   `"true"` CLEARS the field. Mis-encoding the mesh pair unshares the device, removing the mirror
+   on the consuming hub and breaking every app bound to it.
+2. **`version` is an optimistic-concurrency stamp**, so it is read fresh immediately before each
+   POST and never cached across calls.
+
+`--noop` rebuilds the current state and posts it unchanged: a round-trip that should move nothing.
+It is the cheap proof that the encoding is right for a field set you have not posted before, and
+the recommended first call against any unfamiliar device. Drift is reported in two buckets —
+`benign_normalization` for the empty-value normalizations the hub performs on its own, and
+`unexpected_drift` for everything else. A non-empty `unexpected_drift` on a `--noop` means the
+round-trip is lossy; do not follow it with a real edit.
+
+The deterministic pieces (form construction, boolean encoding, drift classification) are pure
+functions unit-tested without a hub; only the fetch/post functions touch the network via an
+injectable `transport`.
+
+Usage:
+    hub_device_update.py --ip 192.0.2.11 --device 953 --noop
+    hub_device_update.py --hub main --device 1694 --noop
+    hub_device_update.py --ip 192.0.2.11 --device 953 --set label="Kitchen Leak"
+    hub_device_update.py --ip 192.0.2.11 --device 953 --set homeKitEnabled=true
+    hub_device_update.py --ip 192.0.2.11 --device 953 --dry-run --set label=X   # print the form, post nothing
+Exactly one of --noop / --set / --dry-run behaviours applies; --set may repeat. Output: one JSON
+object on stdout ({hub, device_id, mode, form, posted, benign_normalization, unexpected_drift}).
+Exit 2 on a config or argument error, 1 on a hub/fetch error or unexpected drift, 0 otherwise.
+"""
+import argparse
+import json
+import sys
+import urllib.parse
+from pathlib import Path
+from typing import Optional
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+# E402: this import must follow the sys.path insert above so hubclient resolves when run as a script.
+from hubclient import HubError, _urllib_transport, resolve_base_from_args  # noqa: E402
+
+DEVICE_PATH = "/device/fullJson/"
+UPDATE_PATH = "/device/update"
+
+# The full field set the device edit form posts, in the hub's own order. Omitting a key CLEARS it,
+# so the form is always rebuilt whole from a fresh read (../_reference/endpoints.md).
+FORM_FIELDS = (
+    "name", "label", "zigbeeId", "maxEvents", "maxStates", "spammyThreshold",
+    "deviceNetworkId", "deviceTypeId", "deviceTypeReadableType", "roomId",
+    "meshEnabled", "retryEnabled", "meshFullSync", "homeKitEnabled",
+    "locationId", "hubId", "groupId", "dashboardIds", "tags", "defaultIcon",
+    "notes", "id", "version", "controllerType",
+)
+
+# Checkbox-semantic: emitted as `on` when true, omitted entirely when false. There is no second
+# encoding on this form — a literal "true" clears the field. Measured 2.5.1.135, 2026-07-27.
+CHECKBOX_FIELDS = frozenset({"meshEnabled", "meshFullSync", "retryEnabled", "homeKitEnabled"})
+
+# Empty-value normalizations the hub applies on its own. A freshly linked hub-mesh mirror is born
+# with label=null and roomId=null and reports these on its first round-trip; they are not drift.
+BENIGN_NORMALIZATIONS = (
+    ("roomId", None, 0),
+    ("label", None, ""),
+)
+
+_TRUE_STRINGS = frozenset({"true", "on", "yes", "1"})
+_FALSE_STRINGS = frozenset({"false", "off", "no", "0", ""})
+
+
+def device_of(full: dict) -> dict:
+    """Pure. The device record from a fullJson payload."""
+    device = full.get("device")
+    return device if isinstance(device, dict) else {}
+
+
+def as_bool(value) -> bool:
+    """Pure. Coerce a fullJson boolean-ish value to a bool.
+
+    The hub renders these as real booleans, as the strings "true"/"false", and as null (absent).
+    A freshly linked mesh mirror reads null for fields it has never had set.
+    """
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in _TRUE_STRINGS:
+        return True
+    if text in _FALSE_STRINGS:
+        return False
+    raise HubError(f"cannot read {value!r} as a boolean — expected true/false/on/off/null")
+
+
+def scalar(value) -> str:
+    """Pure. Render a non-boolean field for the form. None becomes the empty string, which is what
+    the browser form submits for an untouched empty input."""
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (list, tuple)):
+        return ",".join(scalar(v) for v in value)
+    return str(value)
+
+
+def build_form(full: dict, changes: Optional[dict] = None) -> list:
+    """Pure. The full `/device/update` form as an ordered list of (key, value) pairs.
+
+    Booleans in CHECKBOX_FIELDS are emitted as `on` when true and omitted when false — the encoding
+    this whole script exists to get right. Every other field is sent as a string, whole, because
+    an omitted key clears the value on this endpoint.
+    """
+    device = device_of(full)
+    if not device:
+        raise HubError("fullJson carried no device record — cannot rebuild the update form")
+    pending = dict(changes or {})
+    unknown = sorted(set(pending) - set(FORM_FIELDS))
+    if unknown:
+        raise HubError(f"not fields on this form: {', '.join(unknown)} — "
+                       f"valid: {', '.join(FORM_FIELDS)}")
+
+    pairs = []
+    for field in FORM_FIELDS:
+        value = pending[field] if field in pending else device.get(field)
+        if field in CHECKBOX_FIELDS:
+            if as_bool(value):
+                pairs.append((field, "on"))
+            # false -> omitted entirely. Emitting "false" here is the destructive bug.
+            continue
+        pairs.append((field, scalar(value)))
+    return pairs
+
+
+def encode_form(pairs: list) -> str:
+    """Pure. urlencode the ordered pairs exactly as the browser form does."""
+    return urllib.parse.urlencode(pairs)
+
+
+def read_fields(full: dict) -> dict:
+    """Pure. The comparable projection of a device record: every form field, booleans normalized."""
+    device = device_of(full)
+    out = {}
+    for field in FORM_FIELDS:
+        value = device.get(field)
+        out[field] = as_bool(value) if field in CHECKBOX_FIELDS else value
+    return out
+
+
+def classify_drift(before: dict, after: dict, ignore=("version",)) -> tuple:
+    """Pure. Split the before/after difference into (benign_normalization, unexpected_drift).
+
+    `version` is excluded by default: a successful POST bumps it, so it always differs and its
+    change is the proof the write landed rather than evidence of drift.
+    """
+    benign, unexpected = {}, {}
+    for field in FORM_FIELDS:
+        if field in ignore:
+            continue
+        was, now = before.get(field), after.get(field)
+        if was == now:
+            continue
+        move = {"before": was, "after": now}
+        if any(field == f and was == b and now == a for f, b, a in BENIGN_NORMALIZATIONS):
+            benign[field] = move
+        else:
+            unexpected[field] = move
+    return benign, unexpected
+
+
+def parse_set(assignments: list) -> dict:
+    """Pure. Turn repeated `--set key=value` into a change dict, coercing checkbox fields to bool."""
+    changes = {}
+    for item in assignments or []:
+        if "=" not in item:
+            raise HubError(f"--set expects key=value, got {item!r}")
+        key, _, value = item.partition("=")
+        key = key.strip()
+        changes[key] = as_bool(value) if key in CHECKBOX_FIELDS else value
+    return changes
+
+
+def fetch_full_json(base: str, device_id, transport) -> dict:
+    """Read the device record fresh. `version` must come from here immediately before each POST."""
+    status, _, body = transport("GET", f"{base}{DEVICE_PATH}{device_id}", None)
+    if status != 200:
+        raise HubError(f"GET {DEVICE_PATH}{device_id} returned HTTP {status} — "
+                       f"check the device id and that Hub Security is off for this client")
+    try:
+        return json.loads(body)
+    except ValueError as e:
+        raise HubError(f"GET {DEVICE_PATH}{device_id} did not return JSON: {e}") from e
+
+
+def post_update(base: str, pairs: list, transport) -> int:
+    """Post the rebuilt form. The hub answers HTML or a redirect, never JSON."""
+    status, _, _ = transport("POST", f"{base}{UPDATE_PATH}", encode_form(pairs),
+                             "application/x-www-form-urlencoded")
+    if status not in (200, 302):
+        raise HubError(f"POST {UPDATE_PATH} returned HTTP {status} — the field set was not applied; "
+                       f"re-read the device before retrying, the version stamp may be stale")
+    return status
+
+
+def main(argv=None, transport=None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Rebuild and post a Hubitat device's /device/update field set, correctly encoded.")
+    parser.add_argument("--ip")
+    parser.add_argument("--port", type=int, default=8080)
+    parser.add_argument("--hub")
+    parser.add_argument("--hubs-file")
+    parser.add_argument("--device", type=int, required=True)
+    parser.add_argument("--noop", action="store_true",
+                        help="repost current state unchanged and report drift")
+    parser.add_argument("--set", dest="assignments", action="append", metavar="KEY=VALUE",
+                        help="change a field; repeatable")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="build and print the form, post nothing")
+    args = parser.parse_args(argv)
+    transport = transport or _urllib_transport
+
+    if not args.noop and not args.assignments and not args.dry_run:
+        print("nothing to do — pass --noop to round-trip current state, or --set KEY=VALUE to edit",
+              file=sys.stderr)
+        return 2
+    if args.noop and args.assignments:
+        print("--noop reposts current state unchanged; it cannot be combined with --set",
+              file=sys.stderr)
+        return 2
+
+    try:
+        base = resolve_base_from_args(args.ip, args.port, args.hub, args.hubs_file)
+    except (HubError, OSError, ValueError) as e:
+        print(str(e), file=sys.stderr)
+        return 2
+
+    try:
+        changes = parse_set(args.assignments)
+        full = fetch_full_json(base, args.device, transport)
+        before = read_fields(full)
+        pairs = build_form(full, changes)
+
+        if args.dry_run:
+            print(json.dumps({"hub": base, "device_id": args.device, "mode": "dry-run",
+                              "form": pairs, "posted": False}, indent=2, default=str))
+            return 0
+
+        post_update(base, pairs, transport)
+        after = read_fields(fetch_full_json(base, args.device, transport))
+        benign, unexpected = classify_drift(before, after)
+    except HubError as e:
+        print(str(e), file=sys.stderr)
+        return 1
+
+    result = {
+        "hub": base,
+        "device_id": args.device,
+        "mode": "noop" if args.noop else "update",
+        "form": pairs,
+        "posted": True,
+        "benign_normalization": benign,
+        "unexpected_drift": unexpected,
+    }
+    print(json.dumps(result, indent=2, default=str))
+    if unexpected:
+        print(f"unexpected drift on {len(unexpected)} field(s): {', '.join(sorted(unexpected))} — "
+              f"the round-trip is lossy; do not post a real edit until the encoding is fixed",
+              file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -21,6 +21,7 @@ end-of-life on 2024-10-07; CI runs 3.11.
 | `hub_radiolog.py` | Tail the `zwaveLogsocket`/`zigbeeLogsocket` for per-frame radio traffic | WebSocket |
 | `hub_device_usage.py` | Report a device's delete blast radius; `--live` audits subscriptions and Rule Machine `trigDevs` separately | HTTP |
 | `hub_device_command.py` | Run a command on a device (enumerate the real command surface, coerce args, POST `runmethod`) and verify it landed by re-reading the `relatedAttribute` | HTTP |
+| `hub_device_update.py` | Rebuild and post a device's `/device/update` field set with the correct checkbox boolean encoding; `--noop` round-trips current state and reports drift, split benign vs unexpected | HTTP |
 | `hub_device_sequence.py` | Fire an ordered list of devices with a timed hold on each (built on `hub_device_command`); live per-step narration for a field walk that binds observations to device ids | HTTP |
 | `hub_fw_update.py` | Batch-flash Z-Wave firmware via the native zwaveJS updater, with a no-progress watchdog, canary radio-health probe + auto-reboot recovery, and an RSSI floor (a failed/stalled OTA can hang the whole controller) | HTTP |
 | `hubs_config.py` | Owner of `hubs.json` — init/add/set-default/remove/list hubs (imported + CLI) | — |
