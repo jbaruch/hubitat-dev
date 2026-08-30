@@ -94,12 +94,18 @@ def check_expected(subs: list, expected: Optional[int]) -> Optional[dict]:
 
 
 def group_by_attribute(subs: list) -> dict:
-    """Pure. `{event name: [device ids]}` for the DEVICE rows, for reading coverage at a glance."""
+    """Pure. `{event name: [device ids]}` for the DEVICE rows, for reading coverage at a glance.
+
+    Drops rows with no `typeId` and de-duplicates, matching `device_ids` — `null` is not a device
+    id, and emitting one would put a value in the output that no caller can act on.
+    """
     out: dict = {}
     for row in subs:
         if str(row.get("type") or "").upper() != "DEVICE":
             continue
-        out.setdefault(str(row.get("name") or ""), []).append(row.get("typeId"))
+        if row.get("typeId") is None:
+            continue
+        out.setdefault(str(row.get("name") or ""), set()).add(row.get("typeId"))
     return {k: sorted(v, key=lambda x: (str(type(x)), x)) for k, v in sorted(out.items())}
 
 

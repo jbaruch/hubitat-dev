@@ -54,10 +54,9 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Verify the configured and type-specific live surfaces defined in `rules/device-lifecycle.md`.
 - `mainPage` and its sub-pages use different table column layouts — identify a column by its hidden `settings[...]` input name or by content, never by index across pages.
 - A **disabled** Rule Machine rule's `configure/<id>/mainPage` is a stub — no `settings[...]`, `removeButton:false`, and a rendered control set that varies by build (Cancel/Remove/Enable on 2.5.1.134; Enable alone on 2.5.1.x/RM 5.1.8). Enable it first (`POST /installedapp/disable {"id":<id>,"disable":false}`) or an empty settings set reads as an empty rule. Note the hidden Remove button does not mean un-removable — HTTP removal works regardless (`skills/_reference/playwright-ui.md` gotcha 31).
-- **Verify a Rule Machine rule at `statusJson.eventSubscriptions`, never at its config page.** A rule that reads correct is not a rule that runs.
+- **Verify a Rule Machine rule at `statusJson.eventSubscriptions`, never at its config page.**
 - On a rule **known to carry an event trigger**, zero subscriptions is a broken Required Expression, not a mode mismatch. Confirm the RE state before diagnosing.
 - RM subscribes to a rule's triggers only while the Required Expression is true, and to the RE's own source always.
-- Such a rule at zero is not watching the thing that would arm it. It can never fire, in any mode.
 - An action-only rule invoked by another rule legitimately holds no subscription. Establish the trigger role first (`rules/device-lifecycle.md`).
 - One subscription in a non-matching mode is the healthy state.
 - `POST /installedapp/disable` off-and-on and RM's own **Update Rule** button both leave it at zero (`skills/_reference/playwright-ui.md`).

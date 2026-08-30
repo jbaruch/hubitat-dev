@@ -61,7 +61,9 @@ Exercise the sensor and confirm it responds — `Skill(skill: "device-command")`
 
 ## Step 10 — Re-commit every app expected to watch the sensor
 
-Hubitat Safety Monitor's `useAllWater` toggle is a **snapshot taken at its last Done**, not a live filter — adding a device does not extend coverage, and every surface you would naturally check says it did (`rules/app-lifecycle.md`). Treat any other "use all X" toggle as snapshot-shaped until measured. For each subscription-driven app that should now watch this sensor, open its config page and press **Done** (`skills/_reference/playwright-ui.md` gotchas 42–43; never hand-serialize `_action_update`, `rules/ui-automation.md`).
+Hubitat Safety Monitor's `useAllWater` toggle is a **snapshot taken at its last Done**, not a live filter (`rules/app-lifecycle.md`). Treat any other "use all X" toggle as snapshot-shaped until measured.
+
+For each subscription-driven app that should now watch this sensor, open its config page and press **Done** (`skills/_reference/playwright-ui.md` gotchas 42–43). Never hand-serialize `_action_update` (`rules/ui-automation.md`).
 
 Verify at the app's live subscriptions, not at the page:
 
@@ -72,7 +74,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_app_subscriptions
 
 Argument contract and output shape: `skills/_scripts/hub_app_subscriptions.py` module docstring. The JSON result is `{hub, app_id, app_label, attribute, count, subscriptions, device_ids, by_attribute, expected}`. **Exit 0** — the device is subscribed. **Exit 1 with the result on stdout** — `--expect-device` was not found; read `device_ids` for what the app does watch, then re-Done. **Exit 1 with stderr only** — a hub or fetch error. **Exit 2 with stderr only** — a config or argument error.
 
-Assert **presence of the expected device**, never a count delta: one Done can legitimately add several previously missing subscriptions, and one device can need several attribute subscriptions. Proceed to Step 11.
+Assert **presence of the expected device**, never a count delta. Proceed to Step 11.
 
 ## Step 11 — Reconcile the fleet
 

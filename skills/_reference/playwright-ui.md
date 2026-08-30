@@ -588,12 +588,12 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     Tells that it is an **automation** browser and safe to kill: a throwaway `--user-data-dir=…/ms-playwright-mcp/
     mcp-chrome-<hash>` (not the default profile), the flags `--remote-debugging-pipe`, `--no-first-run`,
     `--disable-sync`, `--disable-blink-features=AutomationControlled`, a launch URL of `about:blank`, and a
-    `playwright-mcp` node ancestor. `SingletonLock -> Mac-<pid>` in that profile dir names the exact holder.
+    `playwright-mcp` node ancestor. On macOS, `SingletonLock -> Mac-<pid>` in that profile dir names the exact holder; the lock file's naming differs on Linux and Windows.
     Killing it frees the profile and the MCP server relaunches a fresh one on the next call (verified: the very
     next `browser_navigate` succeeded). **The default profile is the operator's — leave it alone.**
 
 43. **Hubitat Safety Monitor's Done sits in a row of destructive decoys.** Same class as the
-    `removeDeviceAndCallback()` device-removal decoy. On `/installedapp/configure/61/mainPage`:
+    `removeDeviceAndCallback()` device-removal decoy. On the HSM instance's `/installedapp/configure/<hsmAppId>/mainPage` (61 on the grounded hub):
 
     | selector | effect |
     |---|---|

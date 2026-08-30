@@ -73,7 +73,7 @@ def hubStartupHandler() { reconcile() }
 - Absence is conclusive only for an app type known to consume the device by subscription. Command-only consumers hold none (`rules/device-lifecycle.md`).
 - **Verified for Hubitat Safety Monitor's `useAllWater`:** the toggle is a snapshot taken at the last Done, not a live filter. A device added afterwards is absent from `eventSubscriptions` and its handler never fires.
 - Treat any other "use all X" toggle as snapshot-shaped until measured. `useAllSmoke` is **unverified**.
-- Assert the expected device ids are present, never a subscription count. One device can need several attribute subscriptions.
+- Assert the expected device ids are present, never a subscription count.
 - Committing an installed app's config is a **UI Done** (`rules/ui-automation.md`).
 
 ## Subscriptions & scheduling

@@ -123,6 +123,15 @@ class TestGroupByAttribute(unittest.TestCase):
     def test_location_rows_excluded(self):
         self.assertNotIn("mode", m.group_by_attribute(m.subscriptions_of(hsm_status())))
 
+    def test_missing_type_id_is_dropped(self):
+        """`null` is not a device id; device_ids skips it and this must agree."""
+        g = m.group_by_attribute([sub("water.wet", None), sub("water.wet", 7)])
+        self.assertEqual(g, {"water.wet": [7]})
+
+    def test_duplicates_collapse(self):
+        g = m.group_by_attribute([sub("water.wet", 7), sub("water.wet", 7)])
+        self.assertEqual(g, {"water.wet": [7]})
+
 
 class TestFetchStatus(unittest.TestCase):
     def test_returns_parsed(self):
@@ -155,6 +164,18 @@ class TestFetchStatus(unittest.TestCase):
 
 
 class TestMain(unittest.TestCase):
+    """main() prints to stdout and stderr by contract; every case here captures both so a passing
+    suite stays quiet."""
+
+    def setUp(self):
+        import contextlib
+        import io as _io
+        self.out, self.err = _io.StringIO(), _io.StringIO()
+        self._ctx = contextlib.ExitStack()
+        self._ctx.enter_context(contextlib.redirect_stdout(self.out))
+        self._ctx.enter_context(contextlib.redirect_stderr(self.err))
+        self.addCleanup(self._ctx.close)
+
     def test_reports_and_exits_zero(self):
         t = FakeTransport([(200, {}, json.dumps(hsm_status()))])
         self.assertEqual(m.main(["--ip", "192.0.2.11", "--app", "61"], transport=t), 0)
@@ -173,25 +194,17 @@ class TestMain(unittest.TestCase):
 
     def test_absent_still_emits_the_result(self):
         """The buckets are the diagnosis; exit 1 here is a verdict, not a fetch failure."""
-        import contextlib
-        import io as _io
         t = FakeTransport([(200, {}, json.dumps(hsm_status()))])
-        buf = _io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            m.main(["--ip", "192.0.2.11", "--app", "61", "--expect-device", "953"], transport=t)
-        result = json.loads(buf.getvalue())
+        m.main(["--ip", "192.0.2.11", "--app", "61", "--expect-device", "953"], transport=t)
+        result = json.loads(self.out.getvalue())
         self.assertEqual(result["expected"], {"device_id": 953, "present": False})
         self.assertEqual(result["device_ids"], [101, 102, 103])
 
     def test_hub_error_exits_one_with_no_json(self):
-        import contextlib
-        import io as _io
         t = FakeTransport([(500, {}, "")])
-        buf = _io.StringIO()
-        with contextlib.redirect_stdout(buf):
-            rc = m.main(["--ip", "192.0.2.11", "--app", "61"], transport=t)
+        rc = m.main(["--ip", "192.0.2.11", "--app", "61"], transport=t)
         self.assertEqual(rc, 1)
-        self.assertEqual(buf.getvalue(), "")
+        self.assertEqual(self.out.getvalue(), "")
 
     def test_no_hub_selector_exits_two(self):
         rc = m.main(["--app", "61"], transport=FakeTransport([]))
