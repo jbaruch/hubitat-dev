@@ -564,6 +564,16 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     reveals `illumsD` (required picker) with `luxD` pre-filled at 100 — don't assume it's empty, and
     verify it (verified RL 1.2.3, 2026-07-27).
 
+41. **The Hub Mesh Linked-devices `+` opens a PrimeVue confirm dialog, and its mask eats the next click.**
+    On `/device/hubMesh`, the per-device `+` on the Linked-devices card does not link immediately — it opens
+    a confirm dialog ("Link to device X … now?"). Its `.p-dialog-mask` then swallows every subsequent click,
+    so the first `+` reads as a **dead control** and the *next* action times out somewhere unrelated, which
+    sends you debugging the wrong page. Accept via `.p-confirm-dialog-accept`. **The reject button carries
+    `p-button-primary` and the accept carries `p-button-text`**, so "click the primary button" picks the
+    wrong one. Prefer the HTTP route — `GET /device/createLinked/<sourceHubId>/<sourceDeviceId>` — and read
+    the result from `hubMeshJson.localLinkedDevices` (`skills/_reference/endpoints.md`). Verified
+    2026-08-30 on 2.5.1.169.
+
 ## Room Lighting: the gotchas that travel together
 
 RL knowledge is spread across the numbered list above; in build/edit order it reads as one path:

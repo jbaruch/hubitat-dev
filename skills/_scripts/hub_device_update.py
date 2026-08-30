@@ -144,7 +144,7 @@ def build_form(full: dict, changes: Optional[dict] = None) -> list:
     pending = dict(changes or {})
     unknown = sorted(set(pending) - set(FORM_FIELDS))
     if unknown:
-        raise HubError(f"not fields on this form: {', '.join(unknown)} — "
+        raise HubError(f"unknown field(s) for this form: {', '.join(unknown)} — "
                        f"valid: {', '.join(FORM_FIELDS)}")
 
     pairs = []

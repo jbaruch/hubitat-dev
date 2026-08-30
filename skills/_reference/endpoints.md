@@ -99,7 +99,9 @@ Correlating an app's log line against an event across these two silently mis-ord
 | `GET /hub/details/json` | Hub identity: `platformVersion`, `hardwareVersion`, `hubName`, `hubUID`, `ipAddress`, `macAddress`, `timeZone`, ... (confirmed ~49 KB on 2.5.1.125) |
 | `GET /hub2/hubData` | Newer JSON hub backend |
 | `GET /hub2/devicesList` | Devices: `{suggestBackup, devices:[{key, data:{id, name, ...}, children[], parent, child}]}` — a **tree**: `parent`/`child` are bools ("is a parent" / "is a child"), and children appear **only nested** in `children[]`, never at the top level. Iterating `devices[]` flat misses every child device (`skills/_reference/parent-child-devices.md`) |
-| `GET /hub2/appsList` | Installed apps + `systemAppTypes` |
+| `GET /hub2/appsList` | Installed apps + `systemAppTypes` — a **tree**, exactly like `/hub2/devicesList`: child apps appear **only nested** in `children[]`, never at the top level. Iterating `apps[]` flat misses most of the hub |
+| `GET /hub/advanced/freeOSMemoryHistory` | The hub's own CSV series: `Date/time, Free OS, 5m CPU avg, Total Java, Free Java, Direct Java`, ~5 min cadence, **reset on reboot**. `…/freeOSMemoryLast` is the latest row. The load-average source that needs no driver (`skills/_reference/hub-load.md`) |
+| `GET /logs/eventsJson` | LOCATION events. `severeLoad` lives here and **not** in `/hub/eventsJson`; its `value` is the tripping load average (`skills/_reference/hub-load.md`) |
 | `GET /modes/json` | Real hub mode ids and names. Room Lighting's setting value `"0"` is an **All Modes sentinel**, not an id from this list |
 | `GET /hub/edit` | The **Settings** page (UI). Not `/hub/settings`, which 404s — the nav link is the authority |
 | `GET /installedapp/direct/<builtInAppType>` | Opens a built-in app, redirecting to a transient instance at `/installedapp/configure/<newId>/mainPage` (e.g. `swapDevice` → Settings → Swap Device). The instance takes the next app id and is **not** a persistent install: its **Cancel** discards it, after which `/installedapp/statusJson/<id>` returns `{}` and it is absent from `/hub2/appsList`. Verified 2.5.1.128 |
@@ -139,6 +141,7 @@ The same `GET /device/fullJson/<id>` that carries the blast radius also carries 
 Defensive-parse these — each bit during the irrigation recon:
 
 - `GET /hub2/appsList` returns a **dict with an `apps` key**, not a list. Built-in app entries populate `name` and leave `label` null.
+- Each entry is `{key, data:{id, name, type, disabled}, children:[…same shape, recursively…], parent, child}`. **Walk `children[]` recursively.** Measured 2026-08-30 on 2.5.1.169 across three hubs, top-level `apps[]` vs the full walk: **37 → 186**, 9 → 13, 6 → 9. On the busiest hub **80% of the apps are children** — every Rule Machine rule is a child of the RM parent and every dashboard a child of `Hubitat® Dashboards`, so a flat iteration audits neither. `appsUsing` on `fullJson` does not have this problem; the hub computes it. The trap is in a hand-rolled census, which is what you write the moment the question is "which app *setting* contains this id" (`rules/device-lifecycle.md`).
 - `GET /installedapp/statusJson/<id>` can return a bare `{}` — another instance of this route being unreliable for reading app config (below).
 - `GET /installedapp/configure/json/<appId>/mainPage` can return **non-JSON** — parse defensively, do not assume a JSON body.
 - `GET /device/edit/<id>` is a **6.8 KB SPA shell** — no state, no routes, nothing in the served HTML. It is the natural first thing to try for a device and it is a dead end; drive the page with Playwright and capture the request instead (`skills/_reference/playwright-ui.md`).
@@ -338,7 +341,11 @@ analyzes it and the `mesh-health` skill reads it. The write side — share (`add
 | `hubList[].deviceIds` | Devices shared over that link — the **blast radius** of removing the peer (each is a link an app can bind to) |
 | `hubList[].lastActive` | Epoch **milliseconds** (not an ISO string like everything else here) |
 | `sharedDevices[]` | `{id, name, appsUsing[], childCount, sourceHubId}` — `sourceHubId: null` means the device is **local** to this hub |
+| `availableLinkedDevices[]` | Shared by a peer and **not linked here**: `{deviceId, hubName, hubId, deviceDisplayName, linkedLocally: false, childCount, childDevice}` |
+| `localLinkedDevices[]` | Linked here. Each carries its own `appsUsing[]`, which is how a mirror census answers "is any mirror an orphan" |
 | `modeHubId` | The hub that owns mode, or `null` |
+
+**`availableLinkedDevices` vs `localLinkedDevices` is the shared-but-not-linked diagnosis.** Sharing is two-sided (write side above), and when the mirror is missing the source hub looks correct because it *is* correct. Grounded 2026-08-30 on 2.5.1.169: three freshly shared probes read `meshEnabled: true` / `meshFullSync: true` on the source, byte-identical to a working sibling, with no mirror on the destination. One read settled it — all three sat in `availableLinkedDevices` with `linkedLocally: false`, and the peer's `hubList[].deviceIds` listed all three. Advertised, not linked, which points straight at the missing `createLinked` call. Without this read the symptom has no cheap discriminator and the tempting conclusion is that sharing failed on the source.
 
 **`hubId` == `hubUID`:** the `hubId` here is the same identifier as `hubUID` in `GET /hub/details/json`
 (verified across three hubs). Fetching a peer's `ipAddress` and comparing its `hubUID` to the recorded
