@@ -16,11 +16,10 @@ Hubitat's two planes behave differently across a multi-hub setup. Conflating the
 ## The owning hub exports to HomeKit
 
 - **The hub that physically owns a device exports it.**
-- **Never export a hub-mesh mirror.** It lands the accessory on the wrong bridge.
-- Exporting a mirror succeeds, which is what makes it a trap. The mirror sits on the consuming hub already, looking exportable.
+- **Never export a hub-mesh mirror.** Exporting one succeeds.
 - Read both bridges' export lists before exporting (`skills/_reference/endpoints.md`).
 - Never read the device-level `homeKitEnabled` field as export state. It is `null` on correctly-exported sensors.
-- HomeKit caps a bridge at **149 accessories + the bridge**. On a multi-hub setup that decides the layout, not a preference (`skills/_reference/homekit-mdns-network.md`).
+- HomeKit caps a bridge at **149 accessories + the bridge** (`skills/_reference/homekit-mdns-network.md`).
 
 ## Local network, no Hub Security (assumed default)
 

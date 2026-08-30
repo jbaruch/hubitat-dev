@@ -574,6 +574,59 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     the result from `hubMeshJson.localLinkedDevices` (`skills/_reference/endpoints.md`). Verified
     2026-08-30 on 2.5.1.169.
 
+42. **A locked automation profile is a stale process to clear, not a hard stop.** Both browser paths can fail at
+    once — Playwright MCP with `Error: Browser is already in use for …/ms-playwright-mcp/mcp-chrome-<hash>, use
+    --isolated to run multiple instances`, and the Chrome extension with `Browser extension is not connected.`
+    Read together they look like a live session belonging to the operator that must not be disturbed. Settle it
+    from the process tree rather than guessing:
+
+    ```bash
+    ps -p <chromePid> -o pid=,ppid=,command=     # then walk ppid up
+    # 39285 -> 87347 node .../playwright-mcp -> 87155 npm exec @playwright/mcp@latest
+    ```
+
+    Tells that it is an **automation** browser and safe to kill: a throwaway `--user-data-dir=…/ms-playwright-mcp/
+    mcp-chrome-<hash>` (not the default profile), the flags `--remote-debugging-pipe`, `--no-first-run`,
+    `--disable-sync`, `--disable-blink-features=AutomationControlled`, a launch URL of `about:blank`, and a
+    `playwright-mcp` node ancestor. On macOS, `SingletonLock -> Mac-<pid>` in that profile dir names the exact holder; the lock file's naming differs on Linux and Windows.
+    Killing it frees the profile and the MCP server relaunches a fresh one on the next call (verified: the very
+    next `browser_navigate` succeeded). **The default profile is the operator's — leave it alone.**
+
+43. **Hubitat Safety Monitor's Done sits in a row of destructive decoys.** Same class as the
+    `removeDeviceAndCallback()` device-removal decoy. On the HSM instance's `/installedapp/configure/<hsmAppId>/mainPage` (61 on the grounded hub):
+
+    | selector | effect |
+    |---|---|
+    | `button#btnDone[name="_action_update"]` | **the Done** — commits, redirects to the app list |
+    | `button#settings[armedAway]` | **arms the house, immediately** |
+    | `button#settings[armedNight]` | **arms Night, immediately** |
+    | `button#settings[disarmAll]` | **disarms** smoke/water/custom |
+    | `button#settings[updateMe]` | "Update HSM" — not Done, not a commit |
+
+    The arming buttons are live side effects on the security app in the same button row as Done, the same hazard
+    as RM's `settings[runAction]` (gotcha 35). Match on `name="_action_update"` / `id=btnDone`, never on position
+    and never on visible text. **Verify at the app's subscriptions, not on the page:**
+    `hub_app_subscriptions.py --app <id> --attribute water.wet --expect-device <deviceId>` (`rules/app-lifecycle.md`).
+    The assertion is **presence of the expected device**, not a count delta — one Done can legitimately add several
+    previously missing subscriptions. Check the collateral separately: on the observed run `armedState` was unchanged
+    (disarmed) and both 30-device contact lists were intact, which is what says the Done committed the intended
+    change and nothing else.
+
+44. **Rebuilding a broken Required Expression, and the click that silently defeats it.** A rule whose RE is broken
+    shows `Expression: **Broken Condition**(F) [FALSE]` once you open Required Expression → Edit, and the page
+    title gains `(Required Expression false)`. The orphaned condition still exists in the rule — RM lists it in
+    `appState.unusedConds`, and `appState.eval["0"]` is the predicate: `[]` or `["XYZ"]` is empty/placeholder,
+    `[7]` means condition 7 is really in it. The rebuild is Required Expression → Edit → **Erase Expression** →
+    *Define Expression element* → `--> New Condition` → capability → value → **`Done with this Condition`**
+    (`settings[hasAll]`) → `Done with Expression` (`settings[hasRule]`) → `Done with Required Expression`
+    (`settings[doneST]`) → rule `Done`. **`Done with this Condition` renders only after a value is selected.**
+    Skip it and the new condition is orphaned exactly like the old one, producing an empty expression that
+    *also* reports "Required Expression false" — indistinguishable from the original bug, so the natural next
+    move is to repeat the rebuild that just failed. Verify at `eventSubscriptions`, never at the config page
+    (`rules/ui-automation.md`). To test a trigger without a human, fire the device's own capability command
+    (a button's `doubleTap`); the log tags it `(digital)` rather than a paddle's `[down]`, and RM sees the same
+    attribute event.
+
 ## Room Lighting: the gotchas that travel together
 
 RL knowledge is spread across the numbered list above; in build/edit order it reads as one path:

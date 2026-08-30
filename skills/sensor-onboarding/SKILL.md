@@ -9,7 +9,7 @@ Process steps in order. Do not skip ahead. Each step verifies before the next.
 
 ## Step 1 — Snapshot the inventory before pairing
 
-Capture `GET /hub2/devicesList` (`skills/_reference/endpoints.md`) before any pairing. A join can mint a stray or duplicate device, and only a pre/post diff (Step 10) makes that visible. Save the id set. Proceed to Step 2.
+Capture `GET /hub2/devicesList` (`skills/_reference/endpoints.md`) before any pairing. A join can mint a stray or duplicate device, and only a pre/post diff (Step 11) makes that visible. Save the id set. Proceed to Step 2.
 
 ## Step 2 — Pair the sensor
 
@@ -59,6 +59,23 @@ Add the sensor to the inactivity monitor keyed on `lastActivityTime` or battery,
 
 Exercise the sensor and confirm it responds — `Skill(skill: "device-command")` runs a command (or `refresh`) and verifies by observation. **Exclude the settling window:** a freshly installed sensor's first hours can read garbage while it physically equilibrates (a soil probe settles over several wet/dry cycles). Do not baseline or health-check inside that window. Proceed to Step 10.
 
-## Step 10 — Reconcile the fleet
+## Step 10 — Re-commit every app expected to watch the sensor
+
+Hubitat Safety Monitor's `useAllWater` toggle is a **snapshot taken at its last Done**, not a live filter (`rules/app-lifecycle.md`). Treat any other "use all X" toggle as snapshot-shaped until measured.
+
+For each subscription-driven app that should now watch this sensor, open its config page and press **Done** (`skills/_reference/playwright-ui.md` gotchas 42–43). Never hand-serialize `_action_update` (`rules/ui-automation.md`).
+
+Verify at the app's live subscriptions, not at the page:
+
+```bash
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_app_subscriptions.py \
+  --hub <hub> --app <appId> --attribute <event> --expect-device <deviceId>
+```
+
+Argument contract and output shape: `skills/_scripts/hub_app_subscriptions.py` module docstring. The JSON result is `{hub, app_id, app_label, attribute, count, subscriptions, device_ids, by_attribute, expected}`. **Exit 0** — the device is subscribed. **Exit 1 with the result on stdout** — `--expect-device` was not found; read `device_ids` for what the app does watch, then re-Done. **Exit 1 with stderr only** — a hub or fetch error. **Exit 2 with stderr only** — a config or argument error.
+
+Assert **presence of the expected device**, never a count delta. Proceed to Step 11.
+
+## Step 11 — Reconcile the fleet
 
 Re-read `GET /hub2/devicesList` and diff against the Step 1 snapshot. Every new id must be a device you paired; a stray or duplicate join surfaces only here. Report the reconciled inventory and any sensor still short of a step. Finish here.
