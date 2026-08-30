@@ -230,6 +230,17 @@ class TestParseSet(unittest.TestCase):
     def test_value_containing_equals_is_kept_whole(self):
         self.assertEqual(m.parse_set(["notes=a=b"]), {"notes": "a=b"})
 
+    def test_setting_id_is_rejected(self):
+        """--set id=<other> would POST to a different device than the one verification re-reads."""
+        with self.assertRaises(HubError) as ctx:
+            m.parse_set(["id=999"])
+        self.assertIn("--device", str(ctx.exception))
+
+    def test_setting_version_is_rejected(self):
+        """The stamp is read fresh immediately before the POST; overriding it defeats the check."""
+        with self.assertRaises(HubError):
+            m.parse_set(["version=1"])
+
     def test_missing_equals_raises(self):
         with self.assertRaises(HubError):
             m.parse_set(["label"])
@@ -419,6 +430,24 @@ class TestMain(unittest.TestCase):
         result = json.loads(buf.getvalue())
         self.assertEqual(set(result), {"hub", "device_id", "mode", "form", "posted",
                                        "applied", "benign_normalization", "unexpected_drift"})
+
+    def test_setting_id_exits_two_and_posts_nothing(self):
+        t = FakeTransport([])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "id=999"], transport=t)
+        self.assertEqual(rc, 2)
+        self.assertEqual(t.calls, [])
+
+    def test_setting_version_exits_two_and_posts_nothing(self):
+        t = FakeTransport([])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "version=1"], transport=t)
+        self.assertEqual(rc, 2)
+        self.assertEqual(t.calls, [])
+
+    def test_malformed_set_exits_two(self):
+        """An argument error is exit 2, not the exit 1 a hub failure gets."""
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "label"],
+                    transport=FakeTransport([]))
+        self.assertEqual(rc, 2)
 
     def test_fetch_error_exits_one(self):
         t = FakeTransport([(404, {}, "")])

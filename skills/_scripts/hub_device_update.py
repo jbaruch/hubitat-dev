@@ -38,7 +38,8 @@ Usage:
     hub_device_update.py --ip 192.0.2.11 --device 953 --set homeKitEnabled=true
     hub_device_update.py --ip 192.0.2.11 --device 953 --dry-run --set label=X   # print the form, post nothing
 --noop and --set are mutually exclusive, and --noop and --dry-run are contradictory; --set may
-repeat and may be combined with --dry-run. Output: one JSON
+repeat and may be combined with --dry-run. --set cannot reach `id` or `version`: the script owns
+both. Output: one JSON
 object on stdout ({hub, device_id, mode, form, posted, applied, benign_normalization,
 unexpected_drift}) — the same keys in every mode, with empty buckets under --dry-run.
 Exit 2 on a config or argument error, 1 on a hub/fetch error or unexpected drift, 0 otherwise.
@@ -77,6 +78,11 @@ BENIGN_NORMALIZATIONS = (
     ("roomId", None, 0),
     ("label", None, ""),
 )
+
+# The script owns these two: `id` selects the device (from --device, and what verification re-reads)
+# and `version` is the concurrency stamp read fresh immediately before the POST. Letting --set reach
+# either one silently retargets the write or defeats the stamp, so both are argument errors.
+SCRIPT_OWNED_FIELDS = frozenset({"id", "version"})
 
 _TRUE_STRINGS = frozenset({"true", "on", "yes", "1"})
 _FALSE_STRINGS = frozenset({"false", "off", "no", "0", ""})
@@ -235,6 +241,9 @@ def parse_set(assignments: list) -> dict:
             raise HubError(f"--set expects key=value, got {item!r}")
         key, _, value = item.partition("=")
         key = key.strip()
+        if key in SCRIPT_OWNED_FIELDS:
+            raise HubError(f"--set {key} is not allowed: the script owns it — the device comes from "
+                           f"--device and `version` is read fresh immediately before the POST")
         changes[key] = as_bool(value) if key in CHECKBOX_FIELDS else value
     return changes
 
@@ -293,12 +302,12 @@ def main(argv=None, transport=None) -> int:
 
     try:
         base = resolve_base_from_args(args.ip, args.port, args.hub, args.hubs_file)
+        changes = parse_set(args.assignments)
     except (HubError, OSError, ValueError) as e:
         print(str(e), file=sys.stderr)
         return 2
 
     try:
-        changes = parse_set(args.assignments)
         full = fetch_full_json(base, args.device, transport)
         before = read_fields(full)
         pairs = build_form(full, changes)
