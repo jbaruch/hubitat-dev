@@ -31,6 +31,8 @@ them onto the new id.
 - For a Rule Machine **trigger**, `state.trigDevs` is authoritative. A trigger remains there while a Required Expression is false even though its event subscription is temporarily absent.
 - A Rule Machine action or condition device need not appear in `trigDevs`. Absence from that trigger map is not a liveness negative without trigger-role evidence such as a matching `tDev*` setting or `trigDevsW` entry.
 - `state.trigDevsW` and stale `tDev-N` settings are withdrawn bookkeeping, not live triggers. They remain deletion blast-radius references.
+- An enabled RM rule with **zero** `eventSubscriptions` is inert in every mode (`rules/ui-automation.md`).
+- Zero subscriptions is a broken Required Expression, not a temporarily-false one. A trigger stays in `state.trigDevs` either way.
 
 ## Warn with the concrete blast radius
 

@@ -59,6 +59,20 @@ Add the sensor to the inactivity monitor keyed on `lastActivityTime` or battery,
 
 Exercise the sensor and confirm it responds — `Skill(skill: "device-command")` runs a command (or `refresh`) and verifies by observation. **Exclude the settling window:** a freshly installed sensor's first hours can read garbage while it physically equilibrates (a soil probe settles over several wet/dry cycles). Do not baseline or health-check inside that window. Proceed to Step 10.
 
-## Step 10 — Reconcile the fleet
+## Step 10 — Re-commit every app expected to watch the sensor
+
+A built-in app's "use all X" setting is a **snapshot taken at its last Done**, not a live filter — adding a device does not extend coverage, and every surface you would naturally check says it did (`rules/app-lifecycle.md`). For each app that should now watch this sensor, open its config page and press **Done** (`skills/_reference/playwright-ui.md` gotchas 42–43; never hand-serialize `_action_update`, `rules/ui-automation.md`).
+
+Verify by subscription delta, not by the page:
+
+```bash
+curl -s http://<hub-ip>:8080/installedapp/statusJson/<appId> | python3 -c \
+"import sys,json;s=json.load(sys.stdin)['eventSubscriptions'];\
+print(sorted(x['typeId'] for x in s if x['name']=='<attribute>'))"
+```
+
+The new device id must be present and the count up by exactly one. Anything else means the commit did not take, or took something else with it. Proceed to Step 11.
+
+## Step 11 — Reconcile the fleet
 
 Re-read `GET /hub2/devicesList` and diff against the Step 1 snapshot. Every new id must be a device you paired; a stray or duplicate join surfaces only here. Report the reconciled inventory and any sensor still short of a step. Finish here.

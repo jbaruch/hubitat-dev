@@ -66,6 +66,17 @@ def hubStartupHandler() { reconcile() }
 - `app.updateSetting(name, value)` writes a setting; `app.removeSetting(name)` / `clearSetting(name)` drop one. All undocumented platform methods.
 - `removeSetting` is **deferred** — the in-memory `settings` map still returns the old value for the rest of the current execution, so it is cleanup for the next wake, never a same-render crash-guard (`rules/groovy-gotchas.md`).
 
+## Reader side: what an installed app actually watches
+
+- `statusJson.eventSubscriptions[].typeId` is the only honest statement of what an installed app watches.
+- Read the subscriptions, never the setting.
+- A built-in app's **"use all X" toggle is a snapshot taken at the last Done**, not a live filter.
+- Adding a device does not extend an existing app's coverage.
+- A device added after the last Done is absent from `eventSubscriptions`, and its handler never fires.
+- Coverage is correct only when the subscription count matches the device census.
+- Committing an installed app's config is a **UI Done** (`rules/ui-automation.md`).
+- Grounded on Hubitat Safety Monitor, whose `useAllWater = 'true'` and `hasWater = "All leak and water detectors"` both read as automatic coverage and are neither. `useAllSmoke` is assumed to behave identically and is **unverified**.
+
 ## Subscriptions & scheduling
 
 - Handler method names are passed as **bare strings**: `subscribe(dev, "switch", "switchHandler")`, `runIn(300, "checkState")`. A typo'd or missing handler name fails quietly — see `rules/groovy-gotchas.md`.
