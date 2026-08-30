@@ -272,6 +272,25 @@ class TestFetchAndPost(unittest.TestCase):
         self.assertIn("version", str(ctx.exception))
 
 
+class TestVersionAdvanced(unittest.TestCase):
+    def test_bumped_stamp_is_an_applied_write(self):
+        self.assertTrue(m.version_advanced({"version": 41}, {"version": 42}))
+
+    def test_unchanged_stamp_is_not(self):
+        """A stale-stamp rejection answers 200 and changes nothing — success-shaped."""
+        self.assertFalse(m.version_advanced({"version": 41}, {"version": 41}))
+
+    def test_backwards_stamp_is_not(self):
+        self.assertFalse(m.version_advanced({"version": 42}, {"version": 41}))
+
+    def test_string_stamps_compare_numerically(self):
+        self.assertTrue(m.version_advanced({"version": "9"}, {"version": "10"}))
+
+    def test_missing_stamp_is_not_an_applied_write(self):
+        self.assertFalse(m.version_advanced({"version": None}, {"version": 42}))
+        self.assertFalse(m.version_advanced({}, {}))
+
+
 class TestMain(unittest.TestCase):
     def test_noop_round_trip_is_clean_and_exits_zero(self):
         body = json.dumps(full_json())
@@ -364,6 +383,42 @@ class TestMain(unittest.TestCase):
         rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--noop", "--set", "label=X"],
                     transport=FakeTransport([]))
         self.assertEqual(rc, 2)
+
+    def test_unbumped_version_is_a_failed_write(self):
+        """The hub answered 200 but the stamp never moved: nothing was applied. Reporting this as
+        a clean round-trip would certify a write that did not happen."""
+        t = FakeTransport([
+            (200, {}, json.dumps(full_json(version=41))),
+            (200, {}, ""),
+            (200, {}, json.dumps(full_json(version=41))),
+        ])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--noop"], transport=t)
+        self.assertEqual(rc, 1)
+
+    def test_dry_run_emits_the_full_result_schema(self):
+        """The output shape does not vary by mode."""
+        import contextlib
+        import io as _io
+        t = FakeTransport([(200, {}, json.dumps(full_json()))])
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            m.main(["--ip", "192.0.2.11", "--device", "953", "--dry-run",
+                    "--set", "label=New"], transport=t)
+        result = json.loads(buf.getvalue())
+        self.assertEqual(set(result), {"hub", "device_id", "mode", "form", "posted",
+                                       "applied", "benign_normalization", "unexpected_drift"})
+
+    def test_posted_result_has_the_same_schema(self):
+        import contextlib
+        import io as _io
+        t = FakeTransport([(200, {}, json.dumps(full_json())), (200, {}, ""),
+                           (200, {}, json.dumps(full_json(version=42)))])
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            m.main(["--ip", "192.0.2.11", "--device", "953", "--noop"], transport=t)
+        result = json.loads(buf.getvalue())
+        self.assertEqual(set(result), {"hub", "device_id", "mode", "form", "posted",
+                                       "applied", "benign_normalization", "unexpected_drift"})
 
     def test_fetch_error_exits_one(self):
         t = FakeTransport([(404, {}, "")])

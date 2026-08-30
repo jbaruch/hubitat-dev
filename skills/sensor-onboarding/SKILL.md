@@ -21,7 +21,7 @@ Read `GET /device/fullJson/<id>` and confirm the device landed on a real built-i
 
 ## Step 4 — Name by function and position
 
-Name the device by **function and position** (`<function> - <position>`), qualifying even a single-sensor unit so a second sensor later does not force a rename (`rules/data-collection.md`). The rename is a `POST /device/update` mutation carrying the full field set, the current `version` stamp, and a **destructive mesh-boolean trap** (`skills/_reference/endpoints.md`). Run it through `skills/_scripts/hub_device_update.py`, which owns the field set, the boolean encoding and the fresh-`version` read (argument and output contract in its module docstring) — never a hand-built POST:
+Name the device by **function and position** (`<function> - <position>`), qualifying even a single-sensor unit so a second sensor later does not force a rename (`rules/data-collection.md`). The rename is a `POST /device/update` mutation carrying the full field set, the current `version` stamp, and a **destructive mesh-boolean trap** (`skills/_reference/endpoints.md`). The update script owns the field set, the boolean encoding and the fresh-`version` read — never hand-build the POST:
 
 ```bash
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_update.py \
@@ -30,7 +30,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_update.py 
   --hub <hub> --device <id> --set label="<function> - <position>"
 ```
 
-Both calls print one JSON object: `{hub, device_id, mode, form, posted, applied, benign_normalization, unexpected_drift}`. `applied` holds each field that reached the value asked for, `benign_normalization` the empty-value normalizations the hub performs on its own, `unexpected_drift` everything else. **Exit 0** — the write landed as asked. **Exit 1** — a hub or fetch error, or a non-empty `unexpected_drift`: the write did not land, so stop and re-read the device rather than repeating the call. **Exit 2** — a config or argument error, nothing was posted. The device edit page is the UI alternative (`skills/_reference/playwright-ui.md`). Proceed to Step 5.
+Argument contract and output shape: `skills/_scripts/hub_device_update.py` module docstring. Both calls print one JSON object: `{hub, device_id, mode, form, posted, applied, benign_normalization, unexpected_drift}` — the same keys in every mode. `applied` holds each field that reached the value asked for, `benign_normalization` the empty-value normalizations the hub performs on its own, `unexpected_drift` everything else. **Exit 0** — the write landed as asked. **Exit 1** — a hub or fetch error, a `version` stamp that did not advance, or a non-empty `unexpected_drift`: the write did not land, so stop and re-read the device rather than repeating the call. **Exit 2** — a config or argument error, nothing was posted. The device edit page is the UI alternative (`skills/_reference/playwright-ui.md`). Proceed to Step 5.
 
 ## Step 5 — Raise event retention
 

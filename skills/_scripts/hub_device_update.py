@@ -40,7 +40,7 @@ Usage:
 --noop and --set are mutually exclusive, and --noop and --dry-run are contradictory; --set may
 repeat and may be combined with --dry-run. Output: one JSON
 object on stdout ({hub, device_id, mode, form, posted, applied, benign_normalization,
-unexpected_drift}).
+unexpected_drift}) — the same keys in every mode, with empty buckets under --dry-run.
 Exit 2 on a config or argument error, 1 on a hub/fetch error or unexpected drift, 0 otherwise.
 """
 import argparse
@@ -161,6 +161,23 @@ def read_fields(full: dict) -> dict:
         value = device.get(field)
         out[field] = as_bool(value) if field in CHECKBOX_FIELDS else value
     return out
+
+
+def version_advanced(before: dict, after: dict) -> bool:
+    """Pure. Whether the concurrency stamp moved forward across the POST.
+
+    The hub bumps `version` on every save (../_reference/endpoints.md), so a stamp that did not
+    advance means the write was not applied — a stale-version rejection is success-shaped on this
+    endpoint, answering 200 while changing nothing. Without this check a rejected `--noop` reads as
+    a clean round-trip, which is the opposite of what the caller asked.
+    """
+    was, now = before.get("version"), after.get("version")
+    if was is None or now is None:
+        return False
+    try:
+        return int(now) > int(was)
+    except (TypeError, ValueError):
+        return False
 
 
 def same_value(field: str, left, right) -> bool:
@@ -288,11 +305,20 @@ def main(argv=None, transport=None) -> int:
 
         if args.dry_run:
             print(json.dumps({"hub": base, "device_id": args.device, "mode": "dry-run",
-                              "form": pairs, "posted": False}, indent=2, default=str))
+                              "form": pairs, "posted": False, "applied": {},
+                              "benign_normalization": {}, "unexpected_drift": {}},
+                             indent=2, default=str))
             return 0
 
         post_update(base, pairs, transport)
         after = read_fields(fetch_full_json(base, args.device, transport))
+        if not version_advanced(before, after):
+            raise HubError(
+                f"the version stamp did not advance ({before.get('version')} -> "
+                f"{after.get('version')}) — the hub answered but did not apply the write, which is "
+                f"what a stale-stamp rejection looks like on this endpoint. Re-read the device and "
+                f"retry; if the stamp never advances on this platform build, the postcondition "
+                f"here is wrong and not the write")
         applied, benign, unexpected = classify_drift(before, after, changes)
     except HubError as e:
         print(str(e), file=sys.stderr)
