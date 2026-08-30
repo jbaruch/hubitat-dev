@@ -42,7 +42,9 @@ repeat and may be combined with --dry-run. --set cannot reach `id` or `version`:
 both. Output: one JSON
 object on stdout ({hub, device_id, mode, form, posted, applied, benign_normalization,
 unexpected_drift}) — the same keys in every mode, with empty buckets under --dry-run.
-Exit 2 on a config or argument error, 1 on a hub/fetch error or unexpected drift, 0 otherwise.
+On success the JSON goes to stdout; on any failure the diagnostic goes to stderr and no JSON is
+emitted. Exit 2 on a config or argument error, 1 on a hub/fetch error, an unadvanced version stamp
+or unexpected drift, 0 otherwise.
 """
 import argparse
 import json
@@ -276,7 +278,7 @@ def main(argv=None, transport=None) -> int:
     parser.add_argument("--ip")
     parser.add_argument("--port", type=int, default=8080)
     parser.add_argument("--hub")
-    parser.add_argument("--hubs-file")
+    parser.add_argument("--hubs", help="path to hubs.json (default ./hubs.json when --hub is given)")
     parser.add_argument("--device", type=int, required=True)
     parser.add_argument("--noop", action="store_true",
                         help="repost current state unchanged and report drift")
@@ -288,8 +290,8 @@ def main(argv=None, transport=None) -> int:
     transport = transport or _urllib_transport
 
     if not args.noop and not args.assignments and not args.dry_run:
-        print("nothing to do — pass --noop to round-trip current state, or --set KEY=VALUE to edit",
-              file=sys.stderr)
+        print("nothing to do — pass --noop to round-trip current state, --set KEY=VALUE to edit, "
+              "or --dry-run to build the form without posting", file=sys.stderr)
         return 2
     if args.noop and args.assignments:
         print("--noop reposts current state unchanged; it cannot be combined with --set",
@@ -301,7 +303,7 @@ def main(argv=None, transport=None) -> int:
         return 2
 
     try:
-        base = resolve_base_from_args(args.ip, args.port, args.hub, args.hubs_file)
+        base = resolve_base_from_args(args.ip, args.port, args.hub, args.hubs)
         changes = parse_set(args.assignments)
     except (HubError, OSError, ValueError) as e:
         print(str(e), file=sys.stderr)
