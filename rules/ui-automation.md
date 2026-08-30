@@ -25,8 +25,8 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Enumerate an app's sub-pages from the rendered DOM's `_action_href` buttons, never by probing plausible names.
 - **Committing an installed app's config is a UI Done.** This is the one place the HTTP-first preference loses (`skills/_reference/playwright-ui.md`).
 - **Never hand-serialize `_action_update` on `POST /installedapp/update/json`.** It is not the counterpart of the `_action_remove` route.
-- `_action_remove` is branched on before settings are applied, which is what makes its minimal body safe.
-- `_action_update` applies settings and clears anything omitted. On Hubitat Safety Monitor that form carries 69 settings including two 30-device intrusion lists.
+- `_action_remove` is branched on before settings are applied.
+- `_action_update` applies settings and clears anything omitted (`skills/_reference/playwright-ui.md`).
 - Match the Done on `name="_action_update"` / `id=btnDone`, never on position and never on visible text.
 - Drive the UI only for the operations with no endpoint: installing an app instance, configuring built-in/community apps (Room Lighting, Notifications, CoCoHue, HubiThings Replica), deleting a device, uninstalling Hubitat Package Manager packages, importing devices, reading/downloading a backup, swapping a device's app references (`skills/device-migration/SKILL.md`).
 
@@ -55,9 +55,10 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - `mainPage` and its sub-pages use different table column layouts — identify a column by its hidden `settings[...]` input name or by content, never by index across pages.
 - A **disabled** Rule Machine rule's `configure/<id>/mainPage` is a stub — no `settings[...]`, `removeButton:false`, and a rendered control set that varies by build (Cancel/Remove/Enable on 2.5.1.134; Enable alone on 2.5.1.x/RM 5.1.8). Enable it first (`POST /installedapp/disable {"id":<id>,"disable":false}`) or an empty settings set reads as an empty rule. Note the hidden Remove button does not mean un-removable — HTTP removal works regardless (`skills/_reference/playwright-ui.md` gotcha 31).
 - **Verify a Rule Machine rule at `statusJson.eventSubscriptions`, never at its config page.** A rule that reads correct is not a rule that runs.
-- **Zero subscriptions on an enabled rule is a broken Required Expression, not a mode mismatch.**
+- On a rule **known to carry an event trigger**, zero subscriptions is a broken Required Expression, not a mode mismatch. Confirm the RE state before diagnosing.
 - RM subscribes to a rule's triggers only while the Required Expression is true, and to the RE's own source always.
-- A rule at zero is not watching the thing that would arm it. It can never fire, in any mode.
+- Such a rule at zero is not watching the thing that would arm it. It can never fire, in any mode.
+- An action-only rule invoked by another rule legitimately holds no subscription. Establish the trigger role first (`rules/device-lifecycle.md`).
 - One subscription in a non-matching mode is the healthy state.
 - `POST /installedapp/disable` off-and-on and RM's own **Update Rule** button both leave it at zero (`skills/_reference/playwright-ui.md`).
 - Cutting a Rule Machine action leaves its `actType.N`/… settings behind — a present `settings[N]` does not mean action N exists. Verify against the rendered action rows or the "Select Actions to Run" summary (`skills/_reference/playwright-ui.md` gotcha 33).

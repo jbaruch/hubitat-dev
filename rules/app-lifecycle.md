@@ -68,14 +68,13 @@ def hubStartupHandler() { reconcile() }
 
 ## Reader side: what an installed app actually watches
 
-- `statusJson.eventSubscriptions[].typeId` is the only honest statement of what an installed app watches.
-- Read the subscriptions, never the setting.
-- A built-in app's **"use all X" toggle is a snapshot taken at the last Done**, not a live filter.
-- Adding a device does not extend an existing app's coverage.
-- A device added after the last Done is absent from `eventSubscriptions`, and its handler never fires.
-- Coverage is correct only when the subscription count matches the device census.
+- For a **subscription-driven** app, `statusJson.eventSubscriptions[].typeId` is the live surface. Read it with `skills/_scripts/hub_app_subscriptions.py` (contract in its module docstring).
+- Read the subscriptions, never the app's own settings.
+- Absence is conclusive only for an app type known to consume the device by subscription. Command-only consumers hold none (`rules/device-lifecycle.md`).
+- **Verified for Hubitat Safety Monitor's `useAllWater`:** the toggle is a snapshot taken at the last Done, not a live filter. A device added afterwards is absent from `eventSubscriptions` and its handler never fires.
+- Treat any other "use all X" toggle as snapshot-shaped until measured. `useAllSmoke` is **unverified**.
+- Assert the expected device ids are present, never a subscription count. One device can need several attribute subscriptions.
 - Committing an installed app's config is a **UI Done** (`rules/ui-automation.md`).
-- Grounded on Hubitat Safety Monitor, whose `useAllWater = 'true'` and `hasWater = "All leak and water detectors"` both read as automatic coverage and are neither. `useAllSmoke` is assumed to behave identically and is **unverified**.
 
 ## Subscriptions & scheduling
 

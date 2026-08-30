@@ -9,7 +9,7 @@ Process steps in order. Do not skip ahead. Each step verifies before the next.
 
 ## Step 1 — Snapshot the inventory before pairing
 
-Capture `GET /hub2/devicesList` (`skills/_reference/endpoints.md`) before any pairing. A join can mint a stray or duplicate device, and only a pre/post diff (Step 10) makes that visible. Save the id set. Proceed to Step 2.
+Capture `GET /hub2/devicesList` (`skills/_reference/endpoints.md`) before any pairing. A join can mint a stray or duplicate device, and only a pre/post diff (Step 11) makes that visible. Save the id set. Proceed to Step 2.
 
 ## Step 2 — Pair the sensor
 
@@ -61,17 +61,18 @@ Exercise the sensor and confirm it responds — `Skill(skill: "device-command")`
 
 ## Step 10 — Re-commit every app expected to watch the sensor
 
-A built-in app's "use all X" setting is a **snapshot taken at its last Done**, not a live filter — adding a device does not extend coverage, and every surface you would naturally check says it did (`rules/app-lifecycle.md`). For each app that should now watch this sensor, open its config page and press **Done** (`skills/_reference/playwright-ui.md` gotchas 42–43; never hand-serialize `_action_update`, `rules/ui-automation.md`).
+Hubitat Safety Monitor's `useAllWater` toggle is a **snapshot taken at its last Done**, not a live filter — adding a device does not extend coverage, and every surface you would naturally check says it did (`rules/app-lifecycle.md`). Treat any other "use all X" toggle as snapshot-shaped until measured. For each subscription-driven app that should now watch this sensor, open its config page and press **Done** (`skills/_reference/playwright-ui.md` gotchas 42–43; never hand-serialize `_action_update`, `rules/ui-automation.md`).
 
-Verify by subscription delta, not by the page:
+Verify at the app's live subscriptions, not at the page:
 
 ```bash
-curl -s http://<hub-ip>:8080/installedapp/statusJson/<appId> | python3 -c \
-"import sys,json;s=json.load(sys.stdin)['eventSubscriptions'];\
-print(sorted(x['typeId'] for x in s if x['name']=='<attribute>'))"
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_app_subscriptions.py \
+  --hub <hub> --app <appId> --attribute <event> --expect-device <deviceId>
 ```
 
-The new device id must be present and the count up by exactly one. Anything else means the commit did not take, or took something else with it. Proceed to Step 11.
+Argument contract and output shape: `skills/_scripts/hub_app_subscriptions.py` module docstring. The JSON result is `{hub, app_id, app_label, attribute, count, subscriptions, device_ids, by_attribute, expected}`. **Exit 0** — the device is subscribed. **Exit 1 with the result on stdout** — `--expect-device` was not found; read `device_ids` for what the app does watch, then re-Done. **Exit 1 with stderr only** — a hub or fetch error. **Exit 2 with stderr only** — a config or argument error.
+
+Assert **presence of the expected device**, never a count delta: one Done can legitimately add several previously missing subscriptions, and one device can need several attribute subscriptions. Proceed to Step 11.
 
 ## Step 11 — Reconcile the fleet
 
