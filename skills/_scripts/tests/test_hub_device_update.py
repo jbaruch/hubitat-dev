@@ -265,8 +265,22 @@ class TestFetchAndPost(unittest.TestCase):
             m.fetch_full_json("http://h:8080", 953, t)
         self.assertIn("Hub Security", str(ctx.exception))
 
-    def test_fetch_non_json_raises(self):
+    def test_fetch_non_json_raises_actionable_message(self):
         t = FakeTransport([(200, {}, "<html>")])
+        with self.assertRaises(HubError) as ctx:
+            m.fetch_full_json("http://h:8080", 953, t)
+        self.assertIn("Hub Security", str(ctx.exception))
+
+    def test_fetch_valid_json_of_the_wrong_shape_raises(self):
+        """`null` and `[]` are valid JSON and used to crash at full.get(...)."""
+        for body in ("null", "[]", '"a string"', "{}"):
+            t = FakeTransport([(200, {}, body)])
+            with self.assertRaises(HubError) as ctx:
+                m.fetch_full_json("http://h:8080", 953, t)
+            self.assertIn("device", str(ctx.exception).lower(), body)
+
+    def test_fetch_rejects_a_non_object_device_member(self):
+        t = FakeTransport([(200, {}, json.dumps({"device": []}))])
         with self.assertRaises(HubError):
             m.fetch_full_json("http://h:8080", 953, t)
 
@@ -459,6 +473,31 @@ class TestMain(unittest.TestCase):
         rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "label"],
                     transport=FakeTransport([]))
         self.assertEqual(rc, 2)
+
+    def test_unexpected_drift_still_emits_the_json_result(self):
+        """Exit 1 from drift prints the result: the buckets are the diagnosis."""
+        import contextlib
+        import io as _io
+        t = FakeTransport([
+            (200, {}, json.dumps(full_json(retryEnabled=True))),
+            (200, {}, ""),
+            (200, {}, json.dumps(full_json(retryEnabled=False, version=42))),
+        ])
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--noop"], transport=t)
+        self.assertEqual(rc, 1)
+        self.assertIn("retryEnabled", json.loads(buf.getvalue())["unexpected_drift"])
+
+    def test_hub_error_emits_no_json(self):
+        import contextlib
+        import io as _io
+        t = FakeTransport([(404, {}, "")])
+        buf = _io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--noop"], transport=t)
+        self.assertEqual(rc, 1)
+        self.assertEqual(buf.getvalue(), "")
 
     def test_fetch_error_exits_one(self):
         t = FakeTransport([(404, {}, "")])

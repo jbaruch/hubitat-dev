@@ -42,9 +42,12 @@ repeat and may be combined with --dry-run. --set cannot reach `id` or `version`:
 both. Output: one JSON
 object on stdout ({hub, device_id, mode, form, posted, applied, benign_normalization,
 unexpected_drift}) — the same keys in every mode, with empty buckets under --dry-run.
-On success the JSON goes to stdout; on any failure the diagnostic goes to stderr and no JSON is
-emitted. Exit 2 on a config or argument error, 1 on a hub/fetch error, an unadvanced version stamp
-or unexpected drift, 0 otherwise.
+Output contract:
+  exit 0 — the JSON result on stdout, nothing on stderr.
+  exit 1, unexpected drift — the JSON result on stdout AND a diagnostic on stderr. The buckets say
+          which fields moved, so the result is worth reading, not discarding.
+  exit 1, hub/fetch error or a version stamp that did not advance — stderr only, no JSON.
+  exit 2, config or argument error — stderr only, no JSON; nothing was posted.
 """
 import argparse
 import json
@@ -260,9 +263,21 @@ def fetch_full_json(base: str, device_id, transport) -> dict:
         raise HubError(f"GET {DEVICE_PATH}{device_id} returned HTTP {status} — "
                        f"check the device id and that Hub Security is off for this client")
     try:
-        return json.loads(body)
+        full = json.loads(body)
     except ValueError as e:
-        raise HubError(f"GET {DEVICE_PATH}{device_id} did not return JSON: {e}") from e
+        raise HubError(
+            f"GET {DEVICE_PATH}{device_id} did not return JSON ({e}) — the hub serves an HTML "
+            f"login page when Hub Security is on for this client, and an error page for an id that "
+            f"does not exist. Confirm the device id, confirm Hub Security is off for this client, "
+            f"then re-verify the route against skills/_reference/endpoints.md for this platform "
+            f"build") from e
+    if not isinstance(full, dict) or not isinstance(full.get("device"), dict):
+        raise HubError(
+            f"GET {DEVICE_PATH}{device_id} returned JSON without a `device` object "
+            f"(got {type(full).__name__}) — the route answered but not with a device record. "
+            f"Confirm the device id exists, then re-verify the route against "
+            f"skills/_reference/endpoints.md for this platform build")
+    return full
 
 
 def post_update(base: str, pairs: list, transport) -> int:
