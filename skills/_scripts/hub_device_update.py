@@ -37,7 +37,8 @@ Usage:
     hub_device_update.py --ip 192.0.2.11 --device 953 --set label="Kitchen Leak"
     hub_device_update.py --ip 192.0.2.11 --device 953 --set homeKitEnabled=true
     hub_device_update.py --ip 192.0.2.11 --device 953 --dry-run --set label=X   # print the form, post nothing
-Exactly one of --noop / --set / --dry-run behaviours applies; --set may repeat. Output: one JSON
+--noop and --set are mutually exclusive, and --noop and --dry-run are contradictory; --set may
+repeat and may be combined with --dry-run. Output: one JSON
 object on stdout ({hub, device_id, mode, form, posted, applied, benign_normalization,
 unexpected_drift}).
 Exit 2 on a config or argument error, 1 on a hub/fetch error or unexpected drift, 0 otherwise.
@@ -266,6 +267,10 @@ def main(argv=None, transport=None) -> int:
         return 2
     if args.noop and args.assignments:
         print("--noop reposts current state unchanged; it cannot be combined with --set",
+              file=sys.stderr)
+        return 2
+    if args.noop and args.dry_run:
+        print("--noop posts current state and --dry-run posts nothing; pass one or the other",
               file=sys.stderr)
         return 2
 

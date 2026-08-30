@@ -30,7 +30,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_update.py 
   --hub <hub> --device <id> --set label="<function> - <position>"
 ```
 
-A non-empty `unexpected_drift` from either call means the write did not land as asked — stop and re-read the device rather than repeating it. The device edit page is the UI alternative (`skills/_reference/playwright-ui.md`). Proceed to Step 5.
+Both calls print one JSON object: `{hub, device_id, mode, form, posted, applied, benign_normalization, unexpected_drift}`. `applied` holds each field that reached the value asked for, `benign_normalization` the empty-value normalizations the hub performs on its own, `unexpected_drift` everything else. **Exit 0** — the write landed as asked. **Exit 1** — a hub or fetch error, or a non-empty `unexpected_drift`: the write did not land, so stop and re-read the device rather than repeating the call. **Exit 2** — a config or argument error, nothing was posted. The device edit page is the UI alternative (`skills/_reference/playwright-ui.md`). Proceed to Step 5.
 
 ## Step 5 — Raise event retention
 
@@ -41,7 +41,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_update.py 
   --hub <hub> --device <id> --set maxEvents=1000
 ```
 
-Proceed to Step 6.
+Same JSON object and the same exit codes as Step 4. Proceed to Step 6.
 
 ## Step 6 — Read the real adjustable preferences
 

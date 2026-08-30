@@ -348,6 +348,18 @@ class TestMain(unittest.TestCase):
         self.assertEqual(m.main(["--ip", "192.0.2.11", "--device", "953"],
                                 transport=FakeTransport([])), 2)
 
+    def test_noop_with_dry_run_is_rejected(self):
+        """Contradictory modes: --noop posts, --dry-run does not."""
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--noop", "--dry-run"],
+                    transport=FakeTransport([]))
+        self.assertEqual(rc, 2)
+
+    def test_dry_run_with_set_is_allowed(self):
+        t = FakeTransport([(200, {}, json.dumps(full_json()))])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--dry-run",
+                     "--set", "maxEvents=1000"], transport=t)
+        self.assertEqual(rc, 0)
+
     def test_noop_with_set_is_rejected(self):
         rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--noop", "--set", "label=X"],
                     transport=FakeTransport([]))
