@@ -11,7 +11,7 @@
 
 ### Changed
 
-- **Every surface that directed a raw `POST /device/update` now names the script** (`rules/device-lifecycle.md`, `rules/data-collection.md`, `skills/sensor-onboarding/SKILL.md`). `device-lifecycle` already carried "round-trip the field set with a no-op before the first real edit" as prose; `sensor-onboarding` Steps 4–5 and `data-collection` still told an agent to hand-build the form. A safety check an agent can bypass by following a sibling instruction is not a safety check — surfaced by the policy reviewer under the Post-Edit Rule Audit.
+- **Every surface that directed a raw `POST /device/update` now names the script** (`rules/device-lifecycle.md`, `rules/data-collection.md`, `rules/multi-hub-topology.md`, `skills/sensor-onboarding/SKILL.md`). `device-lifecycle` already carried "round-trip the field set with a no-op before the first real edit" as prose; `sensor-onboarding` Steps 4–5 and `data-collection` still told an agent to hand-build the form. `multi-hub-topology` described the read-fresh-then-send `version` discipline as something the agent performs around its own POST. A safety check an agent can bypass by following a sibling instruction is not a safety check — surfaced by the policy reviewer under the Post-Edit Rule Audit, one surface per round until the sweep was done repo-wide.
 - **The `/device/update` trap list said "Three traps" above four bullets** (`skills/_reference/endpoints.md`). Now says four. Boy-scouted while correcting the boolean encoding.
 
 ## 0.1.74 — 2026-08-18
