@@ -58,6 +58,14 @@ them onto the new id.
 - Never leave a freed label duplicated when the source's old name is about to be reused.
 - Round-trip the field set before the first real edit of any device — `skills/_scripts/hub_device_update.py --hub <name> --device <id> --noop` (argument and output contract in its module docstring).
 - A mis-encoded mesh boolean pair unshares the device and deletes the mirror (`skills/_reference/endpoints.md`).
+- **A HomeKit-exported device leaves an orphan accessory in the controller after deletion.**
+- The hub prunes its side. The external controller does not.
+- The orphan freezes at its last characteristic values, which are the alarming ones — a decommissioned leak sensor presents as a live leak with a flat battery.
+- Tell hub-clean from controller-stale with `GET http://<hub-ip>:21063/accessories`, the live HAP database (`skills/_reference/homekit-mdns-network.md`).
+- Clearing the orphan is a controller-side manual action. A bridged accessory cannot be removed through the HomeKit API.
+- The accessory's serial characteristic is `HUBITAT<deviceId>` and is **not unique across hubs**.
+- Two hubs in one home can mint the same serial. The bridge disambiguates.
+- The bridge app also retains per-device `disableAccessoryTrait|<id>|…` and `assignAccessoryClass|<id>|…` rows for the deleted id. They apply to whatever device next takes that id on that hub.
 - Every boolean on that form is checkbox-semantic.
 - A literal `true` clears the field.
 
@@ -73,4 +81,11 @@ them onto the new id.
 - It is **not** available for a child device: devices owned by a parent device or parent app are excluded from its lists by design (`skills/_reference/parent-child-devices.md`). An app-managed replacement above re-wires by hand for that reason. A virtual-device hop does not lift the exclusion. The last swap of any chain still targets the child.
 - The swap is **bidirectional**: apps already using the *new* device are moved onto the *old* one. Check the replacement's usage before swapping, not after.
 - Hubitat scopes the swap to apps and claims nothing about **dashboards** — verify dashboard tiles separately rather than reporting them migrated.
+- **A swap moves the new hardware into the OLD device record.**
+- The record you keep is the one apps already reference. The record you paired is deleted.
+- The id you paired is not the id you end up with.
+- `currentStates[*].deviceId` keeps the **deleted** record's id until the next report. Cosmetic, not a mis-bound device.
+- The event log stays with the surviving record.
+- A new sensor presents with the old device's history and none of its own readings.
+- Confirm the binding at `GET /hub/zwaveDetails/json` → `nodes[].deviceId`, never in `currentStates`.
 - Order the work **references first, delete second** — swap while the old device still exists. A deleted device cannot be swapped from. When the old must go first (a radio exclusion), park the references on a virtual device and swap them onto the replacement afterwards.
