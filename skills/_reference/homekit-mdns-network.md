@@ -90,6 +90,37 @@ Work the path, not the symptom — top to bottom, stop when it breaks:
    original states**, then restore incrementally and retest after each group.
 5. Fix the narrow exception, re-enable the deny rule, retest.
 
+## What gets exported, and the 149-accessory cap
+
+Export is one HTTP GET — `GET /hub/homekit/enableDevice/<deviceId>/<true|false>`, no app `Done` required
+(`skills/_reference/endpoints.md`). Ground truth for what is *actually* served is the unauthenticated HAP database
+at `GET http://<hub-ip>:21063/accessories`, not the app's `authorizedDevices` setting, which records what was asked
+for.
+
+**HomeKit allows 149 accessories + the bridge = 150 per bridge**, enforced client-side by the app
+(`if (checked || deviceCount < 150)`). On a multi-hub setup that is not a preference — it decides the layout, and it
+produces the rule in `rules/multi-hub-topology.md`: **the hub that physically owns a device exports it, and a
+hub-mesh mirror is never exported.** Measured on the fleet 2026-08-30: the apps hub's bridge exports 104 devices, of
+which **zero** are mesh mirrors, while every Zigbee sensor is exported from the hub that owns its radio.
+
+**Accessory class is capability-derived and not freely settable**, which constrains what an export can achieve:
+
+| device | classes offered |
+|---|---|
+| Dimmer / colour bulb / CoCoHue group | Light, Dimmable Light, Colour Temp Light, RGB Light, Dimmer, Switch |
+| Zooz ZEN switch (wall lights **and** exhaust fans) | Switch, Button — nothing else |
+| Zooz ZEN plug | Outlet, Switch, Smoke Detector, CO Detector — no Light |
+| Zooz ZAC36 ball valve | Temperature Sensor, Valve, Water Sensor |
+
+So a switch-only device **cannot** be exported as a Lightbulb or a Fan. Class changes go through the app form
+(`buttonClick` + confirm), not a hub endpoint — `enableDevice` is the only `/hub/homekit/` route on that page, and
+the controls stay hidden until Advanced → *Show accessory classes and characteristics* is toggled on.
+
+HAP strips a trailing `)` from names, so `Kitchen (Hue Group)` arrives as `Kitchen (Hue Group`.
+
+Grounded 2026-08-11 on 2.5.1.140 with both bridges paired and serving, re-exercised 2026-08-30 on 2.5.1.169 adding
+a Zigbee leak sensor: one GET moved `authorizedDevices` 53 → 54 and the accessory appeared in the HAP DB ~10 s later.
+
 ## What not to do
 
 A blocked mDNS or HAP path looks exactly like a broken integration — and none of the destructive

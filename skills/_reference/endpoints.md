@@ -106,6 +106,51 @@ Correlating an app's log line against an event across these two silently mis-ord
 | `GET /hub/edit` | The **Settings** page (UI). Not `/hub/settings`, which 404s — the nav link is the authority |
 | `GET /installedapp/direct/<builtInAppType>` | Opens a built-in app, redirecting to a transient instance at `/installedapp/configure/<newId>/mainPage` (e.g. `swapDevice` → Settings → Swap Device). The instance takes the next app id and is **not** a persistent install: its **Cancel** discards it, after which `/installedapp/statusJson/<id>` returns `{}` and it is absent from `/hub2/appsList`. Verified 2.5.1.128 |
 
+## Dashboards: the whole tile grid is one JSON POST (grounded 2026-08-30, 2.5.1.169)
+
+```
+GET  /apps/api/<appId>/dashboard/<appId>/layout?requestToken=<rt>
+POST /apps/api/<appId>/dashboard/<appId>/layout?requestToken=<rt>    body = the whole layout object
+     Authorization: Bearer <dashboard access_token>
+```
+
+Found in `/ui2/dashboard2/js/app.js`'s `saveLayout` action — the tile editor itself does exactly this. The app id
+appears **twice** (parent path segment and child), which is not obvious from the UI URL.
+
+**Two different tokens, and mixing them fails with `Invalid request token`:**
+
+- `Bearer` is the dashboard's **`access_token`**, also at `installedapp/statusJson/<id>` → `appState.accessToken`.
+- `requestToken` is **`javascriptRequestToken`**, scraped from the dashboard page HTML. It is **not** `parentToken`,
+  which is also present on that page and is rejected.
+
+Round-trip the GET and edit only `tiles`; every other key (`cols`, `bgColor`, `iconSize`, `rowHeight`, the pin
+fields …) must be sent back or the POST overwrites them with defaults. Tile shape, `col`/`row` 1-indexed:
+
+```json
+{"id": 18, "device": "1694", "template": "water", "col": 4, "row": 3, "colSpan": 1, "rowSpan": 1}
+```
+
+`device` is a **string**. Templates seen: `water`, `valve`, `hsm` (with a negative pseudo-device id, `-3`),
+`humidity` for a soil probe. Verified non-destructive: after a single-field edit a re-GET showed 15 tiles unchanged
+in count, zero non-tile key drift, and zero change to the 14 untouched tiles.
+
+**Authorization is separate from the tile.** A device must be in the dashboard app's `devicesPicked` **and** have a
+tile; authorizing is not a tile, and a tile on an unauthorized device does not render.
+
+**Creating one:** `GET /installedapp/createchild/hubitat/Dashboard/parent/<parentAppId>` creates the child
+immediately and redirects to its config, **skipping the name prompt**, so it lands labelled `Dashboard`. Set
+`input#label` on `/installedapp/configure/<id>` and press Done. The label surfaces in `/hub2/appsList` as `name`;
+`statusJson.label` stays `null` and is not the field to check. `devicesPicked` on a *fresh* dashboard is an EMPTY
+input, so the hidden-value write needs the `device-btn-empty` → `device-btn-filled` class flip
+(`skills/_reference/playwright-ui.md`).
+
+**Unexplained, recorded as an observation only.** After `GET /device/createLinked/...` minted a hub-mesh mirror,
+that mirror appeared in `devicesPicked` on **6 of the 7** dashboards on that hub with no action taken — verified by
+re-reading `installedapp/statusJson/<id>` for each. The one it did not join was the most recently built by explicit
+hidden-input writes. The mechanism was not identifiable from HTTP: the device's own `dashboardIds` is `null`, as on
+every sibling sensor. Anyone reproducing a fresh `createLinked` should check whether this is real, and whether it is
+a platform convenience or a stale-render artefact.
+
 ## Device usage / blast radius (undocumented — grounded 2026-07-16)
 
 `GET /device/fullJson/<deviceId>` returns the hub's own **computed** "in use by" list for a device — verified live on 2.5.1.128 (C-8 Pro, Hub Security off). This is the removal blast radius, straight from the hub; `skills/_scripts/hub_device_usage.py` projects it and the `device-removal` skill reads it.
@@ -141,9 +186,13 @@ The same `GET /device/fullJson/<id>` that carries the blast radius also carries 
 Defensive-parse these — each bit during the irrigation recon:
 
 - `GET /hub2/appsList` returns a **dict with an `apps` key**, not a list. Built-in app entries populate `name` and leave `label` null.
-- Each entry is `{key, data:{id, name, type, disabled}, children:[…same shape, recursively…], parent, child}`. **Walk `children[]` recursively.** Measured 2026-08-30 on 2.5.1.169 across three hubs, top-level `apps[]` vs the full walk: **37 → 186**, 9 → 13, 6 → 9. On the busiest hub **80% of the apps are children** — every Rule Machine rule is a child of the RM parent and every dashboard a child of `Hubitat® Dashboards`, so a flat iteration audits neither. `appsUsing` on `fullJson` does not have this problem; the hub computes it. The trap is in a hand-rolled census, which is what you write the moment the question is "which app *setting* contains this id" (`rules/device-lifecycle.md`).
+- Each entry is `{key, data:{id, name, type, disabled}, children:[…same shape, recursively…], parent, child}`. **Walk `children[]` recursively.** Measured 2026-08-30 on 2.5.1.169 across three hubs, top-level `apps[]` vs the full walk, per hub: apps **37 → 186**, devices 9 → 13, bits 6 → 9. On the busiest hub **80% of the apps are children** — every Rule Machine rule is a child of the RM parent and every dashboard a child of `Hubitat® Dashboards`, so a flat iteration audits neither. `appsUsing` on `fullJson` does not have this problem; the hub computes it. The trap is in a hand-rolled census, which is what you write the moment the question is "which app *setting* contains this id" (`rules/device-lifecycle.md`).
 - `GET /installedapp/statusJson/<id>` can return a bare `{}` — another instance of this route being unreliable for reading app config (below).
 - `GET /installedapp/configure/json/<appId>/mainPage` can return **non-JSON** — parse defensively, do not assume a JSON body.
+- **A wrong page name on `configure/json/<appId>/<page>` is not a free miss — it logs an `ERROR` against that app.** `Cannot find page 'meansPage' for app 1230`. On any hub running an error-notifier app that is a **push notification to a human**, naming a real app and reading exactly like a genuine fault in it. Three probes produced three Telegram alerts (2026-08-30, 2.5.1.176). **Never enumerate page names by guessing.** The loop is also useless: all five probes in that run returned no settings at all, the two *valid* page names included — this route did not render settings for any of them.
+- **Enumerate sub-pages from the rendered DOM instead**, reading the config page's href buttons: `[...document.querySelectorAll('button[name^="_action_href"]')].map(b => ({name: b.name, label: b.innerText.trim()}))`. For Room Lighting 1230 that returns the real structure directly — `_action_href_name|onMeansPage|8`, `…|offMeansPage|9`, `…|onDevicesPage|7` — with no guessing and no error log.
+- **Match on the `_action_href` prefix, not the full literal.** The Device Status Announcer's custom group page is `_action_href_pageCustomDeviceGroup0Href|pageCustomDeviceGroup|2`.
+- **`mainPage` is not universal.** App 329 (a Device Status Announcer child) names its page `pageMain`, and a tool assuming `mainPage` fires the same logged ERROR. Read the name from the config page's own `configPage.name`.
 - `GET /device/edit/<id>` is a **6.8 KB SPA shell** — no state, no routes, nothing in the served HTML. It is the natural first thing to try for a device and it is a dead end; drive the page with Playwright and capture the request instead (`skills/_reference/playwright-ui.md`).
 
 ## Installed-app configuration and live-consumer surfaces (grounded through 2026-07-24)
@@ -193,9 +242,12 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 | `GET /installedapp/createchild/hubitat/<ChildAppName>/parent/<parentAppId>` | path-encoded `<ChildAppName>` (e.g. `Room%20Lights`) | Creates a **parent/child** app instance → 302 to `/installedapp/configure/<newId>/mainPage` (2026-07-22) |
 | `GET /installedapp/create/<appTypeId>` | `<appTypeId>` from `/hub2/appsList` `userAppTypes[].id` | Creates a **standalone** user-app instance → 302 to the transient configure page (2026-07-22) |
 | `GET /device/listJson?capability=<capability.foo[,capability.bar]>` | capabilities comma-joined | Capability-filtered device list `[{id, displayName, …}]` — the list the classic `.btn-device` picker fetches; enumerate an input's candidate devices without the UI (2026-07-22) |
+| `GET /hub/homekit/enableDevice/<deviceId>/<true\|false>` | — | **HomeKit: export / un-export** a device → 200. Persists immediately; the HAP DB rebuilds seconds later and the mDNS `c#` config generation bumps, which is what tells controllers to re-read. The app's **Done is not required**. Batch-safe at ~0.35 s spacing. The HomeKit Bridge app is `singleInstance`, so the path carries no app id. Found by reading `changeDeviceAuthorization()` in the bridge app page's JS (2.5.1.140, re-exercised 2.5.1.169) |
 | `GET /device/addToMesh/<deviceId>` | — | **Hub Mesh: share** a local device to the mesh (run on the **source** hub) → 200; the device joins `sharedDevices[]` (2026-07-22) |
 | `GET /device/createLinked/<sourceHubId>/<sourceDeviceId>` | `<sourceHubId>` = peer hub UUID (`hubMeshJson` `hubId` / `sharedDevices[].sourceHubId`) | **Hub Mesh: link** a peer-shared device (run on the **destination** hub) → 200; mints a new local linked device bound to the source (2026-07-22) |
 | `GET /device/hubMeshFullRefreshNow` | — | Hub Mesh full resync (either hub) → 200; does **not** by itself link available devices (2026-07-22) |
+
+**The HAP database is the honest surface for what is exported, not the app page.** `GET http://<hub-ip>:21063/accessories` is unauthenticated and is ground truth for what the bridge is actually serving; the app's `authorizedDevices` setting says what was *asked for*. `dns-sd -L "<bridge name>" _hap._tcp local` reads the pairing state (`sf=0` paired, `sf=1` unpaired). Verified 2026-08-30 on 2.5.1.169: one `enableDevice` GET moved `authorizedDevices` from 53 → 54 and the accessory appeared in the HAP DB ~10 s later with its Leak (`0x83`), Temperature (`0x8A`) and Battery (`0x96`) services. **The device-level `homeKitEnabled` field is not the export switch** — it reads `null` on correctly-exported sensors, because the export lives in the bridge app's `authorizedDevices` (`skills/_reference/homekit-mdns-network.md`, `rules/multi-hub-topology.md`).
 
 **Hub Mesh sharing is two-sided.** The *source* hub shares a device (`addToMesh`); the *destination* hub must then explicitly **link** it (`createLinked`) — a shared device does not auto-appear on the destination, and neither a Linked-devices refresh nor `hubMeshFullRefreshNow` links it. The Hub Mesh UI lives at `/device/hubMesh` (**not** `/hub2/hubMesh`, which 404s). **Un-share / un-link are not yet captured** — `removeFromMesh` and a `removeLinked` counterpart are likely but unverified; do not assume the path. Read side is `/hub2/hubMeshJson` (Hub mesh section below); this grounds the cross-hub re-home in `skills/device-migration/SKILL.md`.
 
