@@ -21,11 +21,27 @@ Read `GET /device/fullJson/<id>` and confirm the device landed on a real built-i
 
 ## Step 4 — Name by function and position
 
-Name the device by **function and position** (`<function> - <position>`), qualifying even a single-sensor unit so a second sensor later does not force a rename (`rules/data-collection.md`). The rename is a `POST /device/update` mutation carrying the full field set, the current `version` stamp, and a **destructive mesh-boolean trap** (`skills/_reference/endpoints.md`). `version` is the integer the hub bumps on every save, echoed back unchanged so a concurrent edit is detected. Do it on the device edit page (`skills/_reference/playwright-ui.md`), or over HTTP only by reading the current full field set first and preserving every field. Proceed to Step 5.
+Name the device by **function and position** (`<function> - <position>`), qualifying even a single-sensor unit so a second sensor later does not force a rename (`rules/data-collection.md`). The rename is a `POST /device/update` mutation carrying the full field set, the current `version` stamp, and a **destructive mesh-boolean trap** (`skills/_reference/endpoints.md`). Run it through `skills/_scripts/hub_device_update.py`, which owns the field set, the boolean encoding and the fresh-`version` read (argument and output contract in its module docstring) — never a hand-built POST:
+
+```bash
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_update.py \
+  --hub <hub> --device <id> --noop        # prove the round-trip first
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_update.py \
+  --hub <hub> --device <id> --set label="<function> - <position>"
+```
+
+A non-empty `unexpected_drift` from either call means the write did not land as asked — stop and re-read the device rather than repeating it. The device edit page is the UI alternative (`skills/_reference/playwright-ui.md`). Proceed to Step 5.
 
 ## Step 5 — Raise event retention
 
-This is the step that decides whether the collected data still exists tomorrow. `maxEvents` defaults to **11 changes per attribute** (`rules/data-collection.md`); raise it via `POST /device/update` before relying on the hub as a buffer (same full-field-set/mesh-boolean cautions as Step 4). Proceed to Step 6.
+This is the step that decides whether the collected data still exists tomorrow. `maxEvents` defaults to **11 changes per attribute** (`rules/data-collection.md`); raise it before relying on the hub as a buffer, through the same script as Step 4:
+
+```bash
+python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_update.py \
+  --hub <hub> --device <id> --set maxEvents=1000
+```
+
+Proceed to Step 6.
 
 ## Step 6 — Read the real adjustable preferences
 
