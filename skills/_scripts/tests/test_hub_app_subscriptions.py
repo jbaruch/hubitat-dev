@@ -81,6 +81,26 @@ class TestFilterByAttribute(unittest.TestCase):
         self.assertEqual(rows, [])
 
 
+class TestNormalizeDeviceId(unittest.TestCase):
+    def test_int_passes_through(self):
+        self.assertEqual(m.normalize_device_id(1611), 1611)
+
+    def test_decimal_string_normalizes(self):
+        """The hub renders typeId as a bare int and as its decimal string."""
+        self.assertEqual(m.normalize_device_id("1611"), 1611)
+
+    def test_whitespace_tolerated(self):
+        self.assertEqual(m.normalize_device_id(" 1611 "), 1611)
+
+    def test_rule_machine_state_key_takes_the_id(self):
+        self.assertEqual(m.normalize_device_id("1612:Motion"), 1612)
+
+    def test_none_and_junk_are_not_device_ids(self):
+        self.assertIsNone(m.normalize_device_id(None))
+        self.assertIsNone(m.normalize_device_id("not-an-id"))
+        self.assertIsNone(m.normalize_device_id(""))
+
+
 class TestDeviceIds(unittest.TestCase):
     def test_device_rows_only(self):
         """A LOCATION row's typeId is not a device id."""
@@ -93,6 +113,13 @@ class TestDeviceIds(unittest.TestCase):
     def test_missing_type_id_is_skipped(self):
         self.assertEqual(m.device_ids([sub("water.wet", None)]), [])
 
+    def test_string_ids_normalize_and_dedupe_against_ints(self):
+        """A string "1611" must not read as a different device from 1611."""
+        self.assertEqual(m.device_ids([sub("water.wet", "1611"), sub("water.wet", 1611)]), [1611])
+
+    def test_sorted_numerically_not_lexically(self):
+        self.assertEqual(m.device_ids([sub("w", "20"), sub("w", "3")]), [3, 20])
+
 
 class TestCheckExpected(unittest.TestCase):
     def test_none_asserts_nothing(self):
@@ -101,6 +128,12 @@ class TestCheckExpected(unittest.TestCase):
     def test_present(self):
         r = m.check_expected(m.subscriptions_of(hsm_status()), 102)
         self.assertEqual(r, {"device_id": 102, "present": True})
+
+    def test_string_type_id_is_found(self):
+        """The false-negative this normalization exists to prevent: a string id reported absent
+        would send the caller off to re-Done an app that is already correctly configured."""
+        rows = [sub("water.wet", "953")]
+        self.assertTrue(m.check_expected(rows, 953)["present"])
 
     def test_absent(self):
         """The device added after the last Done: configured everywhere, subscribed nowhere."""
@@ -182,6 +215,13 @@ class TestMain(unittest.TestCase):
 
     def test_expected_present_exits_zero(self):
         t = FakeTransport([(200, {}, json.dumps(hsm_status(water_ids=(101, 953))))])
+        rc = m.main(["--ip", "192.0.2.11", "--app", "61", "--attribute", "water.wet",
+                     "--expect-device", "953"], transport=t)
+        self.assertEqual(rc, 0)
+
+    def test_string_type_id_exits_zero(self):
+        t = FakeTransport([(200, {}, json.dumps(
+            {"label": "HSM", "eventSubscriptions": [sub("water.wet", "953")]}))])
         rc = m.main(["--ip", "192.0.2.11", "--app", "61", "--attribute", "water.wet",
                      "--expect-device", "953"], transport=t)
         self.assertEqual(rc, 0)

@@ -71,14 +71,31 @@ def filter_by_attribute(subs: list, attribute: Optional[str]) -> list:
     return out
 
 
+def normalize_device_id(raw) -> Optional[int]:
+    """Pure. Normalize a `typeId` to an int, or None when it is not a device id.
+
+    The hub renders `typeId` as a bare integer and as its decimal string, and Rule Machine writes
+    state keys of the form `1612:Motion`. Comparing the raw forms makes a valid `"1611"` read as
+    absent, which would have this script emit a confident and wrong "re-Done the app" instruction.
+    Same normalization as `hub_device_usage.py._device_id`.
+    """
+    if raw is None:
+        return None
+    token = str(raw).strip().split(":", 1)[0]
+    try:
+        return int(token)
+    except ValueError:
+        return None
+
+
 def device_ids(subs: list) -> list:
-    """Pure. The sorted distinct `typeId` values of DEVICE-type rows.
+    """Pure. The sorted distinct normalized device ids of DEVICE-type rows.
 
     Only `type == "DEVICE"` rows carry a device id; a LOCATION row's `typeId` is not a device.
     """
-    ids = {r.get("typeId") for r in subs
-           if str(r.get("type") or "").upper() == "DEVICE" and r.get("typeId") is not None}
-    return sorted(ids, key=lambda v: (str(type(v)), v))
+    ids = {normalize_device_id(r.get("typeId")) for r in subs
+           if str(r.get("type") or "").upper() == "DEVICE"}
+    return sorted(i for i in ids if i is not None)
 
 
 def check_expected(subs: list, expected: Optional[int]) -> Optional[dict]:
@@ -96,17 +113,18 @@ def check_expected(subs: list, expected: Optional[int]) -> Optional[dict]:
 def group_by_attribute(subs: list) -> dict:
     """Pure. `{event name: [device ids]}` for the DEVICE rows, for reading coverage at a glance.
 
-    Drops rows with no `typeId` and de-duplicates, matching `device_ids` — `null` is not a device
-    id, and emitting one would put a value in the output that no caller can act on.
+    Drops rows whose `typeId` is not a device id and de-duplicates, matching `device_ids`. Emitting
+    a `null` would put a value in the output that no caller can act on.
     """
     out: dict = {}
     for row in subs:
         if str(row.get("type") or "").upper() != "DEVICE":
             continue
-        if row.get("typeId") is None:
+        device = normalize_device_id(row.get("typeId"))
+        if device is None:
             continue
-        out.setdefault(str(row.get("name") or ""), set()).add(row.get("typeId"))
-    return {k: sorted(v, key=lambda x: (str(type(x)), x)) for k, v in sorted(out.items())}
+        out.setdefault(str(row.get("name") or ""), set()).add(device)
+    return {k: sorted(v) for k, v in sorted(out.items())}
 
 
 def fetch_status(base: str, app_id, transport) -> dict:
