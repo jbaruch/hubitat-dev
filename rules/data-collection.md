@@ -16,7 +16,9 @@ The hub is an always-on host that can buffer and serve sensor data, but its defa
 ## Retention as a short-horizon buffer
 
 - Event-retention defaults are display-tuned, not collection-tuned. `maxEvents` is **11 per attribute**, `maxStates` 30, `spammyThreshold` 300, and history rolls silently with no warning (`skills/_reference/endpoints.md`).
-- Raise `maxEvents` via `POST /device/update` before relying on the hub for any baseline. 1000 buffers roughly two weeks of a slow-moving signal.
+- Raise `maxEvents` via `skills/_scripts/hub_device_update.py --hub <name> --device <id> --set maxEvents=<n>` before relying on the hub for any baseline. 1000 buffers roughly two weeks of a slow-moving signal.
+- Never hand-build the `POST /device/update` form.
+- The script owns the field set and the boolean encoding (`rules/device-lifecycle.md`).
 - The hub is always on and a laptop is not. Raise retention and harvest periodically rather than running an external poller.
 
 ## Harvesting the change-filtered event log

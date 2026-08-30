@@ -50,8 +50,10 @@ them onto the new id.
 - Verify the mirror's `label` after every source rename.
 - Two devices sharing a `label` make every label-resolving consumer pick one of them arbitrarily.
 - Never leave a freed label duplicated when the source's old name is about to be reused.
-- Round-trip the field set with a no-op `POST /device/update` before the first real edit of any device.
+- Round-trip the field set before the first real edit of any device — `skills/_scripts/hub_device_update.py --hub <name> --device <id> --noop` (argument and output contract in its module docstring).
 - A mis-encoded mesh boolean pair unshares the device and deletes the mirror (`skills/_reference/endpoints.md`).
+- Every boolean on that form is checkbox-semantic.
+- A literal `true` clears the field.
 
 ## Replacement re-wires nothing
 

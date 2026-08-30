@@ -23,4 +23,6 @@ Hubitat's two planes behave differently across a multi-hub setup. Conflating the
 - The `version` integer returned by `/app/ajax/code` and `/driver/ajax/code` is bumped on every save and is the concurrency stamp. An update must send the **current** version.
 - If the hub rejects the version, a newer edit exists on the hub — re-pull and reconcile. Never blindly retry with an incremented number; that is how you clobber a change made in the web editor.
 - The endpoints are undocumented and version-sensitive — re-verify after a platform update (`skills/_reference/endpoints.md`).
-- The same `version` optimistic-concurrency pattern is **not code-only**. `POST /device/update` (device rename/edit) carries a per-device `version` stamp with the identical read-fresh-then-send rule — read it from `fullJson` immediately before each POST (`skills/_reference/endpoints.md`).
+- The same `version` optimistic-concurrency pattern is **not code-only**. `POST /device/update` (device rename/edit) carries a per-device `version` stamp with the identical read-fresh-then-send rule.
+- Do not hand-build that POST.
+- `skills/_scripts/hub_device_update.py` owns the fresh-`version` read, the field set and the boolean encoding (`rules/device-lifecycle.md`).
