@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.76 — 2026-08-30
+
 ### Added
 
 - **`GET /hub2/appsList` is a TREE, and a flat read misses most of the hub** (`skills/_reference/endpoints.md`, `rules/device-lifecycle.md`). The reference already warned about this for `/hub2/devicesList` ("Iterating `devices[]` flat misses every child device") and said only "Installed apps + `systemAppTypes`" for apps. Measured 2026-08-30 on 2.5.1.169 across three hubs, top-level `apps[]` vs walking `children[]`: **37 → 186**, 9 → 13, 6 → 9. On the busiest hub **80% of the apps are children** — every Rule Machine rule is a child of the RM parent and every dashboard a child of `Hubitat® Dashboards`, so a flat iteration audits neither. This bit a real audit of "which apps reference device X": scanning the 37 top-level apps returned a clean bill and walking the tree to 186 found the references. That is a confident false negative on the exact question `device-lifecycle` Enumerate before removing exists to answer, which is why the rule gains the cross-reference. `appsUsing` on `fullJson` is unaffected — the hub computes it; the trap is only in hand-rolled censuses, which is what you write the moment the question is "which app *setting* contains this id". Closes #132.
