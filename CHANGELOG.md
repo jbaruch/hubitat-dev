@@ -11,6 +11,7 @@
 ### Changed
 
 - **What clearing `homeKitEnabled` costs is now stated as unestablished** (`skills/_reference/endpoints.md`). The first draft of this fix asserted it drops the device out of the HomeKit bridge. Cross-reading #128 contradicts that: the export is governed by the HomeKit Bridge app's `authorizedDevices`, and the device-level `homeKitEnabled` field reads `null` on every correctly-exported sensor in the fleet — so the field is not the export switch, and the inferred consequence was wrong even though the measured encoding fix is right. The reference now records the measured fact (a literal `true` clears the field) and declines to claim the effect.
+- **`rules/device-lifecycle.md` now names the round-trip script instead of describing the procedure** (`rules/device-lifecycle.md`). The rule already carried "round-trip the field set with a no-op `POST /device/update` before the first real edit" — the same deterministic procedure the reviewer flagged in `endpoints.md`, in the same prose form. It points at `hub_device_update.py` now, and gains the one-line encoding contract a reader needs at that point.
 - **The `/device/update` trap list said "Three traps" above four bullets** (`skills/_reference/endpoints.md`). Now says four. Boy-scouted while correcting the boolean encoding.
 
 ## 0.1.74 — 2026-08-18
