@@ -146,14 +146,14 @@ class TestEncodeForm(unittest.TestCase):
 class TestClassifyDrift(unittest.TestCase):
     def test_clean_round_trip_reports_nothing(self):
         before = m.read_fields(full_json())
-        benign, unexpected = m.classify_drift(before, dict(before))
+        _, benign, unexpected = m.classify_drift(before, dict(before))
         self.assertEqual(benign, {})
         self.assertEqual(unexpected, {})
 
     def test_version_bump_is_not_drift(self):
         before = m.read_fields(full_json(version=41))
         after = m.read_fields(full_json(version=42))
-        _, unexpected = m.classify_drift(before, after)
+        _, _, unexpected = m.classify_drift(before, after)
         self.assertEqual(unexpected, {})
 
     def test_fresh_mirror_normalizations_are_benign(self):
@@ -161,7 +161,7 @@ class TestClassifyDrift(unittest.TestCase):
         both on the first round-trip. Reads as drift, is not."""
         before = m.read_fields(full_json(label=None, roomId=None))
         after = m.read_fields(full_json(label="", roomId=0))
-        benign, unexpected = m.classify_drift(before, after)
+        _, benign, unexpected = m.classify_drift(before, after)
         self.assertEqual(set(benign), {"label", "roomId"})
         self.assertEqual(unexpected, {})
 
@@ -169,16 +169,54 @@ class TestClassifyDrift(unittest.TestCase):
         """The device-326 failure, as the script would now report it."""
         before = m.read_fields(full_json(retryEnabled=True, homeKitEnabled=True))
         after = m.read_fields(full_json(retryEnabled=False, homeKitEnabled=False))
-        _, unexpected = m.classify_drift(before, after)
+        _, _, unexpected = m.classify_drift(before, after)
         self.assertEqual(set(unexpected), {"retryEnabled", "homeKitEnabled"})
         self.assertEqual(unexpected["homeKitEnabled"], {"before": True, "after": False})
 
     def test_normalization_in_the_other_direction_is_not_benign(self):
         before = m.read_fields(full_json(roomId=0))
         after = m.read_fields(full_json(roomId=None))
-        benign, unexpected = m.classify_drift(before, after)
+        _, benign, unexpected = m.classify_drift(before, after)
         self.assertEqual(benign, {})
         self.assertIn("roomId", unexpected)
+
+
+class TestClassifyDriftWithChanges(unittest.TestCase):
+    def test_a_landed_change_is_applied_not_drift(self):
+        before = m.read_fields(full_json(label="Old"))
+        after = m.read_fields(full_json(label="New"))
+        applied, _, unexpected = m.classify_drift(before, after, {"label": "New"})
+        self.assertEqual(applied["label"], {"before": "Old", "after": "New"})
+        self.assertEqual(unexpected, {})
+
+    def test_requested_value_compares_across_types(self):
+        """The caller types roomId=8; the hub reads it back as the integer 8."""
+        before = m.read_fields(full_json(roomId=7))
+        after = m.read_fields(full_json(roomId=8))
+        applied, _, unexpected = m.classify_drift(before, after, {"roomId": "8"})
+        self.assertIn("roomId", applied)
+        self.assertEqual(unexpected, {})
+
+    def test_a_landed_checkbox_change_is_applied(self):
+        before = m.read_fields(full_json(homeKitEnabled=False))
+        after = m.read_fields(full_json(homeKitEnabled=True))
+        applied, _, unexpected = m.classify_drift(before, after, {"homeKitEnabled": True})
+        self.assertIn("homeKitEnabled", applied)
+        self.assertEqual(unexpected, {})
+
+    def test_a_change_the_hub_ignored_is_unexpected_drift(self):
+        """Silently not honouring the write is the failure this bucket must still catch."""
+        before = m.read_fields(full_json(label="Old"))
+        after = m.read_fields(full_json(label="Old"))
+        _, _, unexpected = m.classify_drift(before, after, {"label": "New"})
+        self.assertEqual(unexpected["label"]["requested"], "New")
+
+    def test_collateral_drift_on_an_untouched_field_still_caught(self):
+        before = m.read_fields(full_json(label="Old", meshEnabled=True))
+        after = m.read_fields(full_json(label="New", meshEnabled=False))
+        applied, _, unexpected = m.classify_drift(before, after, {"label": "New"})
+        self.assertIn("label", applied)
+        self.assertIn("meshEnabled", unexpected)
 
 
 class TestParseSet(unittest.TestCase):
@@ -268,6 +306,36 @@ class TestMain(unittest.TestCase):
         ])
         rc = m.main(["--ip", "192.0.2.11", "--device", "1694", "--noop"], transport=t)
         self.assertEqual(rc, 0)
+
+    def test_successful_set_update_exits_zero(self):
+        """A requested change that lands is success, not drift — exit 0."""
+        t = FakeTransport([
+            (200, {}, json.dumps(full_json(label="Old"))),
+            (200, {}, ""),
+            (200, {}, json.dumps(full_json(label="New", version=42))),
+        ])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "label=New"], transport=t)
+        self.assertEqual(rc, 0)
+
+    def test_set_that_does_not_land_exits_one(self):
+        t = FakeTransport([
+            (200, {}, json.dumps(full_json(label="Old"))),
+            (200, {}, ""),
+            (200, {}, json.dumps(full_json(label="Old", version=42))),
+        ])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953", "--set", "label=New"], transport=t)
+        self.assertEqual(rc, 1)
+
+    def test_setting_a_checkbox_on_sends_on_and_exits_zero(self):
+        t = FakeTransport([
+            (200, {}, json.dumps(full_json(homeKitEnabled=False))),
+            (200, {}, ""),
+            (200, {}, json.dumps(full_json(homeKitEnabled=True, version=42))),
+        ])
+        rc = m.main(["--ip", "192.0.2.11", "--device", "953",
+                     "--set", "homeKitEnabled=true"], transport=t)
+        self.assertEqual(rc, 0)
+        self.assertIn("homeKitEnabled=on", t.calls[1]["body"])
 
     def test_dry_run_posts_nothing(self):
         t = FakeTransport([(200, {}, json.dumps(full_json()))])

@@ -20,10 +20,12 @@ rather than left to the caller:
 
 `--noop` rebuilds the current state and posts it unchanged: a round-trip that should move nothing.
 It is the cheap proof that the encoding is right for a field set you have not posted before, and
-the recommended first call against any unfamiliar device. Drift is reported in two buckets —
-`benign_normalization` for the empty-value normalizations the hub performs on its own, and
-`unexpected_drift` for everything else. A non-empty `unexpected_drift` on a `--noop` means the
-round-trip is lossy; do not follow it with a real edit.
+the recommended first call against any unfamiliar device. What moved is reported in three buckets —
+`applied` for a `--set` field that reached the value asked for, `benign_normalization` for the
+empty-value normalizations the hub performs on its own, and `unexpected_drift` for everything else,
+including a requested change the hub silently did not honour. A non-empty `unexpected_drift` is the
+only failure: on a `--noop` it means the round-trip is lossy, and on a `--set` it means the write
+did not land as asked. Either way, do not follow it with a further edit.
 
 The deterministic pieces (form construction, boolean encoding, drift classification) are pure
 functions unit-tested without a hub; only the fetch/post functions touch the network via an
@@ -36,7 +38,8 @@ Usage:
     hub_device_update.py --ip 192.0.2.11 --device 953 --set homeKitEnabled=true
     hub_device_update.py --ip 192.0.2.11 --device 953 --dry-run --set label=X   # print the form, post nothing
 Exactly one of --noop / --set / --dry-run behaviours applies; --set may repeat. Output: one JSON
-object on stdout ({hub, device_id, mode, form, posted, benign_normalization, unexpected_drift}).
+object on stdout ({hub, device_id, mode, form, posted, applied, benign_normalization,
+unexpected_drift}).
 Exit 2 on a config or argument error, 1 on a hub/fetch error or unexpected drift, 0 otherwise.
 """
 import argparse
@@ -159,17 +162,43 @@ def read_fields(full: dict) -> dict:
     return out
 
 
-def classify_drift(before: dict, after: dict, ignore=("version",)) -> tuple:
-    """Pure. Split the before/after difference into (benign_normalization, unexpected_drift).
+def same_value(field: str, left, right) -> bool:
+    """Pure. Whether two readings of a field mean the same thing.
+
+    A requested value arrives as the string the caller typed while the hub reads it back in its own
+    type (`roomId=8` vs `8`), so scalars compare as the form renders them.
+    """
+    if field in CHECKBOX_FIELDS:
+        return as_bool(left) == as_bool(right)
+    return scalar(left) == scalar(right)
+
+
+def classify_drift(before: dict, after: dict, changes: Optional[dict] = None,
+                   ignore=("version",)) -> tuple:
+    """Pure. Split the before/after difference into (applied, benign_normalization,
+    unexpected_drift).
+
+    A field the caller asked to change is compared against the REQUESTED value, not the prior one:
+    landing the change is success, so it belongs in `applied`, and only a requested change the hub
+    did not honour falls through to `unexpected_drift` (carrying `requested` so the caller can see
+    what was asked). Every other field still compares before/after, so collateral drift on an
+    untouched field is caught exactly as it is on a `--noop`.
 
     `version` is excluded by default: a successful POST bumps it, so it always differs and its
     change is the proof the write landed rather than evidence of drift.
     """
-    benign, unexpected = {}, {}
+    changes = changes or {}
+    applied, benign, unexpected = {}, {}, {}
     for field in FORM_FIELDS:
         if field in ignore:
             continue
         was, now = before.get(field), after.get(field)
+        if field in changes:
+            if same_value(field, changes[field], now):
+                applied[field] = {"before": was, "after": now}
+            else:
+                unexpected[field] = {"before": was, "after": now, "requested": changes[field]}
+            continue
         if was == now:
             continue
         move = {"before": was, "after": now}
@@ -177,7 +206,7 @@ def classify_drift(before: dict, after: dict, ignore=("version",)) -> tuple:
             benign[field] = move
         else:
             unexpected[field] = move
-    return benign, unexpected
+    return applied, benign, unexpected
 
 
 def parse_set(assignments: list) -> dict:
@@ -259,7 +288,7 @@ def main(argv=None, transport=None) -> int:
 
         post_update(base, pairs, transport)
         after = read_fields(fetch_full_json(base, args.device, transport))
-        benign, unexpected = classify_drift(before, after)
+        applied, benign, unexpected = classify_drift(before, after, changes)
     except HubError as e:
         print(str(e), file=sys.stderr)
         return 1
@@ -270,13 +299,15 @@ def main(argv=None, transport=None) -> int:
         "mode": "noop" if args.noop else "update",
         "form": pairs,
         "posted": True,
+        "applied": applied,
         "benign_normalization": benign,
         "unexpected_drift": unexpected,
     }
     print(json.dumps(result, indent=2, default=str))
     if unexpected:
         print(f"unexpected drift on {len(unexpected)} field(s): {', '.join(sorted(unexpected))} — "
-              f"the round-trip is lossy; do not post a real edit until the encoding is fixed",
+              f"a requested change the hub did not honour, or a field that moved on its own; "
+              f"re-read the device and do not post a further edit until it is explained",
               file=sys.stderr)
         return 1
     return 0
