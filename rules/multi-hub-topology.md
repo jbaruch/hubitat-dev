@@ -13,6 +13,15 @@ Hubitat's two planes behave differently across a multi-hub setup. Conflating the
 - **Devices** can mesh: with hub meshing, one Maker API instance can expose devices from secondary hubs. Device *control* can be centralized; code *deployment* cannot.
 - Hub connection details are keyed by hub, one IP each; the `hub-config` skill owns that config.
 
+## The owning hub exports to HomeKit
+
+- **The hub that physically owns a device exports it.**
+- **Never export a hub-mesh mirror.** It lands the accessory on the wrong bridge.
+- Exporting a mirror succeeds, which is what makes it a trap. The mirror sits on the consuming hub already, looking exportable.
+- Read both bridges' export lists before exporting (`skills/_reference/endpoints.md`).
+- Never read the device-level `homeKitEnabled` field as export state. It is `null` on correctly-exported sensors.
+- HomeKit caps a bridge at **149 accessories + the bridge**. On a multi-hub setup that decides the layout, not a preference (`skills/_reference/homekit-mdns-network.md`).
+
 ## Local network, no Hub Security (assumed default)
 
 - These rules and the deploy/log-tail mechanisms assume hubs on the local network with Hub Security off — no login, no cookie, direct IP access (verified baseline in `skills/_reference/endpoints.md`).

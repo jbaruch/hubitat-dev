@@ -19,6 +19,10 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 
 - Source deploy/pull, log/event tail, mesh detail, and device control (Maker API) have grounded HTTP endpoints — use them (`skills/_reference/endpoints.md`).
 - **Removing an installed app is now an HTTP route too** — `POST /installedapp/update/json` with `_action_remove` (`skills/_reference/endpoints.md`, app-removal note). It even fires on a disabled `removeButton:false` app. Keep the read-the-confirm-first discipline as a human checkpoint (below), but the mechanism no longer needs the UI.
+- **A dashboard's whole tile grid is one JSON POST** to `/apps/api/<appId>/dashboard/<appId>/layout`, not N clicks in the tile editor (`skills/_reference/endpoints.md`).
+- Dashboards are not UI-only work.
+- **HTTP-first does not license guessing endpoint paths.** A wrong page name on `/installedapp/configure/json/<appId>/<page>` logs an app `ERROR` and pushes a notification to a human (`skills/_reference/endpoints.md`).
+- Enumerate an app's sub-pages from the rendered DOM's `_action_href` buttons, never by probing plausible names.
 - Drive the UI only for the operations with no endpoint: installing an app instance, configuring built-in/community apps (Room Lighting, Notifications, CoCoHue, HubiThings Replica), deleting a device, uninstalling Hubitat Package Manager packages, importing devices, reading/downloading a backup, swapping a device's app references (`skills/device-migration/SKILL.md`).
 
 ## Read state the way the framework stores it
@@ -57,6 +61,8 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Room Lighting turn-off mode triggers live in `modeXOff`.
 - Both settings use real mode ids, never the all-modes sentinel.
 - `scheduledJobs[].prevRunTime: null` records no previous firing for the current schedule. It does not mean the job is disabled.
+- A dashboard tile rendering **`?`** means its `template` names an attribute the bound `device` does not have.
+- A `?` tile is not a dead sensor report. Read the bound device's `currentStates` for the template's attribute before concluding the sensor failed.
 
 ## Destructive operations
 
