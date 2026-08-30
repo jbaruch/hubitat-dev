@@ -605,9 +605,12 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
 
     The arming buttons are live side effects on the security app in the same button row as Done, the same hazard
     as RM's `settings[runAction]` (gotcha 35). Match on `name="_action_update"` / `id=btnDone`, never on position
-    and never on visible text. **Verify by subscription delta, not by the page:** before 51 subscriptions with
-    13 × `water.wet`, after 52 with 14 and the new device id present, `armedState` unchanged and both 30-device
-    contact lists intact. `+1` exactly is the assertion — it proves the commit took *and* that nothing else moved.
+    and never on visible text. **Verify at the app's subscriptions, not on the page:**
+    `hub_app_subscriptions.py --app <id> --attribute water.wet --expect-device <deviceId>` (`rules/app-lifecycle.md`).
+    The assertion is **presence of the expected device**, not a count delta — one Done can legitimately add several
+    previously missing subscriptions. Check the collateral separately: on the observed run `armedState` was unchanged
+    (disarmed) and both 30-device contact lists were intact, which is what says the Done committed the intended
+    change and nothing else.
 
 44. **Rebuilding a broken Required Expression, and the click that silently defeats it.** A rule whose RE is broken
     shows `Expression: **Broken Condition**(F) [FALSE]` once you open Required Expression → Edit, and the page
