@@ -1,5 +1,17 @@
 # Changelog
 
+### Fixed
+
+- **`POST /device/update` has ONE boolean encoding, not two** (`skills/_reference/endpoints.md`). The reference claimed `meshEnabled` / `meshFullSync` were checkbox-semantic while `retryEnabled` / `homeKitEnabled` beside them were literal `true` / `false` strings. The second half was wrong, and wrong in the destructive direction: posting the literal string `true` **clears** the field. An agent that trusted the sentence and serialized "as documented" cleared `homeKitEnabled` on every device it touched, dropping it out of the HomeKit bridge with no error and no event. Measured on 2.5.1.135 (2026-07-27) by a `--noop` rebuild-and-repost against device 326 — a run that should have changed nothing flipped both fields `true` → `false` while the checkbox-encoded mesh pair survived. The correction has been carried in the consuming repo's `tools/swap_device_driver.py` since that date but was never filed back, so the reference shipped the wrong encoding for a month. Corroborated on 2.5.1.169 (2026-08-30): two no-op round-trips using uniform checkbox encoding for all four fields reported no unexpected drift, on a Zigbee moisture sensor (`.17` dev 953) and on a freshly linked hub-mesh mirror (main dev 1694). Note the corroboration confirms checkbox encoding is correct; the device-326 run is what disproves the literal-string form. Closes #127.
+
+### Added
+
+- **A no-op round-trip is the way to prove an unfamiliar `/device/update` field set** (`skills/_reference/endpoints.md`). Read `fullJson`, rebuild the form unchanged, post, re-read, diff — the same read-fresh-then-send discipline the `version` stamp already forces, extended from the concurrency field to the payload. The plugin ships no `--noop` tool of its own, so this is stated as a discipline rather than a command; the consuming repo's tool is one implementation of it. Recorded with the two benign diffs a freshly linked hub-mesh mirror produces, which read as drift and are not: the hub normalizes `roomId` `null → 0` and `label` `null → ""`. A mirror is born from `GET /device/createLinked/...` with `name` = source label + `" on <source hub name>"`, `label` = `null`, `roomId` = `null` (2.5.1.169, 2026-08-30).
+
+### Changed
+
+- **The `/device/update` trap list said "Three traps" above four bullets** (`skills/_reference/endpoints.md`). Now says four. Boy-scouted while correcting the boolean encoding.
+
 ## 0.1.74 — 2026-08-18
 
 ### Changed
