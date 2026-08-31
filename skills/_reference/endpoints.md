@@ -251,6 +251,26 @@ Several operations documented as "UI-only" are ordinary HTTP requests the UI fir
 
 **Hub Mesh sharing is two-sided.** The *source* hub shares a device (`addToMesh`); the *destination* hub must then explicitly **link** it (`createLinked`) — a shared device does not auto-appear on the destination, and neither a Linked-devices refresh nor `hubMeshFullRefreshNow` links it. The Hub Mesh UI lives at `/device/hubMesh` (**not** `/hub2/hubMesh`, which 404s). **Un-share / un-link are not yet captured** — `removeFromMesh` and a `removeLinked` counterpart are likely but unverified; do not assume the path. Read side is `/hub2/hubMeshJson` (Hub mesh section below); this grounds the cross-hub re-home in `skills/device-migration/SKILL.md`.
 
+**Done is `_action_update` on this same route, form-urlencoded, and observable.** No WebSocket is involved; the only socket on a config page is `/eventsocket` driving the live log display, which is what makes it look socket-driven. Captured on 2.5.1.169 (app 636, 14 settings): `[POST] /installedapp/update/json => [200] OK`, replayed verbatim from `curl` and `updated()` ran — `unsubscribe`/`unschedule`/`initialize`, both app-state clocks stamped to the same instant, the `runEvery5Minutes` job rescheduled. Body shape, which the `_action_remove` note below does not cover:
+
+- **three fields per setting** — `<name>.type`, `<name>.multiple`, `settings[<name>]`
+- **bools additionally need `checkbox[<name>]=on`** alongside `settings[<name>]`
+- **device multi-selects need a preceding `deviceList=<name>`**
+- `pageBreadcrumbs` is **double**-encoded (`%255B%255D`)
+- `version` read fresh from `GET /installedapp/configure/json/<id>/mainPage` → `.app.version`
+
+**A JSON body to that route is a silent 200 no-op.** The `/json` in the path invites `Content-Type: application/json`. That request returns **200**, a body that is the config page **HTML** (not an error, not `{"status":…}`), and runs **nothing** — no `updated()`, no `initialize()`, no re-subscribe, no schedules. It does not 400, does not 415, and never mentions the content type.
+
+The resulting state is **half-live, not dead**, which is what makes it dangerous. After freshly deployed code plus a JSON `_action_update`:
+
+| surface | reads | actually |
+|---|---|---|
+| `eventSubscriptions` | `power → powerHandler` ✅ | the **pre-existing** subscription, now dispatching into the **new** code |
+| app state | a fresh timestamp ✅ | written by the **event handler**, not by `initialize()` |
+| `scheduledJobs` | `null` ❌ | the new sweep never registered |
+
+Two of three surfaces look healthy, so an agent verifying by subscription-and-state concludes the commit worked while the app cannot act at all. **`scheduledJobs` is the load-bearing check** for any app that schedules. This is also why the "Done is a WebSocket" folklore survives: hand-roll JSON, watch it silently do nothing, conclude Done must not be HTTP.
+
 **Instance creation is transient — but abandonment leaves an orphan, not nothing.** `createchild` (parent/child, e.g. Room Lighting) and `create` (standalone user app) create the instance row **server-side by the GET itself**, before any page renders, then land on `/installedapp/configure/<newId>/mainPage`. What you do next is three-way, not two-way:
 
 | what you do | result |

@@ -25,6 +25,8 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Enumerate an app's sub-pages from the rendered DOM's `_action_href` buttons, never by probing plausible names.
 - **Committing an installed app's config is a UI Done.** This is the one place the HTTP-first preference loses (`skills/_reference/playwright-ui.md`).
 - **Never hand-serialize `_action_update` on `POST /installedapp/update/json`.** It is not the counterpart of the `_action_remove` route.
+- A `_action_update` sent with `Content-Type: application/json` returns **200 and runs nothing** (`skills/_reference/endpoints.md`).
+- **`scheduledJobs` is the load-bearing check that a config commit ran.** A surviving subscription and a handler-written state value both read healthy across a failed commit.
 - `_action_remove` is branched on before settings are applied.
 - `_action_update` applies settings and clears anything omitted (`skills/_reference/playwright-ui.md`).
 - Match the Done on `name="_action_update"` / `id=btnDone`, never on position and never on visible text.
@@ -37,7 +39,9 @@ The setup, full workflow, selectors, and per-gotcha detail all live in `skills/_
 - Snapshot `ref`s are unreliable on Hubitat's MDL `<div>` controls — a `ref` resolves to a wrapper and the click hits a container, silently. Tag the real control by walking up from its hidden `settings[...]` input, then click the tag: `skills/_reference/playwright-ui.md` gotchas 10–12. Tagging in `browser_evaluate` is not the banned synthetic click.
 - The framework **differs by page**. App-config pages are MDL/jQuery — the `label.is-checked`, MDL `<div>`, unreliable-`ref` guidance here applies to them. The **device edit page on 2.5.1.135 is PrimeVue** (`p-inputtext`, `p-tabview-panel`, `data-pc-section` / `data-pc-name`); confirm which framework a page uses before assuming a selector strategy.
 - On the PrimeVue device page a `TabView` panel renders `display:none` until its tab is clicked. The **Device label** input (for `POST /device/update`) sits in the *Device Info* panel; Playwright times out filling an invisible element, which reads like a selector bug. Click the tab first, then address it `input[inputid="Device label"]` (these inputs carry no `name` or `id`) (`skills/_reference/endpoints.md`).
-- A device input persists to the hub on the page's **Done** over a WebSocket, not over observable HTTP. Forcing `.checked` or dispatching synthetic events does not persist.
+- A device input persists to the hub on the page's **Done**, which is an observable `POST /installedapp/update/json`, form-urlencoded (`skills/_reference/endpoints.md`).
+- Forcing `.checked` or dispatching synthetic events does not persist.
+- Drive the page rather than hand-serializing that POST. The hazard is the full-form replace, not the transport.
 - The hidden-`settings[<name>]` write is a shortcut only for an **already-filled** device input — set its hidden value directly and Done serializes it. A **never-set** input renders `device-btn-empty` whatever its `required:` value, and writing the hidden value does not flip that class. An empty **optional** input then makes Done a silent no-op; an empty **required** one rejects. Both need the picker or a `fill()` flip (`skills/_reference/playwright-ui.md` gotchas 14, 17).
 - Commit device inputs **before** filling the sections a `submitOnChange` gates — the dependent controls do not exist until the picker's Update commits.
 - Not every device picker is the MDL `device-save` picker. Newer **inline Vue** pickers (Room Lighting *activation-options* switch guards, `switchesD`/`switchesOE`) mount inline under the button, **not** in `#deviceListModal` (a dead shell): filter with real keystrokes (`locator.fill()` doesn't trigger the Vue filter) and click the checkbox and its `div.mdl-button` **Update** by coordinate — a label-locator click collapses the dropdown (`skills/_reference/playwright-ui.md` gotcha 26).

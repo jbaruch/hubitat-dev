@@ -31,9 +31,13 @@ Usage:
     hub_app_subscriptions.py --ip 192.0.2.11 --app 61
     hub_app_subscriptions.py --ip 192.0.2.11 --app 61 --attribute water.wet
     hub_app_subscriptions.py --hub main --app 61 --attribute water.wet --expect-device 953
-Output: one JSON object on stdout ({hub, app_id, app_label, count, subscriptions, device_ids,
-by_attribute, expected}). Exit 2 on a config or argument error, 1 on a hub/fetch error or a
-missing --expect-device, 0 otherwise.
+Output: one JSON object on stdout ({hub, app_id, app_label, attribute, count, subscriptions,
+device_ids, by_attribute, scheduled_jobs, expected}). Exit 2 on a config or argument error, 1 on a
+hub/fetch error or a missing --expect-device, 0 otherwise.
+
+`scheduled_jobs` is reported alongside because it is the load-bearing check that a config commit
+ran: a failed commit leaves the subscriptions and app state reading healthy while no schedule was
+registered. This script does not judge it — an app that schedules nothing legitimately has none.
 """
 import argparse
 import json
@@ -96,6 +100,19 @@ def device_ids(subs: list) -> list:
     ids = {normalize_device_id(r.get("typeId")) for r in subs
            if str(r.get("type") or "").upper() == "DEVICE"}
     return sorted(i for i in ids if i is not None)
+
+
+def scheduled_jobs(status: dict) -> list:
+    """Pure. The app's `scheduledJobs[]` rows, each a dict. `[]` when the app schedules nothing.
+
+    This is the load-bearing check that a config commit actually ran. A `_action_update` sent with
+    the wrong content type returns 200 and executes nothing, leaving a HALF-LIVE app: the
+    pre-existing subscription survives and an event handler keeps stamping app state, so both of
+    those surfaces read healthy, while `initialize()` never ran and no schedule was registered
+    (../_reference/endpoints.md).
+    """
+    rows = status.get("scheduledJobs")
+    return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
 
 
 def check_expected(subs: list, expected: Optional[int]) -> Optional[dict]:
@@ -187,6 +204,7 @@ def main(argv=None, transport=None) -> int:
         "subscriptions": subs,
         "device_ids": device_ids(subs),
         "by_attribute": group_by_attribute(subs),
+        "scheduled_jobs": scheduled_jobs(status),
         "expected": expected,
     }
     print(json.dumps(result, indent=2, default=str))

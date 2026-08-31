@@ -72,7 +72,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_app_subscriptions
   --hub <hub> --app <appId> --attribute <event> --expect-device <deviceId>
 ```
 
-Argument contract and output shape: `skills/_scripts/hub_app_subscriptions.py` module docstring. The JSON result is `{hub, app_id, app_label, attribute, count, subscriptions, device_ids, by_attribute, expected}`. **Exit 0** — the device is subscribed. **Exit 1 with the result on stdout** — `--expect-device` was not found; read `device_ids` for what the app does watch, then re-Done. **Exit 1 with stderr only** — a hub or fetch error. **Exit 2 with stderr only** — a config or argument error.
+Argument contract and output shape: `skills/_scripts/hub_app_subscriptions.py` module docstring. The JSON result is `{hub, app_id, app_label, attribute, count, subscriptions, device_ids, by_attribute, scheduled_jobs, expected}`. For an app that schedules, check `scheduled_jobs` too — a failed commit leaves the subscriptions reading healthy while no schedule registered (`rules/ui-automation.md`). **Exit 0** — the device is subscribed. **Exit 1 with the result on stdout** — `--expect-device` was not found; read `device_ids` for what the app does watch, then re-Done. **Exit 1 with stderr only** — a hub or fetch error. **Exit 2 with stderr only** — a config or argument error.
 
 Assert **presence of the expected device**, never a count delta. Proceed to Step 11.
 

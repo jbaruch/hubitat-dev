@@ -166,6 +166,20 @@ class TestGroupByAttribute(unittest.TestCase):
         self.assertEqual(g, {"water.wet": [7]})
 
 
+class TestScheduledJobs(unittest.TestCase):
+    def test_reads_the_rows(self):
+        status = {"scheduledJobs": [{"name": "sweep", "prevRunTime": None}]}
+        self.assertEqual(len(m.scheduled_jobs(status)), 1)
+
+    def test_missing_is_empty(self):
+        """A half-live app reads null here while its subscriptions look healthy."""
+        self.assertEqual(m.scheduled_jobs({}), [])
+        self.assertEqual(m.scheduled_jobs({"scheduledJobs": None}), [])
+
+    def test_non_dict_rows_dropped(self):
+        self.assertEqual(m.scheduled_jobs({"scheduledJobs": [1, {"name": "x"}]}), [{"name": "x"}])
+
+
 class TestFetchStatus(unittest.TestCase):
     def test_returns_parsed(self):
         t = FakeTransport([(200, {}, json.dumps(hsm_status()))])
@@ -212,6 +226,14 @@ class TestMain(unittest.TestCase):
     def test_reports_and_exits_zero(self):
         t = FakeTransport([(200, {}, json.dumps(hsm_status()))])
         self.assertEqual(m.main(["--ip", "192.0.2.11", "--app", "61"], transport=t), 0)
+
+    def test_scheduled_jobs_reported(self):
+        """The half-live signature: subscription present, no schedule registered."""
+        status = hsm_status()
+        status["scheduledJobs"] = []
+        t = FakeTransport([(200, {}, json.dumps(status))])
+        m.main(["--ip", "192.0.2.11", "--app", "61"], transport=t)
+        self.assertEqual(json.loads(self.out.getvalue())["scheduled_jobs"], [])
 
     def test_expected_present_exits_zero(self):
         t = FakeTransport([(200, {}, json.dumps(hsm_status(water_ids=(101, 953))))])
