@@ -33,7 +33,9 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 - Branch on the shape: `description?.trim()?.startsWith("{")` → parse the JSON; else `zwave.parse(description, cmdVersions())` for the legacy backend.
 - zwaveJS emits a frame only when a value **changes** — a `…Get()` against an already-interviewed node produces no frame at all, independent of how it would be decoded.
 - Returning a formatted command string/List from a command method **auto-sends it** to the device — easy to trigger unintentionally. S2 devices wrap with `zwaveSecureEncap(...)`.
-- **A platform update can change the shape of what reaches `parse()`.** The zwaveJS backend split is one instance. A 2.5.1.152 multichannel-dispatch change is another: a Zooz ZEN14 that had been silent for a month began erroring `No device for endpoint (1)/(2)` on the first refresh after the update (`skills/_reference/parent-child-devices.md`).
+- **A platform update can change the shape of what reaches `parse()`.**
+- The zwaveJS backend split is one instance. A multichannel-dispatch change is another (`skills/_reference/parent-child-devices.md`).
+- A driver that has been silent for a month can start erroring on the first refresh after an update, with nothing broken before or after.
 - Re-verify a driver's inbound assumptions after a platform update.
 - First line of any protocol `parse()` while developing: `if (logEnable) log.debug "parse: ${description}"` — see `rules/logging-conventions.md`.
 

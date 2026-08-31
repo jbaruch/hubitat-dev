@@ -23,7 +23,7 @@ For a failure that already happened, reach for history instead of a live tail:
 - `/device/eventsJson/<id>` — when an attribute actually moved, and which app issued a command.
 - `/hub/eventsJson` — whether a platform update landed near the onset.
 
-When the complaint is "this value looks wrong" or "this sensor seems stuck", census the device's channels before tailing anything — one attribute can be dead while every other channel on the same device reports normally, which defeats both device-level liveness heuristics (`rules/state-vs-attributes.md`):
+When the complaint is "this value looks wrong" or "this sensor seems stuck", census the device's channels before tailing anything. One attribute can be dead while every other channel on the same device reports normally, which defeats both device-level liveness heuristics (`rules/state-vs-attributes.md`).
 
 ```bash
 python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_events.py \
@@ -32,7 +32,7 @@ python3 .tessl/plugins/jbaruch/hubitat-dev/skills/_scripts/hub_device_events.py 
 
 Argument contract and output shape: `skills/_scripts/hub_device_events.py` module docstring. The result is `{hub, device_id, declared_attributes, retained_events, by_attribute, silent_attributes, expected}`. **Exit 0** — the attribute carried events, or nothing was asserted. **Exit 1 with the result on stdout** — the named attribute is silent or is not declared; `expected.declared` and `expected.silent` say which. **Exit 1 with stderr only** — a hub or fetch error. **Exit 2 with stderr only** — a config or argument error.
 
-A silent channel is a prompt to investigate, never proof on its own: the retained window is bounded by `maxEvents`, so a genuinely steady channel and a dead one look identical. Compare the value against the device's physical state to separate them.
+Treat a silent channel as a prompt to investigate, never as proof. The retained window is bounded by `maxEvents`. Compare the value against the device's physical state to separate a steady channel from a dead one.
 
 Have the source in hand so the log can be read against it. Proceed to Step 2.
 
