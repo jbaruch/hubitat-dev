@@ -606,7 +606,8 @@ tools load. The tools used below are the standard Playwright MCP surface: `brows
     The arming buttons are live side effects on the security app in the same button row as Done, the same hazard
     as RM's `settings[runAction]` (gotcha 35). Match on `name="_action_update"` / `id=btnDone`, never on position
     and never on visible text. **Verify at the app's subscriptions, not on the page:**
-    `hub_app_subscriptions.py --app <id> --attribute water.wet --expect-device <deviceId>` (`rules/app-lifecycle.md`).
+    `hub_app_subscriptions.py --hub <name> --app <id> --attribute water.wet --expect-device <deviceId>`
+    (`rules/app-lifecycle.md`).
     The assertion is **presence of the expected device**, not a count delta — one Done can legitimately add several
     previously missing subscriptions. Check the collateral separately: on the observed run `armedState` was unchanged
     (disarmed) and both 30-device contact lists were intact, which is what says the Done committed the intended

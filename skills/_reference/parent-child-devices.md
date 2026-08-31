@@ -59,6 +59,44 @@ hub** — orthogonal to parent/child (2 on the grounded hub).
 - **Re-adding a parent mints new child ids**, stranding every reference — the same trap as any
   replacement.
 
+## `state.endPoints > 0` is not proof the children exist
+
+On a multi-endpoint Z-Wave device, `state.endPoints` records what the device *reported*, not what
+the hub *created*. **Check `fullJson.hasChildren` / `childDevices` for existence, never
+`state.endPoints`** — the same "children are invisible to the flat list" family as the tree read
+above.
+
+A platform update can start surfacing that gap as a stream of device errors on a device that has
+been fine for a month. Grounded 2026-08-12: a Zooz ZEN14 outdoor double plug began erroring
+`No device for endpoint (1)/(2). Press Configure to create child devices.` on the first refresh
+after the hub updated to **2.5.1.152**. Every error forwarded to notifications, so it read as a
+device fault. It was not — the device had carried `state.endPoints = 2` for a month while
+`refresh()` sent a per-endpoint `switchBinaryGet` every 6 h with no errors, and the parent's
+`on()`/`off()` targets endpoint 0 and drives both outlets, which is what Alexa, HomeKit and Maker
+API all use. Nothing was broken before or after.
+
+The errors fire only on an **inbound** report carrying a non-zero endpoint, so the
+endpoint-encapsulated replies had previously not been reaching the driver with their endpoint.
+*(The dispatch mechanism is inference from a tight correlation across the restart, not measured.)*
+
+**The trap for anyone diagnosing it.** Reading the driver, you would conclude Configure cannot
+help: `createChildDevices()` is called only from the `MultiChannelEndPointReport` handler, and the
+probe that requests that report fires only when `state.endPoints == null` — which it isn't.
+**Configure works anyway**, because `configure()` → `clearVariables()` → `state.clear()` nulls
+`endPoints`, so the probe re-fires. That indirection is the whole answer and it is invisible from
+the two obvious call sites.
+
+Two notes for the repair:
+
+- Configure also forces a full parameter resync. Compare `fullJson.settings[].defaultValue` against
+  `device.data.configVals` first — on the grounded device all eight matched, so the resync was a
+  no-op.
+- Children are named from `device.name` (the **driver type**), not the device label, so they land
+  as `<Driver Type> - Outlet N` and need relabelling.
+
+A scan for other exposed devices only sees drivers that track endpoints in `state`, so it is not
+conclusive for built-in drivers.
+
 ## Writing a parent/child pair
 
 - Create from an app **or** a driver: `addChildDevice(namespace, typeName, deviceNetworkId, properties)`.

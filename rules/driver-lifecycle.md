@@ -33,7 +33,24 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 - Branch on the shape: `description?.trim()?.startsWith("{")` → parse the JSON; else `zwave.parse(description, cmdVersions())` for the legacy backend.
 - zwaveJS emits a frame only when a value **changes** — a `…Get()` against an already-interviewed node produces no frame at all, independent of how it would be decoded.
 - Returning a formatted command string/List from a command method **auto-sends it** to the device — easy to trigger unintentionally. S2 devices wrap with `zwaveSecureEncap(...)`.
+- **A platform update can change the shape of what reaches `parse()`.**
+- The zwaveJS backend split is one instance. A multichannel-dispatch change is another (`skills/_reference/parent-child-devices.md`).
+- A driver that has been silent for a month can start erroring on the first refresh after an update, with nothing broken before or after.
+- Re-verify a driver's inbound assumptions after a platform update.
 - First line of any protocol `parse()` while developing: `if (logEnable) log.debug "parse: ${description}"` — see `rules/logging-conventions.md`.
+
+## A built-in driver can publish a command, not a measurement
+
+- **Hubitat's Generic Z-Wave Lock derives `lock` from `DoorLockCCOperationReport`'s `current mode`**, the commanded state.
+- It discards the same report's `bolt status`, `latch status` and `door status`.
+- A motor that accepts the command and then stalls reports `mode: Secured` with the bolt retracted, and the hub publishes `lock = locked`.
+- `refresh()` does not help. The truthful field arrives over the wire and is discarded on arrival.
+- **Confirm a lock with a bolt-derived attribute, never with `lock` alone.** Announcing "locked" from `lock` announces what the lock was asked to do.
+- Never gate an automation on `latchStatus` or `doorStatus`. Both read `open` on a definitively shut Ultraloq door.
+- `doorCondition` does reach a driver's `parse()` on the zwaveJS backend (2.5.1.135): bit0 door (1 = closed), bit1 bolt (1 = unlocked), bit2 latch (1 = closed).
+- Assert any such bit mapping against the hub's own zwaveJS decode of the same frame before relying on it.
+- Locks report hand operation unsolicited, within milliseconds. A stale value is a lost frame, not a polling gap.
+- Custom driver attributes propagate across Hub Mesh. A replacement driver's `boltStatus` is readable from another hub (`rules/multi-hub-topology.md`).
 
 ## App-driven virtual devices
 
