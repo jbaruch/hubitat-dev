@@ -1,5 +1,7 @@
 # Changelog
 
+## 0.1.80 — 2026-08-31
+
 ### Fixed
 
 - **`rules/ui-automation.md` claimed Done persists over a WebSocket. It is a plain observable HTTP POST** (`rules/ui-automation.md`, `skills/_reference/endpoints.md`, `skills/_scripts/hub_app_subscriptions.py`, `skills/sensor-onboarding/SKILL.md`). The rule is always-on and `endpoints.md` is read on demand, so the loaded context asserted a mechanism its own reference contradicted, and the wrong one won by default. This is distinct from the #131 gap, where the rule merely never *mentioned* Done: an omission an agent can research its way out of, versus a false statement it has no reason to doubt. Captured on 2.5.1.169 (hub `.17`, app 636, 14 settings): `[POST] /installedapp/update/json => [200] OK`, form-urlencoded, no WebSocket frame involved. The only socket on that page is `/eventsocket` driving the live log display, which is plausibly what made it look socket-driven. Replayed verbatim from `curl` and `updated()` ran — `unsubscribe`/`unschedule`/`initialize`, both app-state clocks stamped to the same instant, the `runEvery5Minutes` job rescheduled. The operative warning survives the correction intact and is now stated as what it always was: the hazard is the **full-form replace** (omitted settings are cleared), never the transport.
