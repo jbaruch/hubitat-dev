@@ -30,9 +30,17 @@ tested without a hub; only the fetches touch the network via an injectable `tran
 Usage:
     hub_device_events.py --ip 192.0.2.11 --device 119
     hub_device_events.py --hub main --device 119 --expect-attribute contact
-Output: one JSON object on stdout ({hub, device_id, retained_events, by_attribute,
-silent_attributes, expected}). Exit 2 on a config or argument error, 1 on a hub/fetch error or a
-silent --expect-attribute, 0 otherwise.
+Output contract:
+  exit 0 — the JSON result on stdout. No --expect-attribute was given, or the named attribute
+           carried events.
+  exit 1, with the result on stdout — --expect-attribute was given and the attribute is either
+           SILENT (declared, zero events in the retained window) or NOT DECLARED by the device.
+           Both print a stderr diagnostic naming which case it is; `expected.declared` and
+           `expected.silent` in the result distinguish them.
+  exit 1, stderr only — a hub or fetch error. No JSON is emitted.
+  exit 2, stderr only — a config or argument error. Nothing was fetched.
+Result keys: {hub, device_id, declared_attributes, retained_events, by_attribute,
+silent_attributes, expected} — the same keys in every mode.
 """
 import argparse
 import json
