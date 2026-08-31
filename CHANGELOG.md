@@ -1,5 +1,10 @@
 # Changelog
 
+### Changed
+
+- **Refreshed the pinned CI actions and dev tooling** (`.github/workflows/ci.yml`, `requirements-dev.txt`). `actions/checkout` v4.2.2 → **v7.0.1**, `actions/setup-python` v5.3.0 → **v7.0.0**, `pyright` 1.1.408 → **1.1.411**. All three were sitting in open Dependabot PRs (#8 since 2026-07-14, #54 / #55 since 2026-07-21) that could never merge: this repo has **zero Dependabot secrets configured**, so `TESSL_TOKEN` and `FLEET_DISPATCH_TOKEN` do not exist in a Dependabot-triggered run, and the `plugin` job's skill-review step plus the `trigger` job's dispatch step fail on every Dependabot PR regardless of what it changes. The `test` job — the one that actually exercises the bump — passed on all three. The bumps are therefore landed here, where the run gets secrets and a real review, and the Dependabot PRs are closed as superseded. Action SHAs verified against the upstream tags before use (`actions/checkout` v7.0.1 = `3d3c42e…`, `actions/setup-python` v7.0.0 = `5fda3b9…`). The pyright bump is the only one with real breakage risk, since a type-checker bump can surface new findings; the zero-findings gate was run at 1.1.411 against the current tree and stayed clean, and the 574-test suite passes.
+- **Standing issue worth a decision:** every future Dependabot PR here hits the same wall. Adding `TESSL_TOKEN` and `FLEET_DISPATCH_TOKEN` as **Dependabot** secrets would fix it, at the cost of exposing both tokens to dependency-update runs. Left as the operator's call rather than changed unilaterally.
+
 ## 0.1.80 — 2026-08-31
 
 ### Fixed
