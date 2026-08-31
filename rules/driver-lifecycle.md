@@ -41,7 +41,8 @@ A driver is a single Groovy file with a `metadata { definition(...); preferences
 
 ## A built-in driver can publish a command, not a measurement
 
-- **Hubitat's Generic Z-Wave Lock derives `lock` from `DoorLockCCOperationReport`'s `current mode`** — what the lock was told to be. It discards the same report's `bolt status`, `latch status` and `door status`.
+- **Hubitat's Generic Z-Wave Lock derives `lock` from `DoorLockCCOperationReport`'s `current mode`**, the commanded state.
+- It discards the same report's `bolt status`, `latch status` and `door status`.
 - A motor that accepts the command and then stalls reports `mode: Secured` with the bolt retracted, and the hub publishes `lock = locked`.
 - `refresh()` does not help. The truthful field arrives over the wire and is discarded on arrival.
 - **Confirm a lock with a bolt-derived attribute, never with `lock` alone.** Announcing "locked" from `lock` announces what the lock was asked to do.

@@ -60,7 +60,7 @@ them onto the new id.
 - A mis-encoded mesh boolean pair unshares the device and deletes the mirror (`skills/_reference/endpoints.md`).
 - **A HomeKit-exported device leaves an orphan accessory in the controller after deletion.**
 - The hub prunes its side. The external controller does not.
-- The orphan freezes at its last characteristic values, which are the alarming ones — a decommissioned leak sensor presents as a live leak with a flat battery.
+- The orphan freezes at its last characteristic values. Those are the alarming ones.
 - Tell hub-clean from controller-stale with `GET http://<hub-ip>:21063/accessories`, the live HAP database (`skills/_reference/homekit-mdns-network.md`).
 - Clearing the orphan is a controller-side manual action. A bridged accessory cannot be removed through the HomeKit API.
 - The accessory's serial characteristic is `HUBITAT<deviceId>` and is **not unique across hubs**.

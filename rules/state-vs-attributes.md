@@ -26,7 +26,8 @@ Hubitat has two distinct persistence mechanisms. Choosing the wrong one is a des
 - `currentStates[attr].date` in that payload is this trap made concrete — it sits beside `value`, reads like a freshness stamp, and is the last **change**, not the last report.
 - **Per-attribute freshness is not a device-level property.** One attribute channel can be dead while every other channel on the same device reports normally.
 - `lastActivityTime` and a healthy sibling attribute prove the **radio** is alive. Neither proves a given attribute is still being reported.
-- Before trusting a long-unchanged value, check whether that attribute appears **at all** in the retained event window — `skills/_scripts/hub_device_events.py --device <id> --expect-attribute <name>` (contract in its module docstring).
+- Before trusting a long-unchanged value, check whether that attribute appears **at all** in the retained event window.
+- Run `skills/_scripts/hub_device_events.py --hub <name> --device <id> --expect-attribute <name>` (contract in its module docstring).
 - A zero count is a prompt to investigate, never proof. A steady channel on a short `maxEvents` window and a dead one look identical there (`rules/data-collection.md`).
 - Compare the value against the device's physical state to tell them apart.
 - A plausible physical explanation for a frozen value is not evidence. It is the hypothesis the check exists to test (`rules/self-reported-vs-measured.md`).
