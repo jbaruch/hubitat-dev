@@ -43,7 +43,7 @@ Iterate until green, then proceed to Step 5.
 
 Wire the green suite into the repo's CI so it runs on every change. **Install a JDK 11 in CI** — the toolchain pin selects a JDK, it does not provide one, and a runner without it fails with `No matching toolchains found`. Provision it explicitly (`actions/setup-java` with `java-version: 11`, kept alongside the JDK the Gradle runtime needs), or enable Gradle's toolchain auto-provisioning. Never drop the pin to match whatever JDK the runner ships — that is the JDK ceiling reasserting itself, and the suite will not run.
 
-Proceed immediately to Step 6.
+If the code under test includes a behavior listed in `rules/platform-bound-validation.md`, proceed immediately to Step 6. For a deterministic-only change, state that no live procedure applies and finish here.
 
 ## Step 6 — Validate on a Live Hub
 
