@@ -1,5 +1,9 @@
 # Changelog
 
+### Added
+
+- **Behavior-scoped authority for Hubitat's platform-bound testing boundary** (`rules/platform-bound-validation.md`, `skills/test/SKILL.md`, `README.md`). The shared rule names the exempt artifact classes as scheduler execution, lifecycle dispatch, live event delivery, physical device interaction, sandbox compilation, and Hubitat-only API execution. Coverage attaches to the smallest runtime invocation layer rather than a source filename, so new or renamed apps and drivers enter the same contract without maintaining an allowlist. Deterministic decisions remain mandatory CI work, including parsing, state transitions, cutoff arithmetic, eligibility, and classification. Each consuming repository keeps its live-hub procedures in `docs/manual-validation.md`, names them by stable behavior and observable outcome, and links the applicable procedure from the pull request. This supplies `testing-standards`' authority-of-record precondition without making a shared plugin enumerate today's application filenames.
+
 ## 0.1.81 — 2026-08-31
 
 ### Changed
