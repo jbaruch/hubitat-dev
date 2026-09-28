@@ -19,7 +19,7 @@ then: 1 * api.sendEvent([name: "switch", value: "on"])
 
 ## Step 1 — Separate logic from platform I/O
 
-Identify the pure logic worth testing — value conversions, `parse()` decoding, state transitions, option handling — versus the thin calls into the platform. The logic is testable; the platform calls get mocked on the executor. Attach any exemption to a runtime behavior, never to the containing file. If the driver is all I/O with no branching logic, say so, invoke `Skill(skill: "debug")`, and finish here. Proceed to Step 2.
+Identify the pure logic worth testing — value conversions, `parse()` decoding, state transitions, option handling — versus the thin calls into the platform. The logic is testable; the platform calls get mocked on the executor. Attach any exemption to a runtime behavior, never to the containing file. If the driver is all I/O with no branching logic, say so, invoke `Skill(skill: "debug")`, then proceed directly to Step 6. Every other case proceeds to Step 2.
 
 ## Step 2 — Set up the harness
 
@@ -45,8 +45,12 @@ Wire the green suite into the repo's CI so it runs on every change. **Install a 
 
 Proceed immediately to Step 6.
 
-## Step 6 — Document Live Validation
+## Step 6 — Validate on a Live Hub
 
-Document the off-hub-inexpressible runtime behavior in `docs/manual-validation.md` under a stable behavior name. Record what to deploy, what to trigger, what to observe, and what counts as a pass.
+- Document the off-hub-inexpressible runtime behavior in `docs/manual-validation.md` under a stable behavior name and user-visible outcome.
+- Record setup, deployment, trigger, observation surface, pass criteria, and any required cleanup.
+- Link the applicable procedure from the pull request test plan.
+- Execute the procedure on a live hub, including cleanup.
+- Record the observed result in the pull request test plan.
 
 State plainly what a green run does **not** prove. The harness models `state` as a plain in-memory `Map`; the real `state` round-trips through JSON between every execution. The suite is blind to non-JSON-serializable `state` values, to key-type changes across the round-trip, and to restore-only failures. A green suite is evidence about the code under test, never about the harness or the plumbing around it. Finish here.
