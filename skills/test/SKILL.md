@@ -19,7 +19,7 @@ then: 1 * api.sendEvent([name: "switch", value: "on"])
 
 ## Step 1 — Separate logic from platform I/O
 
-Identify the pure logic worth testing — value conversions, `parse()` decoding, state transitions, option handling — versus the thin calls into the platform. The logic is testable; the platform calls get mocked on the executor. Attach any exemption to a runtime behavior, never to the containing file. If the driver is all I/O with no branching logic, say so, invoke `Skill(skill: "debug")`, then proceed directly to Step 6. Every other case proceeds to Step 2.
+Identify the pure logic worth testing — value conversions, `parse()` decoding, state transitions, option handling — versus the thin calls into the platform. The logic is testable; the platform calls get mocked on the executor. Attach any exemption to a runtime behavior, never to the containing file. If the driver is all I/O with no branching logic, say so; still compile it and assert every mockable platform interaction in Steps 2–5. Every case proceeds to Step 2.
 
 ## Step 2 — Set up the harness
 
@@ -47,6 +47,7 @@ If the code under test includes a behavior listed in `rules/platform-bound-valid
 
 ## Step 6 — Validate on a Live Hub
 
+- Invoke `Skill(skill: "debug")` when live logging or event capture is needed to execute the applicable procedure.
 - Document the off-hub-inexpressible runtime behavior in `docs/manual-validation.md` under a stable behavior name and user-visible outcome.
 - Record setup, deployment, trigger, observation surface, pass criteria, and any required cleanup.
 - Link the applicable procedure from the pull request test plan.
