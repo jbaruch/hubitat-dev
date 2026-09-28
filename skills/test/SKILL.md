@@ -19,7 +19,7 @@ then: 1 * api.sendEvent([name: "switch", value: "on"])
 
 ## Step 1 — Separate logic from platform I/O
 
-Identify the pure logic worth testing — value conversions, `parse()` decoding, state transitions, option handling — versus the thin calls into the platform. The logic is testable; the platform calls get mocked on the executor. Attach any exemption to a runtime behavior, never to the containing file. If the driver is all I/O with no branching logic, say so — the honest path is then live `debug`. Proceed to Step 2.
+Identify the pure logic worth testing — value conversions, `parse()` decoding, state transitions, option handling — versus the thin calls into the platform. The logic is testable; the platform calls get mocked on the executor. Attach any exemption to a runtime behavior, never to the containing file. If the driver is all I/O with no branching logic, say so, invoke `Skill(skill: "debug")`, and finish here. Proceed to Step 2.
 
 ## Step 2 — Set up the harness
 
@@ -42,6 +42,10 @@ Iterate until green, then proceed to Step 5.
 ## Step 5 — Wire into CI
 
 Wire the green suite into the repo's CI so it runs on every change. **Install a JDK 11 in CI** — the toolchain pin selects a JDK, it does not provide one, and a runner without it fails with `No matching toolchains found`. Provision it explicitly (`actions/setup-java` with `java-version: 11`, kept alongside the JDK the Gradle runtime needs), or enable Gradle's toolchain auto-provisioning. Never drop the pin to match whatever JDK the runner ships — that is the JDK ceiling reasserting itself, and the suite will not run.
+
+Proceed immediately to Step 6.
+
+## Step 6 — Document Live Validation
 
 Document the off-hub-inexpressible runtime behavior in `docs/manual-validation.md` under a stable behavior name. Record what to deploy, what to trigger, what to observe, and what counts as a pass.
 

@@ -16,7 +16,7 @@ description: Behavior-scoped authority for testing Hubitat runtime paths that CI
 - Scheduler registration, persistence, cancellation, restoration, and callback dispatch through Hubitat scheduling APIs.
 - App and driver lifecycle dispatch by the hub, including install, update, startup, and state restoration across executions.
 - Live device subscription, event delivery, platform-generated event metadata, and physical device or radio interaction.
-- Hubitat-only API execution, sandbox compilation, and platform integrations unavailable on a CI runner.
+- Hubitat-only API execution and platform integrations unavailable on a CI runner.
 - Only the smallest invocation layer for a listed behavior is exempt. Deterministic decisions in the same source artifact remain subject to CI tests.
 
 ## Required CI Coverage
@@ -31,5 +31,6 @@ description: Behavior-scoped authority for testing Hubitat runtime paths that CI
 - Keep the validation index at `docs/manual-validation.md` in each consuming repository.
 - Name each procedure by stable runtime behavior and user-visible outcome, not by source filename.
 - Record setup, trigger, observation surface, pass criteria, and any required cleanup.
-- Link the applicable procedure from the pull request test plan and record the observed result.
+- Link the applicable procedure from the pull request test plan.
+- Record the observed result in the pull request test plan.
 - A code-path move needs no documentation change when the behavior and observable contract stay unchanged.
