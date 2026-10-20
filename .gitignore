@@ -11,16 +11,10 @@
 # Local, machine-specific agent settings
 .claude/settings.local.json
 
-# Install-time agent skill links — symlinks into the gitignored vendored tree; they
-# would dangle on a fresh clone, so they are never committed. The small static MCP
-# config files (.mcp.json, .codex/config.toml, .gemini/settings.json, .*/mcp.json) ARE
-# tracked — tessl packages them and they carry no machine-specific state.
-.agents/
 .claude/skills/
 .codex/skills/
 .gemini/skills/
 .vscode/skills/
-.github/skills/
 
 # Python
 __pycache__/
